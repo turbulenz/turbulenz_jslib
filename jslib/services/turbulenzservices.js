@@ -517,6 +517,44 @@ TurbulenzServices = {
         }
     },
 
+    sendCustomMetricEvent: function turbulenzServicesSendCustomMetricEvent(eventKey,
+                                                                           eventValue,
+                                                                           requestHandler,
+                                                                           gameSession,
+                                                                           errorCallbackFn)
+    {
+        if (!errorCallbackFn)
+        {
+            errorCallbackFn = TurbulenzServices.defaultErrorCallback;
+        }
+
+        if (!TurbulenzServices.available())
+        {
+            if (errorCallbackFn)
+            {
+                errorCallbackFn("TurbulenzServices.sendCustomMetricEvent failed: Service not available",
+                                0);
+            }
+        }
+        else
+        {
+            this.getService('customMetrics').request({
+                url: '/api/v1/custommetrics/add-event/' + gameSession.gameSlug,
+                method: 'POST',
+                data: {'key': eventKey, 'value': eventValue, 'gameSessionId': gameSession.gameSessionId},
+                callback: function sendCustomMetricEventAjaxErrorCheck(jsonResponse, status)
+                {
+                    if (status !== 200 && errorCallbackFn)
+                    {
+                        errorCallbackFn("TurbulenzServices.sendCustomMetricEvent error with HTTP status " + status + ": " + jsonResponse.msg, status);
+                    }
+                },
+                requestHandler: requestHandler,
+                encrypt: true
+            });
+        }
+    },
+
     services: {},
     waitingServices: {},
     pollingServiceStatus: false,
