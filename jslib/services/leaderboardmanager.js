@@ -13,6 +13,13 @@ LeaderboardManager.prototype =
 {
     version : 1,
 
+    getTypes: {
+        top: 'top',
+        near: 'near',
+        above: 'above',
+        below: 'below'
+    },
+
     getOverview: function leaderboardManagerGetOverviewFn(spec, callbackFn, errorCallbackFn)
     {
         var errorCallback = errorCallbackFn || this.errorCallbackFn;
@@ -60,31 +67,16 @@ LeaderboardManager.prototype =
         });
     },
 
-    get: function leaderboardManagerGetFn(key, spec, callbackFn, errorCallbackFn)
+    getRaw: function getRawFn(key, spec, callbackFn, errorCallbackFn)
     {
-        var errorCallback = errorCallbackFn || this.errorCallbackFn;
-        if (!this.meta)
-        {
-            errorCallback("The leaderboard manager failed to initialize properly.");
-            return;
-        }
-
-        var meta = this.meta[key];
-        if (!meta)
-        {
-            errorCallback("No leaderboard with the name '" + key + "' exists.");
-            return;
-        }
-
         var that = this;
-        var dataSpec = {};
-
+        var errorCallback = errorCallbackFn || this.errorCallbackFn;
         function getCallbackFn(jsonResponse, status)
         {
             if (status === 200)
             {
                 var data = jsonResponse.data;
-                callbackFn(key, LeaderboardResult.create(that, key, dataSpec, data));
+                callbackFn(data);
             }
             else
             {
@@ -95,15 +87,43 @@ LeaderboardManager.prototype =
             }
         }
 
+        this.service.request({
+            url: '/api/v1/leaderboards/scores/read/' + that.gameSession.gameSlug + '/' + key,
+            method: 'GET',
+            data: spec,
+            callback: getCallbackFn,
+            requestHandler: this.requestHandler
+        });
+        return true;
+    },
+
+    get: function leaderboardManagerGetFn(key, spec, callbackFn, errorCallbackFn)
+    {
+        var errorCallback = errorCallbackFn || this.errorCallbackFn;
+        if (!this.meta)
+        {
+            errorCallback("The leaderboard manager failed to initialize properly.");
+            return false;
+        }
+
+        var meta = this.meta[key];
+        if (!meta)
+        {
+            errorCallback("No leaderboard with the name '" + key + "' exists.");
+            return false;
+        }
+
+        var dataSpec = {};
+
         // backwards compatibility
         if (spec.numNear)
         {
-            dataSpec.type = 'near';
+            dataSpec.type = this.getTypes.near;
             dataSpec.size = spec.numNear * 2 + 1;
         }
         if (spec.numTop)
         {
-            dataSpec.type = 'top';
+            dataSpec.type = this.getTypes.top;
             dataSpec.size = spec.numTop;
         }
 
@@ -117,6 +137,7 @@ LeaderboardManager.prototype =
             // default value
             dataSpec.size = 9;
         }
+
         if (spec.friendsOnly)
         {
             dataSpec.friendsonly = spec.friendsOnly && 1;
@@ -135,13 +156,13 @@ LeaderboardManager.prototype =
             dataSpec.time = spec.time;
         }
 
-        this.service.request({
-            url: '/api/v1/leaderboards/scores/read/' + that.gameSession.gameSlug + '/' + key,
-            method: 'GET',
-            data : dataSpec,
-            callback: getCallbackFn,
-            requestHandler: this.requestHandler
-        });
+        var that = this;
+        function callbackWrapper(data)
+        {
+            callbackFn(key, LeaderboardResult.create(that, key, dataSpec, data));
+        }
+
+        return this.getRaw(key, dataSpec, callbackWrapper, errorCallbackFn);
     },
 
     set: function leaderboardManagerSetFn(key, score, callbackFn, errorCallbackFn)
@@ -287,62 +308,291 @@ LeaderboardResult.prototype =
 {
     version : 1,
 
-    getOffsetPageAbove: function getPageAboveFn(spec, offsetIndex, callbackFn, errorCallbackFn)
+    requestSize: 64,
+
+    computeOverlap: function computeOverlapFn()
     {
-        if (this.top)
+        // calculates the number of scores that the leaderboard results have overlapped
+        // this only happens at the end of the leaderboards
+        var results = this.results;
+        var overlap = 0;
+        if (results.top || results.bottom)
         {
-            // just repeat the data if we are already at the top
-            var that = this;
-            TurbulenzEngine.setTimeout(function ()
+            var ranking = results.ranking;
+            var rankingLength = ranking.length;
+            var sortBy = this.leaderboardManager.meta[this.key].sortBy;
+            var aboveType = this.leaderboardManager.getTypes.above;
+            var specScore = results.spec.score;
+            var specTime = results.spec.time;
+
+            var i;
+            for (i = 0; i < rankingLength; i += 1)
+            {
+                var rank = ranking[i];
+                // find the overlapping point where the score was requested
+                if (rank.score * sortBy < specScore * sortBy ||
+                    (rank.score === specScore && rank.time >= specTime))
                 {
-                    callbackFn(that.key, that);
-                }, 0);
+                    // get the distance from end of the board to score requested
+                    // add 1 becuase the above/below requests are exclusive of the requested score
+                    if (results.spec.type === aboveType)
+                    {
+                        overlap = rankingLength - i;
+                    }
+                    else
+                    {
+                        overlap = i + 1;
+                    }
+                    break;
+                }
+            }
+        }
+        results.overlap = overlap;
+    },
+
+    getPageOffset: function getPageBelowOffsetFn(type, offsetIndex, callbackFn, errorCallbackFn)
+    {
+        var offsetScore = this.results.ranking[offsetIndex];
+        if (!offsetScore)
+        {
+            setTimeout(callbackFn, 0);
+            return false;
+        }
+
+        var newSpec = {
+            type: type,
+            score: offsetScore.score,
+            time: offsetScore.time,
+            size: this.requestSize,
+            // remeber to map to backend lowercase format!
+            friendsonly: this.spec.friendsOnly && 1 || 0
+        };
+
+        var that = this;
+        function parseResults(data)
+        {
+            that.results = that.parseResults(that.key, newSpec, data);
+            that.computeOverlap();
+            callbackFn();
+        }
+
+        this.leaderboardManager.getRaw(this.key, newSpec, parseResults, errorCallbackFn);
+        return true;
+    },
+
+    viewOperationBegin: function viewOperationBeginFn()
+    {
+        // lock the view object so not other page/scroll calls can be made
+        if (this.viewLock)
+        {
+            return false;
+        }
+        this.viewLock = true;
+        return true;
+    },
+
+    viewOperationEnd: function viewOperationEndFn(callbackFn)
+    {
+        // unlock the view object so other page/scroll calls can be made
+        this.viewLock = false;
+
+        var that = this;
+        function callbackWrapperFn()
+        {
+            callbackFn(that.key, that);
+        }
+
+        if (callbackFn)
+        {
+            setTimeout(callbackWrapperFn, 0);
+        }
+    },
+
+    wrapViewOperationError: function getViewOperationErrorCallbackFn(errorCallbackFn)
+    {
+        var that = this;
+        return function errorWrapper(errorMsg, httpStatus, calledByFn, calledByParams)
+        {
+            // unlock the view object so other page/scroll calls can be made
+            that.viewLock = false;
+            errorCallbackFn(errorMsg, httpStatus, calledByFn, calledByParams);
+        };
+    },
+
+    moveUp: function moveUpFn(offset, callbackFn, errorCallbackFn)
+    {
+        if (!this.viewOperationBegin())
+        {
+            return false;
+        }
+
+        var that = this;
+        function newResult()
+        {
+            var results = that.results;
+            that.viewTop = Math.max(0, results.ranking.length - that.viewSize - results.overlap);
+            that.invalidView = true;
+            that.viewOperationEnd(callbackFn);
+        }
+
+        if (this.viewTop - offset < 0)
+        {
+            if (this.results.top)
+            {
+                this.viewTop = 0;
+                this.viewOperationEnd(callbackFn);
+            }
+            else
+            {
+                this.getPageOffset(this.leaderboardManager.getTypes.above,
+                                   this.viewTop + this.viewSize - offset,
+                                   newResult,
+                                   this.wrapViewOperationError(errorCallbackFn));
+            }
             return;
         }
 
-        var offsetScore = this.ranking[offsetIndex];
-        var newSpec = {
-            type: 'above',
-            score: offsetScore.score,
-            time: offsetScore.time,
-            size: (spec && spec.size) || this.spec.size,
-            friendsonly: this.spec.friendsOnly
-        };
-        this.leaderboardManager.get(this.key, newSpec, callbackFn, errorCallbackFn);
+        this.viewTop -= offset;
+        this.invalidView = true;
+        this.viewOperationEnd(callbackFn);
     },
 
-    getOffsetPageBelow: function getPageBelowFn(spec, offsetIndex, callbackFn, errorCallbackFn)
+    moveDown: function moveDownFn(offset, callbackFn, errorCallbackFn)
     {
-        if (this.bottom)
+        if (!this.viewOperationBegin())
         {
-            // just repeat the data if we are already at the top
-            var that = this;
-            TurbulenzEngine.setTimeout(function ()
-                {
-                    callbackFn(that.key, that);
-                }, 0);
-            return;
+            return false;
         }
 
-        var offsetScore = this.ranking[offsetIndex];
-        var newSpec = {
-            type: 'below',
-            score: offsetScore.score,
-            time: offsetScore.time,
-            size: (spec && spec.size) || this.spec.size,
-            friendsonly: this.spec.friendsOnly
+        var that = this;
+        function newResult()
+        {
+            var results = that.results;
+            that.viewTop = Math.min(results.overlap, Math.max(results.ranking.length - that.viewSize, 0));
+            that.invalidView = true;
+            that.viewOperationEnd(callbackFn);
+        }
+
+        var results = this.results;
+        if (this.viewTop + this.viewSize + offset > results.ranking.length)
+        {
+            if (results.bottom)
+            {
+                var orginalViewTop = this.viewTop;
+                this.viewTop = Math.max(results.ranking.length - this.viewSize, 0);
+                this.invalidView = this.invalidView || (this.viewTop !== orginalViewTop);
+                this.viewOperationEnd(callbackFn);
+            }
+            else
+            {
+                this.getPageOffset(this.leaderboardManager.getTypes.below,
+                                   this.viewTop + offset - 1,
+                                   newResult,
+                                   this.wrapViewOperationError(errorCallbackFn));
+            }
+            return true;
+        }
+
+        this.viewTop += offset;
+        this.invalidView = true;
+        this.viewOperationEnd(callbackFn);
+        return true;
+    },
+
+    pageUp: function pageUpFn(callbackFn, errorCallbackFn)
+    {
+        return this.moveUp(this.viewSize, callbackFn, errorCallbackFn);
+    },
+
+    pageDown: function pageDownFn(callbackFn, errorCallbackFn)
+    {
+        return this.moveDown(this.viewSize, callbackFn, errorCallbackFn);
+    },
+
+    scrollUp: function scrollUpFn(callbackFn, errorCallbackFn)
+    {
+        return this.moveUp(1, callbackFn, errorCallbackFn);
+    },
+
+    scrollDown: function scrollDownFn(callbackFn, errorCallbackFn)
+    {
+        return this.moveDown(1, callbackFn, errorCallbackFn);
+    },
+
+    getView: function getViewFn()
+    {
+        if (this.invalidView)
+        {
+            var viewTop = this.viewTop;
+            var viewSize = this.viewSize;
+            var results = this.results;
+            var ranking = results.ranking;
+            var rankingLength = ranking.length;
+
+            var playerIndex = null;
+            if (results.playerIndex !== undefined)
+            {
+                playerIndex = results.playerIndex - viewTop;
+                if (playerIndex < 0 || playerIndex >= viewSize)
+                {
+                    playerIndex = null;
+                }
+            }
+
+            this.view = {
+                ranking: ranking.slice(viewTop, Math.min(viewTop + viewSize, rankingLength)),
+                top: results.top && (viewTop === 0),
+                bottom: results.bottom && (viewTop >= rankingLength - viewSize),
+                player: results.player,
+                playerIndex: playerIndex
+            };
+        }
+        return this.view;
+    },
+
+    parseResults: function parseResultsFn(key, spec, data)
+    {
+        var results = {
+            spec: spec,
+            overlap: null
         };
-        this.leaderboardManager.get(this.key, newSpec, callbackFn, errorCallbackFn);
-    },
 
-    getPageAbove: function getPageAboveFn(callbackFn, errorCallbackFn)
-    {
-        this.getOffsetPageAbove(null, 0, callbackFn, errorCallbackFn);
-    },
+        var player = results.player = data.player;
+        var ranking = results.ranking = data.ranking;
 
-    getPageBelow: function getPageBelowFn(callbackFn, errorCallbackFn)
-    {
-        this.getOffsetPageBelow(null, this.ranking.length - 1, callbackFn, errorCallbackFn);
+        var entities = data.entities;
+        var playerUsername;
+
+        if (player)
+        {
+            this.leaderboardManager.meta[key].bestScore = player.score;
+            if (entities)
+            {
+                player.user = entities[player.user];
+            }
+            playerUsername = player.user.username;
+        }
+
+        var rankingLength = ranking.length;
+        var i;
+        for (i = 0; i < rankingLength; i += 1)
+        {
+            var rank = ranking[i];
+            if (entities)
+            {
+                rank.user = entities[rank.user];
+            }
+
+            if (rank.user.username === playerUsername)
+            {
+                results.playerIndex = i;
+            }
+        }
+
+        results.top = data.top;
+        results.bottom = data.bottom;
+
+        return results;
     }
 };
 
@@ -351,45 +601,30 @@ LeaderboardResult.create = function LeaderboardResultCreate(leaderboardManager, 
     var leaderboardResult = new LeaderboardResult();
 
     leaderboardResult.leaderboardManager = leaderboardManager;
+
     leaderboardResult.key = key;
+
+    // patch up friendsOnly for frontend
+    spec.friendsOnly = spec.friendsonly;
+    delete spec.friendsonly;
     leaderboardResult.spec = spec;
 
-    var player = leaderboardResult.player = data.player;
-    var ranking = leaderboardResult.ranking = data.ranking;
+    var results = leaderboardResult.results = leaderboardResult.parseResults(key, spec, data);
 
-    var entities = data.entities;
-    var player_username;
-
-    if (player)
-    {
-        leaderboardManager.meta[key].bestScore = player.score;
-        if (entities)
-        {
-            player.user = entities[player.user];
-        }
-        player_username = player.user.username;
-    }
-
-    var rankingLength = ranking.length;
-    var i;
-    for (i = 0; i < rankingLength; i += 1)
-    {
-        var rank = ranking[i];
-        if (entities)
-        {
-            rank.user = entities[rank.user];
-        }
-
-        if (rank.user.username === player_username)
-        {
-            leaderboardResult.playerIndex = i;
-            rank.me = true;
-        }
-    }
-
-    var bestScore = ranking[0];
-    leaderboardResult.top = !bestScore || bestScore.rank === 1;
-    leaderboardResult.bottom = data.bottom;
+    leaderboardResult.viewTop = 0;
+    leaderboardResult.viewSize = spec.size;
+    // lock to stop multiple synchronous view operations
+    // as that will have unknown consequences
+    leaderboardResult.viewLock = false;
+    // for lazy evaluation
+    leaderboardResult.view = {
+        player: results.player,
+        ranking: results.ranking,
+        playerIndex: results.playerIndex,
+        top: results.top,
+        bottom: results.bottom
+    };
+    leaderboardResult.invalidView = false;
 
     return leaderboardResult;
 };
