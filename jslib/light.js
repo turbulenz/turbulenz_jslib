@@ -1,4 +1,5 @@
 // Copyright (c) 2010-2011 Turbulenz Limited
+/*global TurbulenzEngine: false */
 
 //
 // Light
@@ -130,6 +131,11 @@ Light.create = function lightCreateFn(params)
     if (params.shadows || params.dynamicshadows)
     {
         light.shadows = true;
+
+        if (params.dynamicshadows)
+        {
+            light.dynamicshadows = true;
+        }
     }
 
     if (params.disabled)

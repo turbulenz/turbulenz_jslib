@@ -2,6 +2,10 @@
 
 "use strict";
 
+/*global Reference: false*/
+/*global Observer: false*/
+/*global TurbulenzEngine: false*/
+
 function TextureInstance() {}
 TextureInstance.prototype =
 {
@@ -98,7 +102,7 @@ TextureManager.prototype =
 
   @return {TextureManager} object, null if failed
 */
-TextureManager.create = function textureManagerCreateFn(gd, dt, errorCallback, log)
+TextureManager.create = function textureManagerCreateFn(gd, rh, dt, errorCallback, log)
 {
     var tm = new TextureManager();
 
@@ -138,10 +142,12 @@ TextureManager.create = function textureManagerCreateFn(gd, dt, errorCallback, l
 
     var textureInstances = {};
     var loadingTexture = {};
-    var delayedTexture = {};
+    var loadedTextureObservers = {};
+    var delayedTextures = {};
     var numLoadingTextures = 0;
     var archivesLoaded = {};
     var loadingArchives = {};
+    var loadedArchiveObservers = {};
     var numLoadingArchives = 0;
     var internalTexture = {};
     var pathRemapping = null;
@@ -227,17 +233,19 @@ TextureManager.create = function textureManagerCreateFn(gd, dt, errorCallback, l
 
       @param {string} path Path to the image file
       @param {boolean} nomipmaps True to disable mipmaps
+      @param {function} onTextureLoaded function to call once the texture is loaded
 
       @return {Texture} object, returns the default texture if the file at given path is not yet loaded
     */
-    function loadTextureFn(path, nomipmaps, reload)
+
+    function loadTextureFn(path, nomipmaps, onTextureLoaded)
     {
         if (path === undefined)
         {
             errorCallback("Invalid texture path passed to TextureManager.Load");
         }
         var textureInstance = textureInstances[path];
-        if (reload || !textureInstance || textureInstance.texture === defaultTexture)
+        if (!textureInstance || textureInstance.texture === defaultTexture)
         {
             if (!textureInstance)
             {
@@ -248,41 +256,86 @@ TextureManager.create = function textureManagerCreateFn(gd, dt, errorCallback, l
             {
                 if (0 === numLoadingArchives)
                 {
+                    loadingTexture[path] = true;
+                    numLoadingTextures += 1;
+
                     var mipmaps = true;
                     if (nomipmaps)
                     {
                         mipmaps = false;
                     }
-                    loadingTexture[path] = true;
-                    numLoadingTextures += 1;
 
-
-                    if (!gd.createTexture({
-                        src     : ((pathRemapping && pathRemapping[path]) || (pathPrefix + path)),
-                        mipmaps : mipmaps,
-                        onload  : function (texture)
-                        {
-                            if (texture)
-                            {
-                                addTextureFn(path, texture, false);
-                            }
-                            //Missing textures are left with the previous, usually default, texture.
-
-                            delete loadingTexture[path];
-                            numLoadingTextures -= 1;
-                        }
-                    }))
+                    var loadedObserver = Observer.create();
+                    loadedTextureObservers[path] = loadedObserver;
+                    if (onTextureLoaded)
                     {
-                        errorCallback("Texture '" + path + "' not created.");
+                        loadedObserver.subscribe(onTextureLoaded);
                     }
+
+                    var textureLoaded = function textureLoadedFn(texture, status)
+                    {
+                        if (status === 200 && texture)
+                        {
+                            addTextureFn(path, texture, false);
+                        }
+
+                        loadedObserver.notify(texture);
+                        delete loadedTextureObservers[path];
+
+                        //Missing textures are left with the previous, usually default, texture.
+                        delete loadingTexture[path];
+                        numLoadingTextures -= 1;
+                    };
+
+                    var textureRequest = function textureRequestFn(url, onload, callContext)
+                    {
+                        var texture = gd.createTexture({
+                            src     : url,
+                            mipmaps : mipmaps,
+                            onload  : onload
+                        });
+                        if (!texture)
+                        {
+                            errorCallback("Texture '" + url + "' not created.");
+                        }
+                    };
+
+                    rh.request({
+                        src: ((pathRemapping && pathRemapping[path]) || (pathPrefix + path)),
+                        requestFn: textureRequest,
+                        onload: textureLoaded
+                    });
                 }
                 else
                 {
-                    delayedTexture[path] = nomipmaps;
+                    delayedTextures[path] = {
+                        nomipmaps: nomipmaps,
+                        onload: onTextureLoaded
+                    };
+
+                    return getTextureFn(path);
                 }
             }
+            else if (onTextureLoaded)
+            {
+                loadedTextureObservers[path].subscribe(onTextureLoaded);
+            }
+
+            return getTextureFn(path);
         }
-        return getTextureFn(path);
+        else
+        {
+            textureInstance = getTextureFn(path);
+            if (onTextureLoaded)
+            {
+                // the callback should always be called asynchronously
+                TurbulenzEngine.setTimeout(function textureAlreadyLoadedFn()
+                    {
+                        onTextureLoaded(textureInstance);
+                    }, 0);
+            }
+            return textureInstance;
+        }
     }
 
     /**
@@ -333,31 +386,6 @@ TextureManager.create = function textureManagerCreateFn(gd, dt, errorCallback, l
     }
 
     /**
-      Reloads a texture
-
-      @memberOf TextureManager.prototype
-      @public
-      @function
-      @name reload
-
-      @param {string} path Path or name of the texture
-    */
-    function reloadTextureFn(path)
-    {
-        if (!loadingTexture[path] && !internalTexture[path])
-        {
-            var mipmaps = true;
-            var textureInstance = textureInstances[path];
-
-            if (textureInstance)
-            {
-                mipmaps = textureInstance.texture.mipmaps;
-            }
-            loadTextureFn(path, !mipmaps, true);
-        }
-    }
-
-    /**
       Loads a textures archive
 
       @memberOf TextureManager.prototype
@@ -368,9 +396,10 @@ TextureManager.create = function textureManagerCreateFn(gd, dt, errorCallback, l
       @param {string} path Path to the archive file
       @param {boolean} nomipmaps True to disable mipmaps
     */
-    function loadArchiveFn(path, nomipmaps)
+    function loadArchiveFn(path, nomipmaps, onTextureLoaded, onArchiveLoaded)
     {
-        if (!(path in archivesLoaded))
+        var archive = archivesLoaded[path];
+        if (!archive)
         {
             if (!(path in loadingArchives))
             {
@@ -381,49 +410,137 @@ TextureManager.create = function textureManagerCreateFn(gd, dt, errorCallback, l
                 }
                 loadingArchives[path] = { textures: {} };
                 numLoadingArchives += 1;
-                if (!gd.loadTexturesArchive({
-                    src     : ((pathRemapping && pathRemapping[path]) || (pathPrefix + path)),
-                    mipmaps : mipmaps,
-                    ontextureload  : function (texture)
+
+                var observer = Observer.create();
+                loadedArchiveObservers[path] = observer;
+                if (onArchiveLoaded)
+                {
+                    observer.subscribe(onArchiveLoaded);
+                }
+
+                var textureArchiveLoaded = function textureArchiveLoadedFn(success, status)
+                {
+                    var loadedArchive;
+                    if (status === 200 && success)
+                    {
+                        loadedArchive = { textures: loadingArchives[path].textures };
+                        archivesLoaded[path] = loadedArchive;
+                    }
+
+                    observer.notify(loadedArchive);
+                    delete loadedArchiveObservers[path];
+
+                    delete loadingArchives[path];
+                    numLoadingArchives -= 1;
+                    if (0 === numLoadingArchives)
+                    {
+                        for (var name in delayedTextures)
+                        {
+                            if (delayedTextures.hasOwnProperty(name))
+                            {
+                                var delayedTexture = delayedTextures[name];
+                                loadTextureFn(name,
+                                              delayedTexture.nomipmaps,
+                                              delayedTexture.onload);
+                            }
+                        }
+                        delayedTextures = {};
+                    }
+                };
+
+                var requestTextureArchive = function requestTextureArchiveFn(url, onload)
+                {
+                    var ontextureload = function ontextureloadFn(texture)
                     {
                         var name = texture.name;
                         if (!(name in textureInstances) || textureInstances[name].texture === defaultTexture)
                         {
                             addTextureFn(name, texture, false);
-                            loadingArchives[path].textures[name] = true;
+                            loadingArchives[path].textures[name] = texture;
                         }
-                        delete delayedTexture[name];
+
+                        if (onTextureLoaded)
+                        {
+                            onTextureLoaded(texture);
+                        }
+
+                        delete delayedTextures[name];
                         if (path in loadingTexture)
                         {
                             delete loadingTexture[path];
                             numLoadingTextures -= 1;
                         }
-                    },
-                    onload: function (success)
+                    };
+
+                    if (!gd.loadTexturesArchive({
+                        src: url,
+                        mipmaps: mipmaps,
+                        ontextureload: ontextureload,
+                        onload: onload
+                    }))
                     {
-                        if (success)
-                        {
-                            archivesLoaded[path] = { textures: loadingArchives[path].textures };
-                        }
-                        delete loadingArchives[path];
-                        numLoadingArchives -= 1;
-                        if (0 === numLoadingArchives)
-                        {
-                            for (var name in delayedTexture)
-                            {
-                                if (delayedTexture.hasOwnProperty(name))
-                                {
-                                    var delayedNoMipmaps = delayedTexture[name];
-                                    loadTextureFn(name, delayedNoMipmaps);
-                                }
-                            }
-                            delayedTexture = {};
-                        }
+                        errorCallback("Archive '" + path + "' not loaded.");
                     }
-                }))
+                };
+
+                rh.request({
+                    src: ((pathRemapping && pathRemapping[path]) || (pathPrefix + path)),
+                    requestFn: requestTextureArchive,
+                    onload: textureArchiveLoaded
+                });
+            }
+            else if (onTextureLoaded)
+            {
+                loadedArchiveObservers[path].subscribe(function textureArchiveLoadedFn()
+                    {
+                        var archive = archivesLoaded[path];
+                        var texturesInArchive = archive.textures;
+                        for (var t in texturesInArchive)
+                        {
+                            if (texturesInArchive.hasOwnProperty(t))
+                            {
+                                // the texture has already been loaded so we call onload manaually
+                                onTextureLoaded(texturesInArchive[t]);
+                            }
+                        }
+                        if (onArchiveLoaded)
+                        {
+                            onArchiveLoaded(archive);
+                        }
+                    });
+            }
+        }
+        else
+        {
+            if (onTextureLoaded)
+            {
+                var texturesInArchive = archive.textures;
+
+                var textureAlreadyLoadedWrapper = function textureAlreadyLoadedWrapper(texture)
                 {
-                    errorCallback("Archive '" + path + "' not loaded.");
+                    return function textureAlreadyLoadedFn()
+                    {
+                        onTextureLoaded(texture);
+                    };
+                };
+
+                for (var t in texturesInArchive)
+                {
+                    if (texturesInArchive.hasOwnProperty(t))
+                    {
+                        // the callback should always be called asynchronously
+                        TurbulenzEngine.setTimeout(textureAlreadyLoadedWrapper(texturesInArchive[t]), 0);
+                    }
                 }
+            }
+
+            if (onArchiveLoaded)
+            {
+                // the callback should always be called asynchronously
+                TurbulenzEngine.setTimeout(function textureArchiveAlreadyLoadedFn()
+                    {
+                        onArchiveLoaded(archive);
+                    }, 0);
             }
         }
     }
@@ -527,12 +644,6 @@ TextureManager.create = function textureManagerCreateFn(gd, dt, errorCallback, l
             log.innerHTML += "TextureManager.remove:&nbsp;'" + path + "'";
             removeTextureFn(path);
         };
-
-        tm.reload = function reloadTextureLogFn(path)
-        {
-            log.innerHTML += "TextureManager.reload:&nbsp;'" + path + "'";
-            reloadTextureFn(path);
-        };
     }
     else
     {
@@ -545,27 +656,7 @@ TextureManager.create = function textureManagerCreateFn(gd, dt, errorCallback, l
         tm.get = getTextureFn;
         tm.getInstance = getTextureInstanceFn;
         tm.remove = removeTextureFn;
-        tm.reload = reloadTextureFn;
     }
-
-    /**
-      Reloads all textures
-
-      @memberOf TextureManager.prototype
-      @public
-      @function
-      @name reloadAll
-    */
-    tm.reloadAll = function reloadAllTexturesFn()
-    {
-        for (var t in textureInstances)
-        {
-            if (textureInstances.hasOwnProperty(t))
-            {
-                reloadTextureFn(t);
-            }
-        }
-    };
 
     /**
       Get object containing all loaded textures
@@ -611,7 +702,7 @@ TextureManager.create = function textureManagerCreateFn(gd, dt, errorCallback, l
     */
     tm.isTextureLoaded = function isTextureLoadedFn(path)
     {
-        return (!(path in loadingTexture) && !(path in delayedTexture));
+        return (!(path in loadingTexture) && !(path in delayedTextures));
     };
 
     /**

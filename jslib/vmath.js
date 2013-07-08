@@ -1,8 +1,10 @@
 // Copyright (c) 2009-2011 Turbulenz Limited
+/*global Float32Array: false*/
 
 //
 // Vector math library
 //
+var VMathArrayConstructor = [].constructor;
 
 var VMath =
 {
@@ -46,9 +48,9 @@ var VMath =
     // Vector3
     //
     v3BuildZero : function v3BuildZeroFn(dst) {
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(3);
         }
         dst[0] = 0.0;
         dst[1] = 0.0;
@@ -57,9 +59,9 @@ var VMath =
     },
 
     v3BuildOne  : function v3BuildOneFn(dst) {
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(3);
         }
         dst[0] = 1.0;
         dst[1] = 1.0;
@@ -68,9 +70,9 @@ var VMath =
     },
 
     v3BuildXAxis : function v3BuildXAxisFn(dst) {
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(3);
         }
         dst[0] = 1.0;
         dst[1] = 0.0;
@@ -79,9 +81,9 @@ var VMath =
     },
 
     v3BuildYAxis : function v3BuildYAxisFn(dst) {
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(3);
         }
         dst[0] = 0.0;
         dst[1] = 1.0;
@@ -90,9 +92,9 @@ var VMath =
     },
 
     v3BuildZAxis : function v3BuildZAxisFn(dst) {
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(3);
         }
         dst[0] = 0.0;
         dst[1] = 0.0;
@@ -102,9 +104,9 @@ var VMath =
 
     v3Build : function v3Fn(a, b, c, dst)
     {
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(3);
         }
         dst[0] = a;
         dst[1] = b;
@@ -114,9 +116,9 @@ var VMath =
 
     v3Copy : function v3CopyFn(src, dst)
     {
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(3);
         }
         dst[0] = src[0];
         dst[1] = src[1];
@@ -131,14 +133,28 @@ var VMath =
         v[2] = a[2];
     },
 
-    v3Neg : function v3NegFn(a)
+    v3Neg : function v3NegFn(a, dst)
     {
-        return [-a[0], -a[1], -a[2]];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
+        dst[0] = -a[0];
+        dst[1] = -a[1];
+        dst[2] = -a[2];
+        return dst;
     },
 
-    v3Add : function v3AddFn(a, b)
+    v3Add : function v3AddFn(a, b, dst)
     {
-        return [(a[0] + b[0]), (a[1] + b[1]), (a[2] + b[2])];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
+        dst[0] = (a[0] + b[0]);
+        dst[1] = (a[1] + b[1]);
+        dst[2] = (a[2] + b[2]);
+        return dst;
     },
 
     v3Add3 : function v3Add3Fn(a, b, c)
@@ -155,14 +171,28 @@ var VMath =
                 (a[2] + b[2] + c[2] + d[2])];
     },
 
-    v3Sub : function v3SubFn(a, b)
+    v3Sub : function v3SubFn(a, b, dst)
     {
-        return [(a[0] - b[0]), (a[1] - b[1]), (a[2] - b[2])];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
+        dst[0] = (a[0] - b[0]);
+        dst[1] = (a[1] - b[1]);
+        dst[2] = (a[2] - b[2]);
+        return dst;
     },
 
-    v3Mul : function v3MulFn(a, b)
+    v3Mul : function v3MulFn(a, b, dst)
     {
-        return [(a[0] * b[0]), (a[1] * b[1]), (a[2] * b[2])];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
+        dst[0] = (a[0] * b[0]);
+        dst[1] = (a[1] * b[1]);
+        dst[2] = (a[2] * b[2]);
+        return dst;
     },
 
     v3MulAdd : function v3MulAddFn(a, b, c)
@@ -175,17 +205,22 @@ var VMath =
         return ((a[0] * b[0]) + (a[1] * b[1]) + (a[2] * b[2]));
     },
 
-    v3Cross : function v3CrossFn(a, b)
+    v3Cross : function v3CrossFn(a, b, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
         var a0 = a[0];
         var a1 = a[1];
         var a2 = a[2];
         var b0 = b[0];
         var b1 = b[1];
         var b2 = b[2];
-        return [(a1 * b2) - (a2 * b1),
-                (a2 * b0) - (a0 * b2),
-                (a0 * b1) - (a1 * b0)];
+        dst[0] = ((a1 * b2) - (a2 * b1));
+        dst[1] = ((a2 * b0) - (a0 * b2));
+        dst[2] = ((a0 * b1) - (a1 * b0));
+        return dst;
     },
 
     v3LengthSq : function v3LengthSqFn(a)
@@ -212,6 +247,11 @@ var VMath =
 
     v3Normalize : function v3NormalizeFn(a, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
+
         var a0 = a[0];
         var a1 = a[1];
         var a2 = a[2];
@@ -219,50 +259,56 @@ var VMath =
         if (lsq > 0.0)
         {
             var lr = 1.0 / Math.sqrt(lsq);
-            if (dst)
-            {
-                dst[0] = (a0 * lr);
-                dst[1] = (a1 * lr);
-                dst[2] = (a2 * lr);
-                return dst;
-            }
-            else
-            {
-                return [(a0 * lr), (a1 * lr), (a2 * lr)];
-            }
+            dst[0] = (a0 * lr);
+            dst[1] = (a1 * lr);
+            dst[2] = (a2 * lr);
         }
         else
         {
-            if (dst)
-            {
-                dst[0] = 0;
-                dst[1] = 0;
-                dst[2] = 0;
-                return dst;
-            }
-            else
-            {
-                return [0, 0, 0];
-            }
+            dst[0] = 0;
+            dst[1] = 0;
+            dst[2] = 0;
         }
+        return dst;
     },
 
-    v3Abs : function v3AbsFn(a)
+    v3Abs : function v3AbsFn(a, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
         var abs = Math.abs;
-        return [abs(a[0]), abs(a[1]), abs(a[2])];
+        dst[0] = abs(a[0]);
+        dst[1] = abs(a[1]);
+        dst[2] = abs(a[2]);
+        return dst;
     },
 
-    v3Max : function v3MaxFn(a, b)
+    v3Max : function v3MaxFn(a, b, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
         var max = Math.max;
-        return [max(a[0], b[0]), max(a[1], b[1]), max(a[2], b[2])];
+        dst[0] = max(a[0], b[0]);
+        dst[1] = max(a[1], b[1]);
+        dst[2] = max(a[2], b[2]);
+        return dst;
     },
 
-    v3Min : function v3MinFn(a, b)
+    v3Min : function v3MinFn(a, b, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
         var min = Math.min;
-        return [min(a[0], b[0]), min(a[1], b[1]), min(a[2], b[2])];
+        dst[0] = min(a[0], b[0]);
+        dst[1] = min(a[1], b[1]);
+        dst[2] = min(a[2], b[2]);
+        return dst;
     },
 
     v3Equal : function v3EqualFn(a, b)
@@ -362,16 +408,25 @@ var VMath =
         return [(a[0] - b), (a[1] - b), (a[2] - b)];
     },
 
-    v3ScalarMul : function v3ScalarMulFn(a, b)
+    v3ScalarMul : function v3ScalarMulFn(a, b, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
         if (b === 0)
         {
-            return [0, 0, 0];
+            dst[0] = 0;
+            dst[1] = 0;
+            dst[2] = 0;
         }
         else
         {
-            return [(a[0] * b), (a[1] * b), (a[2] * b)];
+            dst[0] = (a[0] * b);
+            dst[1] = (a[1] * b);
+            dst[2] = (a[2] * b);
         }
+        return dst;
     },
 
     // Vector3 'masks' with scalars
@@ -407,9 +462,9 @@ var VMath =
 
     v3Lerp : function v3LerpFn(a, b, t, dst)
     {
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(3);
         }
 
         dst[0] =  (a[0] + ((b[0] - a[0]) * t));
@@ -422,19 +477,35 @@ var VMath =
     //
     // Vector4
     //
-    v4BuildZero : function v4BuildZeroFn() {
-        return [0.0, 0.0, 0.0, 0.0];
+    v4BuildZero : function v4BuildZeroFn(dst) {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(4);
+        }
+        dst[0] = 0.0;
+        dst[1] = 0.0;
+        dst[2] = 0.0;
+        dst[3] = 0.0;
+        return dst;
     },
 
-    v4BuildOne  : function v4BuildOneFn() {
-        return [1.0, 1.0, 1.0, 1.0];
+    v4BuildOne  : function v4BuildOneFn(dst) {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(4);
+        }
+        dst[0] = 1.0;
+        dst[1] = 1.0;
+        dst[2] = 1.0;
+        dst[3] = 1.0;
+        return dst;
     },
 
     v4Build : function v4BuildFn(a, b, c, d, dst)
     {
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(4);
         }
         dst[0] = a;
         dst[1] = b;
@@ -445,9 +516,9 @@ var VMath =
 
     v4Copy : function v4CopyFn(src, dst)
     {
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(4);
         }
         dst[0] = src[0];
         dst[1] = src[1];
@@ -689,15 +760,25 @@ var VMath =
         return [(a[0] - b), (a[1] - b), (a[2] - b), (a[3] - b)];
     },
 
-    v4ScalarMul : function v4ScalarMulFn(a, b)
+    v4ScalarMul : function v4ScalarMulFn(a, b, dst)
     {
         if (b === 0)
         {
-            return [0, 0, 0, 0];
+            return VMath.v4BuildZero(dst);
         }
         else
         {
-            return [(a[0] * b), (a[1] * b), (a[2] * b), (a[3] * b)];
+            if (dst === undefined)
+            {
+                dst = new VMathArrayConstructor(4);
+            }
+
+            dst[0] = (a[0] * b);
+            dst[1] = (a[1] * b);
+            dst[2] = (a[2] * b);
+            dst[3] = (a[3] * b);
+
+            return dst;
         }
     },
 
@@ -770,9 +851,21 @@ var VMath =
                 -float_max, -float_max, -float_max];
     },
 
-    aabbCopy : function aabbCopyFn(aabb)
+    aabbCopy : function aabbCopyFn(aabb, dst)
     {
-        return aabb.slice();
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(6);
+        }
+
+        dst[0] = aabb[0];
+        dst[1] = aabb[1];
+        dst[2] = aabb[2];
+        dst[3] = aabb[3];
+        dst[4] = aabb[4];
+        dst[5] = aabb[5];
+
+        return dst;
     },
 
     aabbSet : function aabbSet(dst, src)
@@ -867,17 +960,18 @@ var VMath =
 
     aabbUnionArray : function aabbUnionArrayFn(aabbArray)
     {
-        var union = aabbArray[0].slice();
+        var union = VMath.aabbCopy(aabbArray[0]);
 
         var numAABBs = aabbArray.length;
         for (var i = 0; i < numAABBs; i += 1)
         {
-            union[0] = (union[0] < aabbArray[i][0] ? union[0] : aabbArray[i][0]);
-            union[1] = (union[1] < aabbArray[i][1] ? union[1] : aabbArray[i][1]);
-            union[2] = (union[2] < aabbArray[i][2] ? union[2] : aabbArray[i][2]);
-            union[3] = (union[3] > aabbArray[i][3] ? union[3] : aabbArray[i][3]);
-            union[4] = (union[4] > aabbArray[i][4] ? union[4] : aabbArray[i][4]);
-            union[5] = (union[5] > aabbArray[i][5] ? union[5] : aabbArray[i][5]);
+            var aabb = aabbArray[i];
+            union[0] = (union[0] < aabb[0] ? union[0] : aabb[0]);
+            union[1] = (union[1] < aabb[1] ? union[1] : aabb[1]);
+            union[2] = (union[2] < aabb[2] ? union[2] : aabb[2]);
+            union[3] = (union[3] > aabb[3] ? union[3] : aabb[3]);
+            union[4] = (union[4] > aabb[4] ? union[4] : aabb[4]);
+            union[5] = (union[5] > aabb[5] ? union[5] : aabb[5]);
         }
 
         return union;
@@ -1066,36 +1160,108 @@ var VMath =
     //
     // Matrix
     //
-    m33BuildIdentity : function m33BuildIdentityFn() {
-        return [1.0, 0.0, 0.0,
-                0.0, 1.0, 0.0,
-                0.0, 0.0, 1.0];
+    m33BuildIdentity : function m33BuildIdentityFn(dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(9);
+        }
+
+        dst[0] = 1.0;
+        dst[1] = 0.0;
+        dst[2] = 0.0;
+        dst[3] = 0.0;
+        dst[4] = 1.0;
+        dst[5] = 0.0;
+        dst[6] = 0.0;
+        dst[7] = 0.0;
+        dst[8] = 1.0;
+
+        return dst;
     },
 
     // Matrix33
-    m33Build : function m33BuildFn(r, u, a)
+    m33Build : function m33BuildFn(r, u, a, dst)
     {
-        if (arguments.length >= 9)
+        var length = arguments.length;
+        if (length >= 9)
         {
-            return [arguments[0], arguments[1], arguments[2],
-                    arguments[3], arguments[4], arguments[5],
-                    arguments[6], arguments[7], arguments[8]];
+            // Can NOT use dst because it will overwrite the input value...
+            var res;
+
+            if (length > 9)
+            {
+                res = arguments[9];
+                if (res === undefined)
+                {
+                    res = new VMathArrayConstructor(9);
+                }
+            }
+            else
+            {
+                res = new VMathArrayConstructor(9);
+            }
+
+            res[0] = arguments[0];
+            res[1] = arguments[1];
+            res[2] = arguments[2];
+            res[3] = arguments[3];
+            res[4] = arguments[4];
+            res[5] = arguments[5];
+            res[6] = arguments[6];
+            res[7] = arguments[7];
+            res[8] = arguments[8];
+
+            return res;
         }
         else
         {
-            return [r[0], r[1], r[2],
-                    u[0], u[1], u[2],
-                    a[0], a[1], a[2]];
+            if (dst === undefined)
+            {
+                dst = new VMathArrayConstructor(9);
+            }
+
+            dst[0] = r[0];
+            dst[1] = r[1];
+            dst[2] = r[2];
+            dst[3] = u[0];
+            dst[4] = u[1];
+            dst[5] = u[2];
+            dst[6] = a[0];
+            dst[7] = a[1];
+            dst[8] = a[2];
+
+            return dst;
         }
     },
 
-    m33Copy : function m33CopyFn(m)
+    m33Copy : function m33CopyFn(m, dst)
     {
-        return m.slice();
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(9);
+        }
+
+        dst[0] = m[0];
+        dst[1] = m[1];
+        dst[2] = m[2];
+        dst[3] = m[3];
+        dst[4] = m[4];
+        dst[5] = m[5];
+        dst[6] = m[6];
+        dst[7] = m[7];
+        dst[8] = m[8];
+
+        return dst;
     },
 
-    m33FromAxisRotation : function m33FromAxisRotationFn(axis, angle)
+    m33FromAxisRotation : function m33FromAxisRotationFn(axis, angle, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(9);
+        }
+
         var s = Math.sin(angle);
         var c = Math.cos(angle);
         var t = 1.0 - c;
@@ -1109,17 +1275,17 @@ var VMath =
         var sy = s * axisY;
         var sz = s * axisZ;
 
-        return [tx * axisX + c,
-                tx * axisY - sz,
-                tx * axisZ + sy,
+        dst[0] = tx * axisX + c;
+        dst[1] = tx * axisY - sz;
+        dst[2] = tx * axisZ + sy;
+        dst[3] = ty * axisX + sz;
+        dst[4] = ty * axisY + c;
+        dst[5] = ty * axisZ - sx;
+        dst[6] = tz * axisX - sy;
+        dst[7] = tz * axisY + sx;
+        dst[8] = tz * axisZ + c;
 
-                ty * axisX + sz,
-                ty * axisY + c,
-                ty * axisZ - sx,
-
-                tz * axisX - sy,
-                tz * axisY + sx,
-                tz * axisZ + c];
+        return dst;
     },
 
     m33FromQuat: function m33FromQuatFn(q)
@@ -1408,7 +1574,7 @@ var VMath =
     // Matrix3 operations with scalar
     m33ScalarAdd : function m33ScalarAddFn(m, s)
     {
-        var r = [];
+        var r = new VMathArrayConstructor(9);
         for (var n = 0; n < 9; n += 1)
         {
             r[n] = (m[n] + s);
@@ -1418,7 +1584,7 @@ var VMath =
 
     m33ScalarSub : function m33ScalarSubFn(m, s)
     {
-        var r = [];
+        var r = new VMathArrayConstructor(9);
         for (var n = 0; n < 9; n += 1)
         {
             r[n] = (m[n] - s);
@@ -1428,7 +1594,7 @@ var VMath =
 
     m33ScalarMul : function m33ScalarMulFn(m, s)
     {
-        var r = [];
+        var r = new VMathArrayConstructor(9);
         for (var n = 0; n < 9; n += 1)
         {
             r[n] = (m[n] * s);
@@ -1465,23 +1631,46 @@ var VMath =
     },
 
     // Matrix43
-    m43BuildIdentity : function m43BuildIdentityFn() {
-        return [1.0, 0.0, 0.0,
-                0.0, 1.0, 0.0,
-                0.0, 0.0, 1.0,
-                0.0, 0.0, 0.0];
+    m43BuildIdentity : function m43BuildIdentityFn(dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(12);
+        }
+        dst[0] = 1.0;
+        dst[1] = 0.0;
+        dst[2] = 0.0;
+        dst[3] = 0.0;
+        dst[4] = 1.0;
+        dst[5] = 0.0;
+        dst[6] = 0.0;
+        dst[7] = 0.0;
+        dst[8] = 1.0;
+        dst[9] = 0.0;
+        dst[10] = 0.0;
+        dst[11] = 0.0;
+        return dst;
     },
 
     m43Build : function m43BuildFn(r, u, a, p, dst)
     {
-        var res = [];
         var length = arguments.length;
-
-        if (arguments.length >= 12)
+        if (length >= 12)
         {
-            if (length === 13)
+            // Can NOT use dst because it will overwrite the input value...
+            var res;
+
+            if (length > 12)
             {
                 res = arguments[12];
+                if (res === undefined)
+                {
+                    res = new VMathArrayConstructor(12);
+                }
+            }
+            else
+            {
+                res = new VMathArrayConstructor(12);
             }
 
             res[0] = arguments[0];
@@ -1501,101 +1690,90 @@ var VMath =
         }
         else
         {
-            if (length === 5)
+            if (dst === undefined)
             {
-                res = dst;
+                dst = new VMathArrayConstructor(12);
             }
 
-            res[0] = r[0];
-            res[1] = r[1];
-            res[2] = r[2];
-            res[3] = u[0];
-            res[4] = u[1];
-            res[5] = u[2];
-            res[6] = a[0];
-            res[7] = a[1];
-            res[8] = a[2];
-            res[9] = p[0];
-            res[10] = p[1];
-            res[11] = p[2];
+            dst[0] = r[0];
+            dst[1] = r[1];
+            dst[2] = r[2];
+            dst[3] = u[0];
+            dst[4] = u[1];
+            dst[5] = u[2];
+            dst[6] = a[0];
+            dst[7] = a[1];
+            dst[8] = a[2];
+            dst[9] = p[0];
+            dst[10] = p[1];
+            dst[11] = p[2];
 
-            return res;
+            return dst;
         }
     },
 
     m43BuildTranslation : function m43BuildTranslationFn(p, dst)
     {
-        var res = [];
-        var length = arguments.length;
+        // Can NOT use p or dst because it will overwrite the input value...
+        var res, a;
 
+        var length = arguments.length;
         if (length >= 3)
         {
+            a = arguments;
             if (length === 4)
             {
                 res = arguments[3];
             }
-
-            res[0] = 1;
-            res[1] = 0;
-            res[2] = 0;
-            res[3] = 0;
-            res[4] = 1;
-            res[5] = 0;
-            res[6] = 0;
-            res[7] = 0;
-            res[8] = 1;
-            res[9] = arguments[0];
-            res[10] = arguments[1];
-            res[11] = arguments[2];
-
-            return res;
         }
         else
         {
-            if (length === 2)
-            {
-                res = dst;
-            }
-
-            res[0] = 1;
-            res[1] = 0;
-            res[2] = 0;
-            res[3] = 0;
-            res[4] = 1;
-            res[5] = 0;
-            res[6] = 0;
-            res[7] = 0;
-            res[8] = 1;
-            res[9] = p[0];
-            res[10] = p[1];
-            res[11] = p[2];
-
-            return res;
+            a = p;
+            res = dst;
         }
+
+        if (res === undefined)
+        {
+            res = new VMathArrayConstructor(12);
+        }
+
+        res[0] = 1;
+        res[1] = 0;
+        res[2] = 0;
+        res[3] = 0;
+        res[4] = 1;
+        res[5] = 0;
+        res[6] = 0;
+        res[7] = 0;
+        res[8] = 1;
+        res[9] = a[0];
+        res[10] = a[1];
+        res[11] = a[2];
+
+        return res;
     },
 
     m43Copy : function m43CopyFn(m, dst)
     {
-        if (dst)
+        if (dst === undefined)
         {
-            dst[0] = m[0];
-            dst[1] = m[1];
-            dst[2] = m[2];
-            dst[3] = m[3];
-            dst[4] = m[4];
-            dst[5] = m[5];
-            dst[6] = m[6];
-            dst[7] = m[7];
-            dst[8] = m[8];
-            dst[9] = m[9];
-            dst[10] = m[10];
-            dst[11] = m[11];
-            return dst;
+            dst = new VMathArrayConstructor(12);
         }
-        else
-        {
-            return m.slice();
-        }
+
+        dst[0] = m[0];
+        dst[1] = m[1];
+        dst[2] = m[2];
+        dst[3] = m[3];
+        dst[4] = m[4];
+        dst[5] = m[5];
+        dst[6] = m[6];
+        dst[7] = m[7];
+        dst[8] = m[8];
+        dst[9] = m[9];
+        dst[10] = m[10];
+        dst[11] = m[11];
+
+        return dst;
     },
 
     m43FromM33V3: function m43FromM33V3Fn(m, v)
@@ -1621,9 +1799,9 @@ var VMath =
         var sy = s * axisY;
         var sz = s * axisZ;
 
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(12);
         }
 
         dst[0] = tx * axisX + c;
@@ -1645,8 +1823,13 @@ var VMath =
         return dst;
     },
 
-    m43FromQuatPos : function m43FromQuatPosFn(qp)
+    m43FromQuatPos : function m43FromQuatPosFn(qp, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(12);
+        }
+
         var qx = qp[0];
         var qy = qp[1];
         var qz = qp[2];
@@ -1665,10 +1848,23 @@ var VMath =
         var yz = 2.0 * qy * qz;
         var xw = 2.0 * qx * qw;
 
-        return [1.0 - yy - zz, xy - zw, xz + yw,
-                xy + zw, 1.0 - xx - zz, yz - xw,
-                xz - yw, yz + xw, 1.0 - xx - yy,
-                px, py, pz];
+        dst[0] = 1.0 - yy - zz;
+        dst[1] = xy - zw;
+        dst[2] = xz + yw;
+
+        dst[3] = xy + zw;
+        dst[4] = 1.0 - xx - zz;
+        dst[5] = yz - xw;
+
+        dst[6] = xz - yw;
+        dst[7] = yz + xw;
+        dst[8] = 1.0 - xx - yy;
+
+        dst[9] = px;
+        dst[10] = py;
+        dst[11] = pz;
+
+        return dst;
     },
 
     m43FromRTS : function m43FromRTSFn(quat, pos, scale, dst)
@@ -1692,9 +1888,9 @@ var VMath =
         var sy = scale[1];
         var sz = scale[2];
 
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(12);
         }
 
         dst[0] = sx * (1.0 - yy - zz);
@@ -1730,9 +1926,9 @@ var VMath =
         var yz = (2.0 * qy * qz);
         var xw = (2.0 * qx * qw);
 
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(12);
         }
 
         dst[0] =  1.0 - yy - zz;
@@ -1751,24 +1947,52 @@ var VMath =
         return dst;
     },
 
-    m43Right : function m43RightFn(m)
+    m43Right : function m43RightFn(m, dst)
     {
-        return [m[0], m[1], m[2]];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
+        dst[0] = m[0];
+        dst[1] = m[1];
+        dst[2] = m[2];
+        return dst;
     },
 
-    m43Up : function m43UpFn(m)
+    m43Up : function m43UpFn(m, dst)
     {
-        return [m[3], m[4], m[5]];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
+        dst[0] = m[3];
+        dst[1] = m[4];
+        dst[2] = m[5];
+        return dst;
     },
 
-    m43At : function m43AtFn(m)
+    m43At : function m43AtFn(m, dst)
     {
-        return [m[6], m[7], m[8]];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
+        dst[0] = m[6];
+        dst[1] = m[7];
+        dst[2] = m[8];
+        return dst;
     },
 
-    m43Pos : function m43PosFn(m)
+    m43Pos : function m43PosFn(m, dst)
     {
-        return [m[9], m[10], m[11]];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
+        dst[0] = m[9];
+        dst[1] = m[10];
+        dst[2] = m[11];
+        return dst;
     },
 
     m43SetRight : function m43SetRightFn(m, v)
@@ -1824,8 +2048,12 @@ var VMath =
         m[8] = tz * axisZ + c;
     },
 
-    m43InverseOrthonormal : function m43InverseOrthonormalFn(m)
+    m43InverseOrthonormal : function m43InverseOrthonormalFn(m, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(12);
+        }
         var m0 = m[0];
         var m1 = m[1];
         var m2 = m[2];
@@ -1838,12 +2066,19 @@ var VMath =
         var px = m[9];
         var py = m[10];
         var pz = m[11];
-        return [m0, m3, m6,
-                m1, m4, m7,
-                m2, m5, m8,
-                -((px * m0) + (py * m1) + (pz * m2)),
-                -((px * m3) + (py * m4) + (pz * m5)),
-                -((px * m6) + (py * m7) + (pz * m8))];
+        dst[0] = m0;
+        dst[1] = m3;
+        dst[2] = m6;
+        dst[3] = m1;
+        dst[4] = m4;
+        dst[5] = m7;
+        dst[6] = m2;
+        dst[7] = m5;
+        dst[8] = m8;
+        dst[9]  = -((px * m0) + (py * m1) + (pz * m2));
+        dst[10] = -((px * m3) + (py * m4) + (pz * m5));
+        dst[11] = -((px * m6) + (py * m7) + (pz * m8));
+        return dst;
     },
 
     m43Orthonormalize : function m43OrthonormalizeFn(m)
@@ -1943,28 +2178,48 @@ var VMath =
                 m[2] * (m[3] * m[7] - m[4] * m[6]));
     },
 
-    m43Inverse : function m43InverseFn(m)
+    m43Inverse : function m43InverseFn(m, dst)
     {
-        var det = VMath.m43Determinant(m);
+        var m0 = m[0];
+        var m1 = m[1];
+        var m2 = m[2];
+        var m3 = m[3];
+        var m4 = m[4];
+        var m5 = m[5];
+        var m6 = m[6];
+        var m7 = m[7];
+        var m8 = m[8];
+        var m9 = m[9];
+        var m10 = m[10];
+        var m11 = m[11];
+
+        var det = (m0 * (m4 * m8 - m5 * m7) +
+                   m1 * (m5 * m6 - m3 * m8) +
+                   m2 * (m3 * m7 - m4 * m6));
         if (det === 0.0)
         {
             return [];
         }
         else
         {
+            if (dst === undefined)
+            {
+                dst = new VMathArrayConstructor(12);
+            }
             var detrecp = 1.0 / det;
-            return [((m[4] * m[8] + m[5] * (-m[7])) * detrecp),
-                    ((m[7] * m[2] + m[8] * (-m[1])) * detrecp),
-                    ((m[1] * m[5] - m[2] *   m[4])  * detrecp),
-                    ((m[5] * m[6] + m[3] * (-m[8])) * detrecp),
-                    ((m[8] * m[0] + m[6] * (-m[2])) * detrecp),
-                    ((m[3] * m[2] - m[0] *   m[5])  * detrecp),
-                    ((m[3] * m[7] + m[4] * (-m[6])) * detrecp),
-                    ((m[6] * m[1] + m[7] * (-m[0])) * detrecp),
-                    ((m[0] * m[4] - m[3] *   m[1])  * detrecp),
-                    ((m[3] * (m[10] * m[8]  - m[7] * m[11]) + m[4]  * (m[6] * m[11] - m[9] * m[8]) + m[5]  * (m[9] * m[7] - m[6] * m[10])) * detrecp),
-                    ((m[6] * (m[2]  * m[10] - m[1] * m[11]) + m[7]  * (m[0] * m[11] - m[9] * m[2]) + m[8]  * (m[9] * m[1] - m[0] * m[10])) * detrecp),
-                    ((m[9] * (m[2]  * m[4]  - m[1] * m[5])  + m[10] * (m[0] * m[5]  - m[3] * m[2]) + m[11] * (m[3] * m[1] - m[0] * m[4]))  * detrecp)];
+            dst[0] = ((m4 * m8 + m5 * (-m7)) * detrecp);
+            dst[1] = ((m7 * m2 + m8 * (-m1)) * detrecp);
+            dst[2] = ((m1 * m5 - m2 *   m4)  * detrecp);
+            dst[3] = ((m5 * m6 + m3 * (-m8)) * detrecp);
+            dst[4] = ((m8 * m0 + m6 * (-m2)) * detrecp);
+            dst[5] = ((m3 * m2 - m0 *   m5)  * detrecp);
+            dst[6] = ((m3 * m7 + m4 * (-m6)) * detrecp);
+            dst[7] = ((m6 * m1 + m7 * (-m0)) * detrecp);
+            dst[8] = ((m0 * m4 - m3 *   m1)  * detrecp);
+            dst[9]  = ((m3 * (m10 * m8  - m7 * m11) + m4  * (m6 * m11 - m9 * m8) + m5  * (m9 * m7 - m6 * m10)) * detrecp);
+            dst[10] = ((m6 * (m2  * m10 - m1 * m11) + m7  * (m0 * m11 - m9 * m2) + m8  * (m9 * m1 - m0 * m10)) * detrecp);
+            dst[11] = ((m9 * (m2  * m4  - m1 * m5)  + m10 * (m0 * m5  - m3 * m2) + m11 * (m3 * m1 - m0 * m4))  * detrecp);
+            return dst;
         }
     },
 
@@ -1977,20 +2232,24 @@ var VMath =
 
     m43Scale : function m43ScaleFn(m, scale, dst)
     {
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(12);
         }
 
-        dst[0] = m[0] * scale[0];
-        dst[1] = m[1] * scale[0];
-        dst[2] = m[2] * scale[0];
-        dst[3] = m[3] * scale[1];
-        dst[4] = m[4] * scale[1];
-        dst[5] = m[5] * scale[1];
-        dst[6] = m[6] * scale[2];
-        dst[7] = m[7] * scale[2];
-        dst[8] = m[8] * scale[2];
+        var sx = scale[0];
+        var sy = scale[1];
+        var sz = scale[2];
+
+        dst[0] = m[0] * sx;
+        dst[1] = m[1] * sx;
+        dst[2] = m[2] * sx;
+        dst[3] = m[3] * sy;
+        dst[4] = m[4] * sy;
+        dst[5] = m[5] * sy;
+        dst[6] = m[6] * sz;
+        dst[7] = m[7] * sz;
+        dst[8] = m[8] * sz;
         dst[9] = m[9];
         dst[10] = m[10];
         dst[11] = m[11];
@@ -1998,28 +2257,34 @@ var VMath =
         return dst;
     },
 
-    m43TransformVector : function m43TransformVectorFn(m, v)
+    m43TransformVector : function m43TransformVectorFn(m, v, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
         var v0 = v[0];
         var v1 = v[1];
         var v2 = v[2];
-        return [
-                (m[0] * v0 + m[3] * v1 + m[6] * v2),
-                (m[1] * v0 + m[4] * v1 + m[7] * v2),
-                (m[2] * v0 + m[5] * v1 + m[8] * v2)
-            ];
+        dst[0] = (m[0] * v0 + m[3] * v1 + m[6] * v2);
+        dst[1] = (m[1] * v0 + m[4] * v1 + m[7] * v2);
+        dst[2] = (m[2] * v0 + m[5] * v1 + m[8] * v2);
+        return dst;
     },
 
-    m43TransformPoint : function m43TransformPointFn(m, v)
+    m43TransformPoint : function m43TransformPointFn(m, v, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
         var v0 = v[0];
         var v1 = v[1];
         var v2 = v[2];
-        return [
-                (m[0] * v0 + m[3] * v1 + m[6] * v2 + m[9]),
-                (m[1] * v0 + m[4] * v1 + m[7] * v2 + m[10]),
-                (m[2] * v0 + m[5] * v1 + m[8] * v2 + m[11])
-            ];
+        dst[0] = (m[0] * v0 + m[3] * v1 + m[6] * v2 + m[9]);
+        dst[1] = (m[1] * v0 + m[4] * v1 + m[7] * v2 + m[10]);
+        dst[2] = (m[2] * v0 + m[5] * v1 + m[8] * v2 + m[11]);
+        return dst;
     },
 
     m43Mul : function m43MulFn(a, b, dst)
@@ -2047,9 +2312,9 @@ var VMath =
         var b7  = b[7];
         var b8  = b[8];
 
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(12);
         }
 
         dst[0] =  (b0 * a0 + b3 * a1 + b6 * a2);
@@ -2096,9 +2361,9 @@ var VMath =
         var b10 = b[10];
         var b11 = b[11];
 
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(16);
         }
 
         dst[0] =  (b0 * a0 + b4 * a1 + b8  * a2);
@@ -2121,11 +2386,40 @@ var VMath =
         return dst;
     },
 
-    m43Transpose : function m43TransposeFn(m)
+    m43Transpose : function m43TransposeFn(m, dst)
     {
-        return [m[0], m[3], m[6], m[9],
-                m[1], m[4], m[7], m[10],
-                m[2], m[5], m[8], m[11]];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(12);
+        }
+
+        var m0 = m[0];
+        var m1 = m[1];
+        var m2 = m[2];
+        var m3 = m[3];
+        var m4 = m[4];
+        var m5 = m[5];
+        var m6 = m[6];
+        var m7 = m[7];
+        var m8 = m[8];
+        var m9 = m[9];
+        var m10 = m[10];
+        var m11 = m[11];
+
+        dst[0] =  m0;
+        dst[1] =  m3;
+        dst[2] =  m6;
+        dst[3] =  m9;
+        dst[4] =  m1;
+        dst[5] =  m4;
+        dst[6] =  m7;
+        dst[7] =  m10;
+        dst[8] =  m2;
+        dst[9]  = m5;
+        dst[10] = m8;
+        dst[11] = m11;
+
+        return dst;
     },
 
     m43MulTranspose: function m43MulTransposeFn(a, b, dst)
@@ -2152,30 +2446,38 @@ var VMath =
         var b6 = b[6];
         var b7 = b[7];
         var b8 = b[8];
+        var b9 = b[9];
+        var b10 = b[10];
+        var b11 = b[11];
 
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(12);
         }
 
         dst[0] =  (b0 * a0 + b3 * a1 + b6 * a2);
         dst[1] =  (b0 * a3 + b3 * a4 + b6 * a5);
         dst[2] =  (b0 * a6 + b3 * a7 + b6 * a8);
-        dst[3] =  (b0 * a9 + b3 * a10 + b6 * a11 + b[9]);
+        dst[3] =  (b0 * a9 + b3 * a10 + b6 * a11 + b9);
         dst[4] =  (b1 * a0 + b4 * a1 + b7 * a2);
         dst[5] =  (b1 * a3 + b4 * a4 + b7 * a5);
         dst[6] =  (b1 * a6 + b4 * a7 + b7 * a8);
-        dst[7] =  (b1 * a9 + b4 * a10 + b7 * a11 + b[10]);
+        dst[7] =  (b1 * a9 + b4 * a10 + b7 * a11 + b10);
         dst[8] =  (b2 * a0 + b5 * a1 + b8 * a2);
         dst[9]  = (b2 * a3 + b5 * a4 + b8 * a5);
         dst[10] = (b2 * a6 + b5 * a7 + b8 * a8);
-        dst[11] = (b2 * a9 + b5 * a10 + b8 * a11 + b[11]);
+        dst[11] = (b2 * a9 + b5 * a10 + b8 * a11 + b11);
 
         return dst;
     },
 
-    m43Offset: function m43OffsetFn(m, o)
+    m43Offset: function m43OffsetFn(m, o, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(12);
+        }
+
         var m0 = m[0];
         var m1 = m[1];
         var m2 = m[2];
@@ -2193,14 +2495,29 @@ var VMath =
         var o1 = o[1];
         var o2 = o[2];
 
-        return [m0, m1, m2, m3, m4, m5, m6, m7, m8,
-                (m0 * o0 + m3 * o1 + m6 * o2 + m9),
-                (m1 * o0 + m4 * o1 + m7 * o2 + m10),
-                (m2 * o0 + m5 * o1 + m8 * o2 + m11)];
+        dst[0] =  m0;
+        dst[1] =  m1;
+        dst[2] =  m2;
+        dst[3] =  m3;
+        dst[4] =  m4;
+        dst[5] =  m5;
+        dst[6] =  m6;
+        dst[7] =  m7;
+        dst[8] =  m8;
+        dst[9]  = (m0 * o0 + m3 * o1 + m6 * o2 + m9);
+        dst[10] = (m1 * o0 + m4 * o1 + m7 * o2 + m10);
+        dst[11] = (m2 * o0 + m5 * o1 + m8 * o2 + m11);
+
+        return dst;
     },
 
-    m43NegOffset: function m43NegOffsetFn(m, o)
+    m43NegOffset: function m43NegOffsetFn(m, o, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(12);
+        }
+
         var m0 = m[0];
         var m1 = m[1];
         var m2 = m[2];
@@ -2218,14 +2535,29 @@ var VMath =
         var o1 = -o[1];
         var o2 = -o[2];
 
-        return [m0, m1, m2, m3, m4, m5, m6, m7, m8,
-                (m0 * o0 + m3 * o1 + m6 * o2 + m9),
-                (m1 * o0 + m4 * o1 + m7 * o2 + m10),
-                (m2 * o0 + m5 * o1 + m8 * o2 + m11)];
+        dst[0] =  m0;
+        dst[1] =  m1;
+        dst[2] =  m2;
+        dst[3] =  m3;
+        dst[4] =  m4;
+        dst[5] =  m5;
+        dst[6] =  m6;
+        dst[7] =  m7;
+        dst[8] =  m8;
+        dst[9]  = (m0 * o0 + m3 * o1 + m6 * o2 + m9);
+        dst[10] = (m1 * o0 + m4 * o1 + m7 * o2 + m10);
+        dst[11] = (m2 * o0 + m5 * o1 + m8 * o2 + m11);
+
+        return dst;
     },
 
-    m43InverseTransposeProjection: function m43InverseTransposeProjectionFn(m, s)
+    m43InverseTransposeProjection: function m43InverseTransposeProjectionFn(m, s, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(12);
+        }
+
         var xf = (0.5 / s[0]);
         var yf = (0.5 / s[1]);
         var zf = (0.5 / s[2]);
@@ -2241,15 +2573,27 @@ var VMath =
         var px = m[9];
         var py = m[10];
         var pz = m[11];
-        return [m0, m1, m2, (0.5 - ((px * m0) + (py * m1) + (pz * m2))),
-                m3, m4, m5, (0.5 - ((px * m3) + (py * m4) + (pz * m5))),
-                m6, m7, m8, (0.5 - ((px * m6) + (py * m7) + (pz * m8)))];
+
+        dst[0] =  m0;
+        dst[1] =  m1;
+        dst[2] =  m2;
+        dst[3] =  (0.5 - ((px * m0) + (py * m1) + (pz * m2)));
+        dst[4] =  m3;
+        dst[5] =  m4;
+        dst[6] =  m5;
+        dst[7] =  (0.5 - ((px * m3) + (py * m4) + (pz * m5)));
+        dst[8] =  m6;
+        dst[9]  = m7;
+        dst[10] = m8;
+        dst[11] = (0.5 - ((px * m6) + (py * m7) + (pz * m8)));
+
+        return dst;
     },
 
     // Matrix 43 opeations with scalar
     m43ScalarAdd : function m43ScalarAddFn(m, s)
     {
-        var r = [];
+        var r = new VMathArrayConstructor(12);
         for (var n = 0; n < 12; n += 1)
         {
             r[n] = (m[n] + s);
@@ -2259,7 +2603,7 @@ var VMath =
 
     m43ScalarSub : function m43ScalarSubFn(m, s)
     {
-        var r = [];
+        var r = new VMathArrayConstructor(12);
         for (var n = 0; n < 12; n += 1)
         {
             r[n] = (m[n] - s);
@@ -2269,7 +2613,7 @@ var VMath =
 
     m43ScalarMul : function m43ScalarMulFn(m, s)
     {
-        var r = [];
+        var r = new VMathArrayConstructor(12);
         for (var n = 0; n < 12; n += 1)
         {
             r[n] = (m[n] * s);
@@ -2278,34 +2622,126 @@ var VMath =
     },
 
     // Matrix44
-    m44BuildIdentity : function m44BuildIdentityFn() {
-        return [1.0, 0.0, 0.0, 0.0,
-                0.0, 1.0, 0.0, 0.0,
-                0.0, 0.0, 1.0, 0.0,
-                0.0, 0.0, 0.0, 1.0];
+    m44BuildIdentity : function m44BuildIdentityFn(dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(16);
+        }
+
+        dst[0] =  1.0;
+        dst[1] =  0.0;
+        dst[2] =  0.0;
+        dst[3] =  0.0;
+        dst[4] =  0.0;
+        dst[5] =  1.0;
+        dst[6] =  0.0;
+        dst[7] =  0.0;
+        dst[8] =  0.0;
+        dst[9] =  0.0;
+        dst[10] = 1.0;
+        dst[11] = 0.0;
+        dst[12] = 0.0;
+        dst[13] = 0.0;
+        dst[14] = 0.0;
+        dst[15] = 1.0;
+
+        return dst;
     },
 
-    m44Build : function m44BuildFn(r, u, a, p)
+    m44Build : function m44BuildFn(r, u, a, p, dst)
     {
-        if (arguments.length >= 16)
+        var length = arguments.length;
+        if (length >= 16)
         {
-            return [arguments[0], arguments[1], arguments[2], arguments[3],
-                    arguments[4], arguments[5], arguments[6], arguments[7],
-                    arguments[8], arguments[9], arguments[10], arguments[11],
-                    arguments[12], arguments[13], arguments[14], arguments[15]];
+            // Can NOT use dst because it will overwrite the input value...
+            var res;
+
+            if (length > 16)
+            {
+                res = arguments[16];
+                if (res === undefined)
+                {
+                    res = new VMathArrayConstructor(16);
+                }
+            }
+            else
+            {
+                res = new VMathArrayConstructor(16);
+            }
+
+            res[0] =  arguments[0];
+            res[1] =  arguments[1];
+            res[2] =  arguments[2];
+            res[3] =  arguments[3];
+            res[4] =  arguments[4];
+            res[5] =  arguments[5];
+            res[6] =  arguments[6];
+            res[7] =  arguments[7];
+            res[8] =  arguments[8];
+            res[9] =  arguments[9];
+            res[10] = arguments[10];
+            res[11] = arguments[11];
+            res[12] = arguments[12];
+            res[13] = arguments[13];
+            res[14] = arguments[14];
+            res[15] = arguments[15];
+
+            return res;
         }
         else
         {
-            return [r[0], r[1], r[2], r[3],
-                    u[0], u[1], u[2], u[3],
-                    a[0], a[1], a[2], a[3],
-                    p[0], p[1], p[2], p[3]];
+            if (dst === undefined)
+            {
+                dst = new VMathArrayConstructor(16);
+            }
+
+            dst[0] =  r[0];
+            dst[1] =  r[1];
+            dst[2] =  r[2];
+            dst[3] =  r[3];
+            dst[4] =  u[0];
+            dst[5] =  u[1];
+            dst[6] =  u[2];
+            dst[7] =  u[3];
+            dst[8] =  a[0];
+            dst[9] =  a[1];
+            dst[10] = a[2];
+            dst[11] = a[3];
+            dst[12] = p[0];
+            dst[13] = p[1];
+            dst[14] = p[2];
+            dst[15] = p[3];
+
+            return dst;
         }
     },
 
-    m44Copy : function m44CopyFn(m)
+    m44Copy : function m44CopyFn(m, dst)
     {
-        return m.slice();
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(16);
+        }
+
+        dst[0] =  m[0];
+        dst[1] =  m[1];
+        dst[2] =  m[2];
+        dst[3] =  m[3];
+        dst[4] =  m[4];
+        dst[5] =  m[5];
+        dst[6] =  m[6];
+        dst[7] =  m[7];
+        dst[8] =  m[8];
+        dst[9] =  m[9];
+        dst[10] = m[10];
+        dst[11] = m[11];
+        dst[12] = m[12];
+        dst[13] = m[13];
+        dst[14] = m[14];
+        dst[15] = m[15];
+
+        return dst;
     },
 
     m44Right : function m44RightFn(m)
@@ -2370,7 +2806,7 @@ var VMath =
 
     m44Scale : function m43ScaleFn(m, scale)
     {
-        var r = [];
+        var r = new VMathArrayConstructor(16);
 
         /*jslint white: false */
         r[0] =  m[0]  * scale[0];
@@ -2400,9 +2836,9 @@ var VMath =
         var v1 = v[1];
         var v2 = v[2];
         var v3 = v[3];
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(4);
         }
         if (v3 !== 1.0)
         {
@@ -2506,7 +2942,7 @@ var VMath =
     // Matrix44 operations with scalars
     m44ScalarAdd : function m44ScalarAddFn(m, s)
     {
-        var r = [];
+        var r = new VMathArrayConstructor(16);
         for (var n = 0; n < 16; n += 1)
         {
             r[n] = (m[n] + s);
@@ -2516,7 +2952,7 @@ var VMath =
 
     m44ScalarSub : function m44ScalarSubFn(m, s)
     {
-        var r = [];
+        var r = new VMathArrayConstructor(16);
         for (var n = 0; n < 16; n += 1)
         {
             r[n] = (m[n] - s);
@@ -2526,7 +2962,7 @@ var VMath =
 
     m44ScalarMul : function m44ScalarMulFn(m, s)
     {
-        var r = [];
+        var r = new VMathArrayConstructor(16);
         for (var n = 0; n < 16; n += 1)
         {
             r[n] = (m[n] * s);
@@ -2535,16 +2971,24 @@ var VMath =
     },
 
     // Quaternion
-    quatBuild : function quatBuildFn(x, y, z, w)
+    quatBuild : function quatBuildFn(x, y, z, w, dst)
     {
-        return [x, y, z, w];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(4);
+        }
+        dst[0] = x;
+        dst[1] = y;
+        dst[2] = z;
+        dst[3] = w;
+        return dst;
     },
 
     quatCopy : function quatCopyFn(src, dst)
     {
-        if (!dst)
+        if (dst === undefined)
         {
-            dst = [];
+            dst = new VMathArrayConstructor(4);
         }
         dst[0] = src[0];
         dst[1] = src[1];
@@ -2579,8 +3023,13 @@ var VMath =
         return VMath.v4Dot(q1, q2);
     },
 
-    quatMul : function quatMulFn(q1, q2)
+    quatMul : function quatMulFn(q1, q2, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(4);
+        }
+
         // Note quaternion multiplication is the opposite way around from our matrix multiplication
         //var v1 = q1; // use full quats to avoid copy
         //var v2 = q2;
@@ -2605,13 +3054,13 @@ var VMath =
         var cx = (q1z * q2y) - (q1y * q2z);
         var cy = (q1x * q2z) - (q1z * q2x);
         var cz = (q1y * q2x) - (q1x * q2y);
-        var qrx = (q2x * q1w) + (q1x * q2w) + cx;
-        var qry = (q2y * q1w) + (q1y * q2w) + cy;
-        var qrz = (q2z * q1w) + (q1z * q2w) + cz;
-        var qrw = (q1w * q2w) - (q1x * q2x + q1y * q2y + q1z * q2z);
-        var quat = [qrx, qry, qrz, qrw];
 
-        return quat;
+        dst[0] = (q2x * q1w) + (q1x * q2w) + cx;
+        dst[1] = (q2y * q1w) + (q1y * q2w) + cy;
+        dst[2] = (q2z * q1w) + (q1z * q2w) + cz;
+        dst[3] = (q1w * q2w) - (q1x * q2x + q1y * q2y + q1z * q2z);
+
+        return dst;
     },
 
     quatMulTranslate : function quatMulTranslateFn(qa, va, qb, vb, qr, vr)
@@ -2667,24 +3116,33 @@ var VMath =
         vr[2] = rz + vaz;
     },
 
-    quatNormalize : function quatNormalizeFn(q)
+    quatNormalize : function quatNormalizeFn(q, dst)
     {
-        var norme = Math.sqrt(VMath.quatDot(q, q));
-
+        var norme = VMath.quatDot(q, q);
         if (norme === 0.0)
         {
-            return [0, 0, 0, 0];
+            return VMath.v4BuildZero(dst);
         }
         else
         {
-            var recip = 1.0 / norme;
-            return VMath.v4ScalarMul(q, recip);
+            var recip = 1.0 / Math.sqrt(norme);
+            return VMath.v4ScalarMul(q, recip, dst);
         }
     },
 
-    quatConjugate : function quatConjugateFn(q)
+    quatConjugate : function quatConjugateFn(q, dst)
     {
-        return [-q[0], -q[1], -q[2], q[3]];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(4);
+        }
+
+        dst[0] = -q[0];
+        dst[1] = -q[1];
+        dst[2] = -q[2];
+        dst[3] =  q[3];
+
+        return dst;
     },
 
     quatLerp : function quatLerpFn(q1, q2, t)
@@ -2710,6 +3168,11 @@ var VMath =
 
     quatSlerp : function quatSlerpFn(q1, q2, t, dst)
     {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(4);
+        }
+
         var q1x = q1[0];
         var q1y = q1[1];
         var q1z = q1[2];
@@ -2745,7 +3208,13 @@ var VMath =
 
             var mag = Math.sqrt((qrx * qrx) + (qry * qry) + (qrz * qrz) + (qrw * qrw));
             var recip = 1.0 / mag;
-            return [qrx * recip, qry * recip, qrz * recip, qrw * recip];
+
+            dst[0] =  qrx * recip;
+            dst[1] =  qry * recip;
+            dst[2] =  qrz * recip;
+            dst[3] =  qrw * recip;
+
+            return dst;
         }
 
         var sinFn = Math.sin;
@@ -2764,11 +3233,6 @@ var VMath =
         q2z = q2z * scalar;
         q2w = q2w * scalar;
 
-        if (!dst)
-        {
-            dst = [];
-        }
-
         dst[0] =  q1x + q2x;
         dst[1] =  q1y + q2y;
         dst[2] =  q1z + q2z;
@@ -2777,7 +3241,7 @@ var VMath =
         return dst;
     },
 
-    quatFromM43 : function quatFromM43Fn(m)
+    quatFromM43 : function quatFromM43Fn(m, dst)
     {
         var m0 = m[0];
         var m1 = m[1];
@@ -2826,19 +3290,28 @@ var VMath =
             }
         }
 
-        var q = VMath.quatNormalize([x, y, z, w]);
+        var q = VMath.quatNormalize([x, y, z, w], dst);
 
-        return VMath.quatConjugate(q);
+        return VMath.quatConjugate(q, dst);
     },
 
-    quatFromAxisRotation : function quatFromAxisRotationFn(axis, angle)
+    quatFromAxisRotation : function quatFromAxisRotationFn(axis, angle, dst)
     {
         var omega = 0.5 * angle;
         var s = Math.sin(omega);
         var c = Math.cos(omega);
 
-        var q = [axis[0] * s, axis[1] * s, axis[2] * s, c];
-        return VMath.quatNormalize(q);
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(4);
+        }
+
+        dst[0] = axis[0] * s;
+        dst[1] = axis[1] * s;
+        dst[2] = axis[2] * s;
+        dst[3] = c;
+
+        return VMath.quatNormalize(dst, dst);
     },
 
     quatToAxisRotation : function quatToAxisRotation(q)
@@ -2910,7 +3383,10 @@ var VMath =
         ry += cy * twoQw;
         rz += cz * twoQw;
 
-        var r = [rx, ry, rz];
+        var r = new VMathArrayConstructor(3);
+        r[0] = rx;
+        r[1] = ry;
+        r[2] = rz;
 
         return r;
     },
@@ -2933,39 +3409,33 @@ var VMath =
     {
         if (arguments.length < 7)
         {
-            if (z !== undefined)
+            if (z === undefined)
             {
-                z[0] = x[0];
-                z[1] = x[1];
-                z[2] = x[2];
-                z[3] = x[3];
-                z[4] = y[0];
-                z[5] = y[1];
-                z[6] = y[2];
-                return z;
+                z = new VMathArrayConstructor(7);
             }
-            else
-            {
-                return [x[0], x[1], x[2], x[3], y[0], y[1], y[2]];
-            }
+            z[0] = x[0];
+            z[1] = x[1];
+            z[2] = x[2];
+            z[3] = x[3];
+            z[4] = y[0];
+            z[5] = y[1];
+            z[6] = y[2];
+            return z;
         }
         else
         {
-            if (dst !== undefined)
+            if (dst === undefined)
             {
-                dst[0] = x;
-                dst[1] = y;
-                dst[2] = z;
-                dst[3] = w;
-                dst[4] = px;
-                dst[5] = py;
-                dst[6] = pz;
-                return dst;
+                dst = new VMathArrayConstructor(7);
             }
-            else
-            {
-                return [ x, y, z, w, px, py, pz ];
-            }
+            dst[0] = x;
+            dst[1] = y;
+            dst[2] = z;
+            dst[3] = w;
+            dst[4] = px;
+            dst[5] = py;
+            dst[6] = pz;
+            return dst;
         }
     },
 

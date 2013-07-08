@@ -1,7 +1,12 @@
 // Copyright (c) 2011 Turbulenz Limited
+/*global VMathArrayConstructor: true*/
 /*global VMath*/
 /*global WebGLGraphicsDevice*/
 /*global WebGLInputDevice*/
+/*global WebGLPhysicsDevice*/
+/*global WebGLNetworkDevice*/
+/*global Float32Array*/
+/*global Utilities*/
 /*global console*/
 /*global window*/
 "use strict";
@@ -12,7 +17,7 @@
 function WebGLTurbulenzEngine() {}
 WebGLTurbulenzEngine.prototype = {
 
-    version : '0.17.0',
+    version : '0.18.0',
 
     setInterval: function (f, t)
     {
@@ -44,14 +49,24 @@ WebGLTurbulenzEngine.prototype = {
 
     createPhysicsDevice: function (params)
     {
-        var plugin = this.getPluginObject();
-        if (plugin)
+        if (this.physicsDevice)
         {
-            return plugin.createPhysicsDevice(params);
+            throw 'PhysicsDevice already created';
         }
         else
         {
-            return null;
+            var physicsDevice;
+            var plugin = this.getPluginObject();
+            if (plugin)
+            {
+                physicsDevice = plugin.createPhysicsDevice(params);
+            }
+            else
+            {
+                physicsDevice = WebGLPhysicsDevice.create(params);
+            }
+            this.physicsDevice = physicsDevice;
+            return physicsDevice;
         }
     },
 
@@ -84,19 +99,70 @@ WebGLTurbulenzEngine.prototype = {
 
     createNetworkDevice: function (params)
     {
-        var plugin = this.getPluginObject();
-        if (plugin)
+        if (this.networkDevice)
         {
-            return plugin.createNetworkDevice(params);
+            throw 'NetworkDevice already created';
         }
         else
         {
-            return null;
+            var networkDevice = WebGLNetworkDevice.create(params);
+            this.networkDevice = networkDevice;
+            return networkDevice;
         }
     },
 
     createMathDevice: function (params)
     {
+        // Check if the browser supports using apply with Float32Array
+        try
+        {
+            VMath.v3Build.apply(VMath, new Float32Array([1, 2, 3]));
+
+            Float32Array.prototype.slice = function Float32ArraySlice(s, e)
+            {
+                var length = this.length;
+                if (s === undefined)
+                {
+                    s = 0;
+                }
+                else if (s < 0)
+                {
+                    s += length;
+                }
+                if (e === undefined)
+                {
+                    e = length;
+                }
+                else if (e < 0)
+                {
+                    e += length;
+                }
+                length = (e - s);
+                if (0 < length)
+                {
+                    var dst = new Float32Array(length);
+                    var n = 0;
+                    do
+                    {
+                        dst[n] = this[s];
+                        n += 1;
+                        s += 1;
+                    }
+                    while (s < e);
+                    return dst;
+                }
+                else
+                {
+                    return new Float32Array();
+                }
+            };
+
+            VMathArrayConstructor = Float32Array;
+        }
+        catch (e)
+        {
+        }
+
         return VMath;
     },
 
@@ -107,15 +173,7 @@ WebGLTurbulenzEngine.prototype = {
 
     getPhysicsDevice: function ()
     {
-        var plugin = this.getPluginObject();
-        if (plugin)
-        {
-            return plugin.getPhysicsDevice();
-        }
-        else
-        {
-            return null;
-        }
+        return this.physicsDevice;
     },
 
     getSoundDevice: function ()
@@ -138,15 +196,7 @@ WebGLTurbulenzEngine.prototype = {
 
     getNetworkDevice: function ()
     {
-        var plugin = this.getPluginObject();
-        if (plugin)
-        {
-            return plugin.getNetworkDevice();
-        }
-        else
-        {
-            return null;
-        }
+        return this.networkDevice;
     },
 
     getMathDevice: function ()
@@ -191,7 +241,7 @@ WebGLTurbulenzEngine.prototype = {
 
     onwarning: function (msg)
     {
-        console.log(msg);
+        Utilities.log(msg);
     },
 
     getSystemInfo: function ()
@@ -227,14 +277,28 @@ WebGLTurbulenzEngine.prototype = {
             {
                 if (!that.isUnloading())
                 {
+                    var xhrResponseText = xhr.responseText;
+                    var xhrStatus = xhr.status;
+                    var xhrStatusText = xhr.statusText;
+
+                    // Sometimes the browser sets status to 200 OK when the connection is closed
+                    // before the message is sent (weird!).
+                    // In order to address this we fail any completely empty responses.
+                    // Hopefully, nobody will get a valid response with no headers and no body!
+                    if (xhr.getAllResponseHeaders() === "" && xhrResponseText === "" && xhrStatus === 200 && xhrStatusText === 'OK')
+                    {
+                        callback('', 0);
+                        return;
+                    }
+
                     if (xhr.status !== 0)
                     {
-                        callback(xhr.responseText, xhr.status, xhr.statusText);
+                        callback(xhrResponseText, xhrStatus);
                     }
                     else
                     {
                         // Checking xhr.statusText when xhr.status is 0 causes a silent error
-                        callback(xhr.responseText, 0, "Timeout or cross domain request");
+                        callback(xhrResponseText, 0);
                     }
                 }
 
@@ -256,9 +320,17 @@ WebGLTurbulenzEngine.prototype = {
     // Internals
     destroy : function ()
     {
+        if (this.networkDevice)
+        {
+            delete this.networkDevice;
+        }
         if (this.inputDevice)
         {
             delete this.inputDevice;
+        }
+        if (this.physicsDevice)
+        {
+            delete this.physicsDevice;
         }
         if (this.graphicsDevice)
         {
@@ -300,6 +372,34 @@ WebGLTurbulenzEngine.prototype = {
     isUnloading : function ()
     {
         return this.unloading;
+    },
+
+    enableProfiling : function ()
+    {
+    },
+
+    startProfiling : function ()
+    {
+        if (console && console.profile && console.profileEnd)
+        {
+            console.profile("turbulenz");
+        }
+    },
+
+    stopProfiling : function ()
+    {
+        // Chrome and Safari return an object. IE and Firefox print to the console/profile tab.
+        var result;
+        if (console && console.profile && console.profileEnd)
+        {
+            console.profileEnd("turbulenz");
+            if (console.profiles)
+            {
+                result = console.profiles[console.profiles.length - 1];
+            }
+        }
+
+        return result;
     }
 };
 

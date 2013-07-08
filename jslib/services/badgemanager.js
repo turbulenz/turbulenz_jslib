@@ -14,7 +14,7 @@ BadgeManager.prototype =
     listUserBadges: function userbadgesListFn(callbackFn, errorCallbackFn)
     {
         var that = this;
-        function cb(jsonResponse, status, statusText)
+        function cb(jsonResponse, status)
         {
             if (status === 200)
             {
@@ -27,7 +27,7 @@ BadgeManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("Badges.listUserBadges failed with status " + status + " " + statusText + ": " + jsonResponse.msg,
+                errorCallback("Badges.listUserBadges failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               [callbackFn]);
             }
@@ -41,7 +41,8 @@ BadgeManager.prototype =
             method: 'GET',
             data : dataSpec,
             async: true,
-            callback: cb
+            callback: cb,
+            requestHandler: this.requestHandler
         });
     },
 
@@ -52,12 +53,14 @@ BadgeManager.prototype =
 
     updateUserBadgeProgress: function updateUserBadgeProgressFn(badge_key, current, callbackFn, errorCallbackFn)
     {
+        var that = this;
         if (current && typeof current === 'number')
         {
             this.addUserBadge(badge_key, current, callbackFn, errorCallbackFn);
         }
         else
         {
+            var errorCallback = errorCallbackFn || that.errorCallbackFn;
             errorCallbackFn("Badges.updateUserBadgeProgress expects a numeric value for current",
                           400,
                           [badge_key, current, callbackFn]);
@@ -68,7 +71,7 @@ BadgeManager.prototype =
     addUserBadge: function badgesAddFn(badge_key, current, callbackFn, errorCallbackFn)
     {
         var that = this;
-        function cb(jsonResponse, status, statusText)
+        function cb(jsonResponse, status)
         {
             if (status === 200)
             {
@@ -79,7 +82,7 @@ BadgeManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("Badges.addUserBadge failed with status " + status + " " + statusText + ": " + jsonResponse.msg,
+                errorCallback("Badges.addUserBadge failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               [badge_key, current, callbackFn]);
             }
@@ -100,7 +103,8 @@ BadgeManager.prototype =
             async: true,
             data : dataSpec,
             callback: cb,
-            encrypt: true
+            encrypt: true,
+            requestHandler: this.requestHandler
         });
     },
 
@@ -109,7 +113,7 @@ BadgeManager.prototype =
     {
 
         var that = this;
-        function cb(jsonResponse, status, statusText)
+        function cb(jsonResponse, status)
         {
             if (status === 200)
             {
@@ -122,7 +126,7 @@ BadgeManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("Badges.listBadges failed with status " + status + " " + statusText + ": " + jsonResponse.msg,
+                errorCallback("Badges.listBadges failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               [callbackFn]);
             }
@@ -136,12 +140,13 @@ BadgeManager.prototype =
             method: 'GET',
             async: true,
             data: dataSpec,
-            callback: cb
+            callback: cb,
+            requestHandler: this.requestHandler
         });
     },
 
     errorCallbackFn: function errorCallbackFnx() {
-        console.log(Array.prototype.slice.call(arguments));
+        Utilities.log(Array.prototype.slice.call(arguments));
     }
 
 };

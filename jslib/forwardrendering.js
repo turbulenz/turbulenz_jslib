@@ -392,7 +392,8 @@ ForwardRendering.prototype =
         globalTechniqueParameters.viewDepth = md.v4Build(-viewMatrix[2]  * maxDepthReciprocal,
                                                          -viewMatrix[5]  * maxDepthReciprocal,
                                                          -viewMatrix[8]  * maxDepthReciprocal,
-                                                         -viewMatrix[11] * maxDepthReciprocal);
+                                                         -viewMatrix[11] * maxDepthReciprocal,
+                                                         globalTechniqueParameters.viewDepth);
 
         var globalLights = scene.globalLights;
         var numGlobalLights = globalLights.length;
@@ -470,7 +471,8 @@ ForwardRendering.prototype =
                                                                     lightViewInverseTranspose[8],
                                                                     lightViewInverseTranspose[9],
                                                                     lightViewInverseTranspose[10],
-                                                                    lightViewInverseTranspose[11]);
+                                                                    lightViewInverseTranspose[11],
+                                                                    techniqueParameters.lightFalloff);
                     lightViewInverseTranspose[8] = 0;
                     lightViewInverseTranspose[9] = 0;
                     lightViewInverseTranspose[10] = 0;
@@ -522,7 +524,8 @@ ForwardRendering.prototype =
                                                                 lightViewInverseTranspose[8],
                                                                 lightViewInverseTranspose[9],
                                                                 lightViewInverseTranspose[10],
-                                                                lightViewInverseTranspose[11]);
+                                                                lightViewInverseTranspose[11],
+                                                                techniqueParameters.lightFalloff);
                 lightViewInverseTranspose[8] = 0;
                 lightViewInverseTranspose[9] = 0;
                 lightViewInverseTranspose[10] = 0;
@@ -592,7 +595,8 @@ ForwardRendering.prototype =
                                                                     lightViewInverseTranspose[8],
                                                                     lightViewInverseTranspose[9],
                                                                     lightViewInverseTranspose[10],
-                                                                    lightViewInverseTranspose[11]);
+                                                                    lightViewInverseTranspose[11],
+                                                                    techniqueParameters.lightFalloff);
                     l += 1;
                 }
                 else
@@ -1635,7 +1639,8 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
             var oldSemantics = oldGeometry.semantics;
             var oldVertexBuffer = oldGeometry.vertexBuffer;
             var oldSurface = geometryInstance.surface;
-            var oldVertexBufferData = oldSurface.vertexData;
+            var oldVertexData = oldSurface.vertexData;
+            var oldIndexData = oldSurface.indexData;
 
             var vertexBuffer = gd.createVertexBuffer({
                     numVertices: 6,
@@ -1686,23 +1691,38 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
                 }
             }
 
-            var tlOff = (0 * stride + offset);
-            var trOff = (1 * stride + offset);
-            var blOff = (2 * stride + offset);
-            var brOff = (3 * stride + offset);
-            var v00 = oldVertexBufferData[tlOff + 0];
-            var v01 = oldVertexBufferData[tlOff + 1];
-            var v02 = oldVertexBufferData[tlOff + 2];
-            var v10 = oldVertexBufferData[trOff + 0];
-            var v11 = oldVertexBufferData[trOff + 1];
-            var v12 = oldVertexBufferData[trOff + 2];
-            var v20 = oldVertexBufferData[blOff + 0];
-            var v21 = oldVertexBufferData[blOff + 1];
-            var v22 = oldVertexBufferData[blOff + 2];
-            var v30 = oldVertexBufferData[brOff + 0];
-            var v31 = oldVertexBufferData[brOff + 1];
-            var v32 = oldVertexBufferData[brOff + 2];
-            oldVertexBufferData = null;
+            var faces;
+            if (oldIndexData[3] !== 0 && oldIndexData[4] !== 0 && oldIndexData[5] !== 0)
+            {
+                faces = [0, 2, 1, 3];
+            }
+            else if (oldIndexData[3] !== 1 && oldIndexData[4] !== 1 && oldIndexData[5] !== 1)
+            {
+                faces = [1, 0, 2, 3];
+            }
+            else //if (oldIndexData[3] !== 2 && oldIndexData[4] !== 2 && oldIndexData[5] !== 2)
+            {
+                faces = [3, 0, 1, 2];
+            }
+            oldIndexData = null;
+
+            var tlOff = (faces[0] * stride + offset);
+            var trOff = (faces[1] * stride + offset);
+            var blOff = (faces[2] * stride + offset);
+            var brOff = (faces[3] * stride + offset);
+            var v00 = oldVertexData[tlOff + 0];
+            var v01 = oldVertexData[tlOff + 1];
+            var v02 = oldVertexData[tlOff + 2];
+            var v10 = oldVertexData[trOff + 0];
+            var v11 = oldVertexData[trOff + 1];
+            var v12 = oldVertexData[trOff + 2];
+            var v20 = oldVertexData[blOff + 0];
+            var v21 = oldVertexData[blOff + 1];
+            var v22 = oldVertexData[blOff + 2];
+            var v30 = oldVertexData[brOff + 0];
+            var v31 = oldVertexData[brOff + 1];
+            var v32 = oldVertexData[brOff + 2];
+            oldVertexData = null;
 
             var va01 = [(v00 + v10) * 0.5, (v01 + v11) * 0.5, (v02 + v12) * 0.5];
             var va02 = [(v00 + v20) * 0.5, (v01 + v21) * 0.5, (v02 + v22) * 0.5];
@@ -1775,16 +1795,15 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
             {
                 geometry.top    = top;
                 geometry.bottom = bottom;
-                geometry.tb     = md.v3Build(tb0, tb1, tb2);
                 geometry.normal = normal;
             }
             else
             {
                 geometry.top    = [top0, top1, top2];
                 geometry.bottom = [bottom0, bottom1, bottom2];
-                geometry.tb     = [tb0, tb1, tb2];
                 geometry.normal = [normal0, normal1, normal2];
             }
+            geometry.tb     = [tb0, tb1, tb2];
         }
         else
         {

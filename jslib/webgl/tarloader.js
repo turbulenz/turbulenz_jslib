@@ -117,7 +117,7 @@ TARLoader.prototype = {
                 }
                 if ('' === header.fileType || '0' === header.fileType)
                 {
-                    //console.log('Loading "' + fileName + '" (' + header.length + ')');
+                    //Utilities.log('Loading "' + fileName + '" (' + header.length + ')');
                     this.texturesLoading += 1;
                     gd.createTexture({
                         src : fileName,
@@ -179,7 +179,20 @@ TARLoader.create = function tgaLoaderFn(params)
             {
                 if (!TurbulenzEngine || !TurbulenzEngine.isUnloading())
                 {
-                    if (xhr.status === 200 || xhr.status === 0)
+                    var xhrStatus = xhr.status;
+                    var xhrStatusText = xhr.status !== 0 && xhr.statusText || 'No connection';
+
+                    // Sometimes the browser sets status to 200 OK when the connection is closed
+                    // before the message is sent (weird!).
+                    // In order to address this we fail any completely empty responses.
+                    // Hopefully, nobody will get a valid response with no headers and no body!
+                    if (xhr.getAllResponseHeaders() === "" && xhr.responseText === "" && xhrStatus === 200 && xhrStatusText === 'OK')
+                    {
+                        loader.onload('', 0);
+                        return;
+                    }
+
+                    if (xhrStatus === 200 || xhrStatus === 0)
                     {
                         var buffer;
                         if (xhr.responseType === "arraybuffer")
@@ -218,7 +231,7 @@ TARLoader.create = function tgaLoaderFn(params)
                                     }
                                     else
                                     {
-                                        loader.onload();
+                                        loader.onload(true, xhrStatus);
                                     }
                                 };
                                 callOnload();

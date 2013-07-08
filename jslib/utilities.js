@@ -21,7 +21,6 @@ Utilities.assert = function assertFn(test, message)
     }
 };
 
-
 //
 // beget
 //
@@ -30,6 +29,17 @@ Utilities.beget = function begetFn(o)
     var F = function () { };
     F.prototype = o;
     return new F();
+};
+
+//
+// log
+//
+Utilities.log = function logFn()
+{
+    if (window.console)
+    {
+        return window.console.log.apply(window.console, arguments);
+    }
 };
 
 var MathDeviceConvert =
@@ -149,24 +159,6 @@ var MathDeviceConvert =
 //
 Utilities.ajax = function utilitiesAjaxFn(params)
 {
-    var xhr;
-    if (window.XMLHttpRequest)
-    {
-        xhr = new window.XMLHttpRequest();
-    }
-    else if (window.ActiveXObject)
-    {
-        xhr = new window.ActiveXObject("Microsoft.XMLHTTP");
-    }
-    else
-    {
-        if (params.error)
-        {
-            params.error("No XMLHTTPRequest object could be created");
-        }
-        return;
-    }
-
     // parameters
     var requestText = "";
     var method = params.method;
@@ -174,6 +166,8 @@ Utilities.ajax = function utilitiesAjaxFn(params)
     var encrypted = params.encrypt;
     var signature = null;
     var url = params.url;
+    var requestHandler = params.requestHandler;
+    var callbackFn = params.callback;
 
     if (encrypted)
     {
@@ -214,106 +208,189 @@ Utilities.ajax = function utilitiesAjaxFn(params)
         }
     }
 
-    var callbackFn = params.callback;
-    var httpRequestCallback = function httpRequestCallbackFn()
+    var httpResponseCallback = function httpResponseCallbackFn(xhrResponseText, xhrStatus)
     {
-        if (xhr.readyState === 4 && !TurbulenzEngine.isUnloading()) /* 4 == complete */
+        var sig = this.xhr.getResponseHeader("X-TZ-Signature");
+
+        // break circular reference
+        this.xhr.onreadystatechange = null;
+        this.xhr = null;
+
+        var response;
+
+        if (encrypted)
         {
-            var xhrStatus = xhr.status;
-            var xhrResponseText = xhr.responseText;
+            response = JSON.parse(xhrResponseText);
+            var validSignature = TurbulenzEngine.verifySignature(xhrResponseText, sig);
+            xhrResponseText = null;
 
-            // Checking xhrStatusText when xhrStatus is 0 causes a silent error!
-            var xhrStatusText = (xhrStatus !== 0 && xhr.statusText) || "No connection or cross domain request";
+            TurbulenzEngine.setTimeout(function () {
+                var receivedUrl = response.requestUrl;
 
-            var sig = xhr.getResponseHeader("X-TZ-Signature");
-
-            // break circular reference
-            xhr.onreadystatechange = null;
-            xhr = null;
-
-            if (xhrStatus === 0)
-            {
-                TurbulenzEngine.setTimeout(function () {
-                    callbackFn({msg: "No connection or cross domain request", ok: false}, 0, xhrStatusText);
-                    callbackFn = null;
-                }, 0);
-                return;
-            }
-
-            var response;
-
-            if (encrypted)
-            {
-                response = JSON.parse(xhrResponseText);
-                var validSignature = TurbulenzEngine.verifySignature(xhrResponseText, sig);
-                xhrResponseText = null;
-
-                TurbulenzEngine.setTimeout(function () {
-                    var receivedUrl = response.requestUrl;
-
-                    if (validSignature)
+                if (validSignature)
+                {
+                    if (!TurbulenzEngine.encryptionEnabled || receivedUrl === url)
                     {
-                        if (!TurbulenzEngine.encryptionEnabled || receivedUrl === url)
-                        {
-                            callbackFn(response, xhrStatus, xhrStatusText);
-                            callbackFn = null;
-                            return;
-                        }
+                        callbackFn(response, xhrStatus);
+                        callbackFn = null;
+                        return;
                     }
+                }
 
-                    // If it was a server-side verification fail then pass through the actual message
-                    if (xhrStatus === 400)
-                    {
-                        callbackFn(response, xhrStatus, "Verification Failed");
-                    }
-                    else
-                    {
-                        // Else drop reply
-                        callbackFn({msg: "Verification failed", ok: false}, 400, "Verification Failed");
-                    }
-                    callbackFn = null;
-                }, 0);
-            }
-            else
-            {
-                response = JSON.parse(xhrResponseText);
-                xhrResponseText = null;
+                // If it was a server-side verification fail then pass through the actual message
+                if (xhrStatus === 400)
+                {
+                    callbackFn(response, xhrStatus, "Verification Failed");
+                }
+                else
+                {
+                    // Else drop reply
+                    callbackFn({msg: "Verification failed", ok: false}, 400, "Verification Failed");
+                }
+                callbackFn = null;
+            }, 0);
+        }
+        else
+        {
+            response = JSON.parse(xhrResponseText);
+            xhrResponseText = null;
 
-                TurbulenzEngine.setTimeout(function () {
-                    callbackFn(response, xhrStatus, xhrStatusText);
-                    callbackFn = null;
-                }, 0);
-            }
+            TurbulenzEngine.setTimeout(function () {
+                callbackFn(response, xhrStatus);
+                callbackFn = null;
+            }, 0);
         }
     };
 
-    // Send request
-    xhr.open(method, ((requestText && (method !== "POST")) ? url + "?" + requestText : url), params.async);
-    if (callbackFn)
+    var httpRequest = function httpRequestFn(url, onload, callContext)
     {
-        xhr.onreadystatechange = httpRequestCallback;
-    }
+        var xhr;
+        if (window.XMLHttpRequest)
+        {
+            xhr = new window.XMLHttpRequest();
+        }
+        else if (window.ActiveXObject)
+        {
+            xhr = new window.ActiveXObject("Microsoft.XMLHTTP");
+        }
+        else
+        {
+            if (params.error)
+            {
+                params.error("No XMLHTTPRequest object could be created");
+            }
+            return;
+        }
+        callContext.xhr = xhr;
 
-    if (signature)
-    {
-        xhr.setRequestHeader("X-TZ-Signature", signature);
-    }
+        var httpCallback = function httpCallbackFn()
+        {
+            if (xhr.readyState === 4 && !TurbulenzEngine.isUnloading()) /* 4 == complete */
+            {
+                var xhrResponseText = xhr.responseText;
+                var xhrStatus = xhr.status;
+                // Checking xhrStatusText when xhrStatus is 0 causes a silent error!
+                var xhrStatusText = (xhrStatus !== 0 && xhr.statusText) || "No connection or cross domain request";
 
-    if (method === "POST")
-    {
-        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
-        xhr.send(requestText);
-    }
-    else // method === 'GET'
-    {
-        xhr.send();
-    }
+                // Sometimes the browser sets status to 200 OK when the connection is closed
+                // before the message is sent (weird!).
+                // In order to address this we fail any completely empty responses.
+                // Hopefully, nobody will get a valid response with no headers and no body!
+                if (xhr.getAllResponseHeaders() === "" && xhrResponseText === "" && xhrStatus === 200 && xhrStatusText === 'OK')
+                {
+                    onload('', 0);
+                    return;
+                }
+
+                onload(xhrResponseText, xhrStatus);
+            }
+        };
+
+        // Send request
+        xhr.open(method, ((requestText && (method !== "POST")) ? url + "?" + requestText : url), params.async);
+        if (callbackFn)
+        {
+            xhr.onreadystatechange = httpCallback;
+        }
+
+        if (signature)
+        {
+            xhr.setRequestHeader("X-TZ-Signature", signature);
+        }
+
+        if (method === "POST")
+        {
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+            xhr.send(requestText);
+        }
+        else // method === 'GET'
+        {
+            xhr.send();
+        }
+    };
+
+    requestHandler.request({
+        src: url,
+        requestFn: httpRequest,
+        onload: httpResponseCallback
+    });
 };
 
 
+//
+// ajaxStatusCodes
+//
+
+// http://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html#sec6.1
+Utilities.ajaxStatusCodes = {
+    0: "No Connection, Timeout Or Cross Domain Request",
+    100: "Continue",
+    101: "Switching Protocols",
+    200: "OK",
+    201: "Created",
+    202: "Accepted",
+    203: "Non-Authoritative Information",
+    204: "No Content",
+    205: "Reset Content",
+    206: "Partial Content",
+    300: "Multiple Choices",
+    301: "Moved Permanently",
+    302: "Found",
+    303: "See Other",
+    304: "Not Modified",
+    305: "Use Proxy",
+    307: "Temporary Redirect",
+    400: "Bad Request",
+    401: "Unauthorized",
+    402: "Payment Required",
+    403: "Forbidden",
+    404: "Not Found",
+    405: "Method Not Allowed",
+    406: "Not Acceptable",
+    407: "Proxy Authentication Required",
+    408: "Request Time-out",
+    409: "Conflict",
+    410: "Gone",
+    411: "Length Required",
+    412: "Precondition Failed",
+    413: "Request Entity Too Large",
+    414: "Request-URI Too Large",
+    415: "Unsupported Media Type",
+    416: "Requested range not satisfiable",
+    417: "Expectation Failed",
+    480: "Temporarily Unavailable",
+    500: "Internal Server Error",
+    501: "Not Implemented",
+    502: "Bad Gateway",
+    503: "Service Unavailable",
+    504: "Gateway Time-out",
+    505: "HTTP Version not supported"
+};
 
 //
 //Reference
+//
+
 // Proxy reference class allowing weak reference to the object
 function Reference() {}
 
@@ -518,5 +595,108 @@ var Profile =
             text += line;
         }
         return text;
+    }
+};
+
+//
+// Utilities to use with TurbulenzEngine.stopProfiling() object.
+//
+var JSProfiling = {};
+
+//
+// createArray
+//      Creates an array of nodes by merging all duplicate function references in the call profile tree together.
+JSProfiling.createArray = function JSProfilingCreateArrayFn(rootNode)
+{
+    var map = {};
+    var array = [];
+
+    if (rootNode.head)
+    {
+        rootNode = rootNode.head; // Chrome native profiler.
+    }
+
+    var processNode = function processNodeFn(node)
+    {
+        var urlObject = map[node.url];
+        if (!urlObject)
+        {
+            urlObject = {};
+            map[node.url] = urlObject;
+        }
+
+        var functionName = node.functionName === "" ? "(anonymous)" : node.functionName;
+
+        var functionObject = urlObject[functionName];
+        if (!functionObject)
+        {
+            functionObject = {};
+            urlObject[functionName] = functionObject;
+        }
+
+        var existingNode = functionObject[node.lineNumber];
+        if (!existingNode)
+        {
+            var newNode = { functionName : functionName,
+                            numberOfCalls : node.numberOfCalls,
+                            totalTime : node.totalTime,
+                            selfTime : node.selfTime,
+                            url : node.url,
+                            lineNumber : node.lineNumber
+                           };
+
+            array[array.length] = newNode;
+            functionObject[node.lineNumber] = newNode;
+        }
+        else
+        {
+            existingNode.totalTime += node.totalTime;
+            existingNode.selfTime += node.selfTime;
+            existingNode.numberOfCalls += node.numberOfCalls;
+        }
+
+        var children = node.children;
+        if (children)
+        {
+            var numberOfChildren = children.length;
+            for (var childIndex = 0; childIndex < numberOfChildren; childIndex += 1)
+            {
+                processNode(children[childIndex]);
+            }
+        }
+    };
+
+    processNode(rootNode);
+
+    return array;
+};
+
+//
+// sort
+//
+JSProfiling.sort = function JSProfilingSortFn(array, propertyName, descending)
+{
+    if (!propertyName)
+    {
+        propertyName = "totalTime";
+    }
+
+    var sorterAscending = function (left, right)
+    {
+        return left[propertyName] - right[propertyName];
+    };
+
+    var sorterDescending = function (left, right)
+    {
+        return right[propertyName] - left[propertyName];
+    };
+
+    if (descending === false)
+    {
+        array.sort(sorterAscending);
+    }
+    else
+    {
+        array.sort(sorterDescending);
     }
 };

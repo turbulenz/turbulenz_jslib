@@ -29,7 +29,7 @@ UserDataManager.prototype =
     getKeys: function userdataManagerGetKeysFn(callbackFn, errorCallbackFn)
     {
         var that = this;
-        function getKeysCallbackFn(jsonResponse, status, statusText)
+        function getKeysCallbackFn(jsonResponse, status)
         {
             if (status === 200)
             {
@@ -38,7 +38,7 @@ UserDataManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.getKeys failed with status " + status + " " + statusText + ": " + jsonResponse.msg,
+                errorCallback("UserDataManager.getKeys failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               that.getKeys,
                               [callbackFn]);
@@ -54,7 +54,8 @@ UserDataManager.prototype =
             async: true,
             data: dataSpec,
             callback: getKeysCallbackFn,
-            encrypt: true
+            encrypt: true,
+            requestHandler: this.requestHandler
         });
     },
 
@@ -66,7 +67,7 @@ UserDataManager.prototype =
         }
 
         var that = this;
-        function existsCallbackFn(jsonResponse, status, statusText)
+        function existsCallbackFn(jsonResponse, status)
         {
             if (status === 200)
             {
@@ -75,7 +76,7 @@ UserDataManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.exists failed with status " + status + " " + statusText + ": " + jsonResponse.msg,
+                errorCallback("UserDataManager.exists failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               that.exists,
                               [key, callbackFn]);
@@ -91,7 +92,8 @@ UserDataManager.prototype =
             async: true,
             data: dataSpec,
             callback: existsCallbackFn,
-            encrypt: true
+            encrypt: true,
+            requestHandler: this.requestHandler
         });
     },
 
@@ -103,7 +105,7 @@ UserDataManager.prototype =
         }
 
         var that = this;
-        function getCallbackFn(jsonResponse, status, statusText)
+        function getCallbackFn(jsonResponse, status)
         {
             if (status === 200)
             {
@@ -116,7 +118,7 @@ UserDataManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.get failed with status " + status + " " + statusText + ": " + jsonResponse.msg,
+                errorCallback("UserDataManager.get failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               that.get,
                               [key, callbackFn]);
@@ -132,7 +134,8 @@ UserDataManager.prototype =
             async: true,
             data: dataSpec,
             callback: getCallbackFn,
-            encrypt: true
+            encrypt: true,
+            requestHandler: this.requestHandler
         });
     },
 
@@ -150,7 +153,7 @@ UserDataManager.prototype =
         }
 
         var that = this;
-        function setCallbackFn(responseText, status, statusText)
+        function setCallbackFn(responseText, status)
         {
             if (status === 200)
             {
@@ -159,7 +162,7 @@ UserDataManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.set failed with status " + status + " " + statusText + ": " + responseText,
+                errorCallback("UserDataManager.set failed with status " + status + ": " + responseText,
                               status,
                               that.set,
                               [key, value, callbackFn]);
@@ -176,7 +179,8 @@ UserDataManager.prototype =
             async: true,
             data : dataSpec,
             callback: setCallbackFn,
-            encrypt: true
+            encrypt: true,
+            requestHandler: this.requestHandler
         });
     },
 
@@ -188,7 +192,7 @@ UserDataManager.prototype =
         }
 
         var that = this;
-        function removeCallbackFn(responseText, status, statusText)
+        function removeCallbackFn(responseText, status)
         {
             if (status === 200)
             {
@@ -201,7 +205,7 @@ UserDataManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.remove failed with status " + status + " " + statusText + ": " + responseText,
+                errorCallback("UserDataManager.remove failed with status " + status + ": " + responseText,
                               status,
                               that.remove,
                               [key, callbackFn]);
@@ -217,14 +221,15 @@ UserDataManager.prototype =
             async: true,
             data: dataSpec,
             callback: removeCallbackFn,
-            encrypt: true
+            encrypt: true,
+            requestHandler: this.requestHandler
         });
     },
 
     removeAll: function userdataManagerRemoveAllFn(callbackFn, errorCallbackFn)
     {
         var that = this;
-        function removeAllCallbackFn(responseText, status, statusText)
+        function removeAllCallbackFn(responseText, status)
         {
             if (status === 200)
             {
@@ -233,7 +238,7 @@ UserDataManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.removeAll failed with status " + status + " " + statusText + ": " + responseText,
+                errorCallback("UserDataManager.removeAll failed with status " + status + ": " + responseText,
                               status,
                               that.removeAll,
                               [callbackFn]);
@@ -249,14 +254,15 @@ UserDataManager.prototype =
             async: true,
             data: dataSpec,
             callback: removeAllCallbackFn,
-            encrypt: true
+            encrypt: true,
+            requestHandler: this.requestHandler
         });
     }
 
 };
 
 // Constructor function
-UserDataManager.create = function UserDataManagerCreateFn(gameSession, errorCallbackFn)
+UserDataManager.create = function UserDataManagerCreateFn(requestHandler, gameSession, errorCallbackFn)
 {
     if (!TurbulenzServices.available())
     {
@@ -264,6 +270,7 @@ UserDataManager.create = function UserDataManagerCreateFn(gameSession, errorCall
     }
 
     var userdataManager = new UserDataManager();
+    userdataManager.requestHandler = requestHandler;
     userdataManager.errorCallbackFn = errorCallbackFn || TurbulenzServices.defaultErrorCallback;
     userdataManager.gameSessionId = gameSession.gameSessionId;
 

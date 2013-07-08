@@ -17,94 +17,225 @@ WebGLInputDevice.prototype = {
         var onkeyup;
         var onmousedown;
         var onmouseup;
+        var onmouseover;
         var onmousemove;
-        var oninputcapture;
-        var oninputrelease;
+        var onmousewheel;
+        var onmouselocklost;
         var event;
         var i;
         var eventType = this.eventType;
         var eventQueue = this.eventQueue;
 
-        if (this.capturing)
+        eventQueue = this.eventQueue;
+        numberOfEvents = eventQueue.length;
+
+        if (numberOfEvents)
         {
-            eventQueue = this.eventQueue;
-            numberOfEvents = eventQueue.length;
+            onkeydown = this.onkeydown;
+            onkeyup = this.onkeyup;
+            onmousedown = this.onmousedown;
+            onmouseup = this.onmouseup;
+            onmouseover = this.onmouseover;
+            onmousemove = this.onmousemove;
+            onmousewheel = this.onmousewheel;
+            onmouselocklost = this.onmouselocklost;
 
-            if (numberOfEvents)
+            for (i = 0; i < numberOfEvents; i += 1)
             {
-                onkeydown = this.onkeydown;
-                onkeyup = this.onkeyup;
-                onmousedown = this.onmousedown;
-                onmouseup = this.onmouseup;
-                onmousemove = this.onmousemove;
-                oninputcapture = this.oninputcapture;
-                oninputrelease = this.oninputrelease;
-
-                for (i = 0; i < numberOfEvents; i += 1)
+                event = eventQueue[i];
+                switch (event.type)
                 {
-                    event = eventQueue[i];
-                    switch (event.type)
+                case eventType.KEY_UP:
+                    if (onkeyup)
                     {
-                    case eventType.KEY_UP:
-                        if (onkeyup)
-                        {
-                            onkeyup(event.key);
-                        }
-                        break;
-
-                    case eventType.KEY_DOWN:
-                        if (onkeydown)
-                        {
-                            onkeydown(event.key);
-                        }
-
-                        break;
-
-                    case eventType.MOUSE_UP:
-                        if (onmouseup)
-                        {
-                            onmouseup(event.button);
-                        }
-
-                        break;
-
-                    case eventType.MOUSE_DOWN:
-                        if (onmousedown)
-                        {
-                            onmousedown(event.button);
-                        }
-
-                        break;
-
-                    case eventType.MOUSE_MOVE:
-                        if (onmousemove)
-                        {
-                            onmousemove(event.deltaX, event.deltaY, event.deltaZ);
-                        }
-
-                        break;
-
-                    case eventType.INPUT_CAPTURE:
-                        if (oninputcapture)
-                        {
-                            oninputcapture();
-                        }
-                        break;
-                    case eventType.INPUT_RELEASE:
-                        this.capturing = false;
-
-                        if (oninputrelease)
-                        {
-                            oninputrelease();
-                        }
-
-                        break;
+                        onkeyup(event.key);
                     }
-                }
+                    break;
 
-                eventQueue.length = 0;
+                case eventType.KEY_DOWN:
+                    if (onkeydown)
+                    {
+                        onkeydown(event.key);
+                    }
+
+                    break;
+
+                case eventType.MOUSE_UP:
+                    if (onmouseup)
+                    {
+                        onmouseup(event.button, event.x, event.y);
+                    }
+
+                    break;
+
+                case eventType.MOUSE_DOWN:
+                    if (onmousedown)
+                    {
+                        onmousedown(event.button, event.x, event.y);
+                    }
+
+                    break;
+
+                case eventType.MOUSE_OVER:
+                    if (onmouseover)
+                    {
+                        onmouseover(event.x, event.y);
+                    }
+
+                    break;
+
+                case eventType.MOUSE_MOVE:
+                    if (onmousemove)
+                    {
+                        onmousemove(event.deltaX, event.deltaY);
+                    }
+
+                    break;
+
+                case eventType.MOUSE_WHEEL:
+                    if (onmousewheel)
+                    {
+                        onmousewheel(event.delta);
+                    }
+
+                    break;
+
+                case eventType.MOUSE_ENTER:
+                    if (this.onmouseenter)
+                    {
+                        this.onmouseenter();
+                    }
+                    break;
+
+                case eventType.MOUSE_LEAVE:
+                    if (this.onmouseleave)
+                    {
+                        this.onmouseleave();
+                    }
+                    break;
+
+                case eventType.FOCUS:
+                    if (this.onfocus)
+                    {
+                        this.onfocus();
+                    }
+
+                    break;
+
+                case eventType.BLUR:
+                    if (this.onblur)
+                    {
+                        this.onblur();
+                    }
+
+                    break;
+
+                case eventType.MOUSE_LOCK_LOST:
+                    if (onmouselocklost)
+                    {
+                        onmouselocklost();
+                    }
+
+                    break;
+                }
             }
+
+            eventQueue.length = 0;
         }
+    },
+
+    hideMouse : function hideMouseFn()
+    {
+        if (this.isHovering)
+        {
+            if (!this.isCursorHidden)
+            {
+                this.isCursorHidden = true;
+                this.previousCursor = document.body.style.cursor;
+                document.body.style.cursor = 'none';
+            }
+
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    },
+
+    showMouse : function showMouseFn()
+    {
+        if (this.isCursorHidden &&
+            !this.isMouseLocked)
+        {
+            this.isCursorHidden = false;
+            document.body.style.cursor = this.previousCursor;
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    },
+
+    isHidden : function isHiddenFn()
+    {
+        return this.isCursorHidden;
+    },
+
+    lockMouse : function lockMouseFn()
+    {
+        if (this.isHovering &&
+            this.isFocused)
+        {
+            this.isMouseLocked = true;
+            this.hideMouse();
+
+            this.addEventHandlersLock();
+
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    },
+
+    unlockMouse : function unlockMouseFn()
+    {
+        if (this.isMouseLocked)
+        {
+            this.isMouseLocked = false;
+            this.showMouse();
+
+            this.addEventHandlersUnlock();
+
+            if (this.isOutsideEngine)
+            {
+                this.isOutsideEngine = false;
+
+                this.isHovering = false;
+
+                // Send mouseout event
+                this.eventQueue.push({
+                        type : this.eventType.MOUSE_LEAVE
+                    });
+
+                this.removeEventHandlersMouseLeave();
+
+            }
+
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    },
+
+    isLocked : function isLockedFn()
+    {
+        return this.isMouseLocked;
     },
 
     // Cannot convert keycodes to unicode in javascript so return empty strings
@@ -128,6 +259,21 @@ WebGLInputDevice.prototype = {
     getLocale : function getLocaleFn()
     {
         return "";
+    },
+
+    // Returns the local coordinates of the event (i.e. position in Canvas coords)
+    getCanvasPosition : function getCanvasPositionFn(event, position)
+    {
+        if (event.offsetX)
+        {
+            position.x = event.offsetX;
+            position.y = event.offsetY;
+        }
+        else if (event.layerX)
+        {
+            position.x = event.layerX;
+            position.y = event.layerY;
+        }
     }
 };
 
@@ -135,13 +281,42 @@ WebGLInputDevice.prototype = {
 WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
 {
     var id = new WebGLInputDevice();
-    id.canvas = canvas;
-    id.capturing = false;
-    id.eventQueue = [];
 
-    var previousCursor = '';
     var lastX = 0;
     var lastY = 0;
+    var onMouseDown;
+    var onMouseUp;
+    var onMouseOver;
+    var onMouseMove;
+    var onWheel;
+    var onKeyDown;
+    var onKeyUp;
+    var emptyEvent;
+
+    id.canvas = canvas;
+    id.isMouseLocked = false;
+    id.isHovering = false;
+    id.isFocused = false;
+    id.isCursorHidden = false;
+    id.isOutsideEngine = false; // Used for determining where we are when unlocking
+    id.eventQueue = [];
+    id.previousCursor = '';
+
+    // Callbacks
+    id.onkeydown = null;
+    id.onkeyup = null;
+    id.onmousedown = null;
+    id.onmouseup = null;
+    id.onmouseover = null;
+    id.onmousemove = null;
+    id.onpaddown = null;
+    id.onpadup = null;
+    id.onpadmove = null;
+    id.onmouseenter = null;
+    id.onmouseleave = null;
+    id.onfocus = null;
+    id.onblur = null;
+    id.onmouselocklost = null;
 
     // Event enums
     var eventType =
@@ -150,12 +325,16 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         KEY_UP : 1,
         MOUSE_DOWN : 2,
         MOUSE_UP : 3,
-        MOUSE_MOVE : 4,
-        PAD_DOWN : 5,
-        PAD_UP : 6,
-        PAD_MOVE : 7,
-        INPUT_CAPTURE : 8,
-        INPUT_RELEASE : 9
+        MOUSE_OVER : 4,
+        MOUSE_MOVE : 5,
+        PAD_DOWN : 6,
+        PAD_UP : 7,
+        PAD_MOVE : 8,
+        MOUSE_ENTER : 9,
+        MOUSE_LEAVE : 10,
+        FOCUS : 11,
+        BLUR : 12,
+        MOUSE_LOCK_LOST : 13
     };
 
     id.eventType = eventType;
@@ -211,7 +390,7 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         RIGHT_ALT : 305,
         ESCAPE : 400,
         TAB : 401,
-        SPACE :	402,
+        SPACE :    402,
         BACKSPACE : 403,
         RETURN : 404,
         GRAVE : 500,
@@ -267,7 +446,7 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         BUTTON_5 : 5,
         DELTA_X : 100,
         DELTA_Y : 101,
-        DELTA_Z : 102
+        MOUSE_WHEEL : 102
     };
 
     /*var padCodes =
@@ -347,7 +526,7 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         8 : 403, // BACKSPACE
         13 : 404, // RETURN
         223 : 500, // GRAVE
-	//192 : 500, // GRAVE (on mac chrome)
+        //192 : 500, // GRAVE (on mac chrome)
         109 : 501, // MINUS (mozilla - gecko)
         189 : 501, // MINUS (ie + webkit)
         107 : 502, // EQUALS (mozilla - gecko)
@@ -414,97 +593,119 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         2 : 1
     };
 
-    function onMouseDown(event)
+    function addEventHandlersMouseEnter()
     {
-        event.stopPropagation();
-        event.preventDefault();
-
-        var button = event.button;
-
-        if (button < 3)
-        {
-            button = mouseMap[button];
-        }
-
-		id.eventQueue.push({
-			type: eventType.MOUSE_DOWN,
-			down: true,
-			button: button
-		});
-
+        // Add event listener to get focus event
+        window.addEventListener('mousedown', onMouseDown, true);
+        window.addEventListener('mouseup', onMouseUp, true);
+        window.addEventListener('mousemove', onMouseOver, true);
+        window.addEventListener('DOMMouseScroll', onWheel, true);
+        window.addEventListener('mousewheel', onWheel, true);
+        window.addEventListener('click', emptyEvent, true);
     }
 
-    function onMouseUp(event)
+    function removeEventHandlersMouseLeave()
     {
-        event.stopPropagation();
-        event.preventDefault();
+        // Remove mouse event listeners
+        window.removeEventListener('mousedown', onMouseDown, true);
+        window.removeEventListener('mousemove', onMouseOver, true);
+        window.removeEventListener('DOMMouseScroll', onWheel, true);
+        window.removeEventListener('mousewheel', onWheel, true);
+        window.removeEventListener('click', emptyEvent, true);
+    }
+    id.removeEventHandlersMouseLeave = removeEventHandlersMouseLeave;
 
-        var button = event.button;
-        //3 === buttonMapping.length
-        if (button < 3)
-        {
-            button = mouseMap[button];
-        }
-		
-		id.eventQueue.push({
-			type: eventType.MOUSE_UP,
-			button: button
-		});
+    function addEventHandlersFocus()
+    {
+        window.addEventListener('keydown', onKeyDown, true);
+        window.addEventListener('keyup', onKeyUp, true);
     }
 
-    function onMouseMove(event)
+    function removeEventHandlersBlur()
     {
+        window.removeEventListener('keydown', onKeyDown, true);
+        window.removeEventListener('keyup', onKeyUp, true);
+        window.removeEventListener('mouseup', onMouseUp, true);
+    }
+
+    function addEventHandlersLock()
+    {
+        window.removeEventListener('mousemove', onMouseOver, true);
+        window.addEventListener('mousemove', onMouseMove, true);
+    }
+    id.addEventHandlersLock = addEventHandlersLock;
+
+    function addEventHandlersUnlock()
+    {
+        window.removeEventListener('mousemove', onMouseMove, true);
+        window.addEventListener('mousemove', onMouseOver, true);
+    }
+    id.addEventHandlersUnlock = addEventHandlersUnlock;
+
+    onMouseOver = function onMouseOverFn(event)
+    {
+        var position = {};
+
         event.stopPropagation();
         event.preventDefault();
 
-        var screenX = event.screenX;
-        var screenY = event.screenY;
-        var deltaX = (screenX - lastX);
-        var deltaY = -(screenY - lastY);
-
-        lastX = screenX;
-        lastY = screenY;
+        id.getCanvasPosition(event, position);
 
         id.eventQueue.push({
-            type: eventType.MOUSE_MOVE,
-            deltaX : deltaX,
-            deltaY : deltaY,
-            deltaZ : 0
+            type : eventType.MOUSE_OVER,
+            x : position.x,
+            y : position.y
         });
-    }
 
-    function onWheel(event)
+        lastX = event.screenX;
+        lastY = event.screenY;
+    };
+
+    onMouseMove = function onMouseMoveFn(event)
     {
         event.stopPropagation();
         event.preventDefault();
 
-        var wheelEvent =
-        {
-            type: eventType.MOUSE_MOVE,
-            deltaX : 0,
-            deltaY : 0
-        };
+        id.eventQueue.push({
+            type : eventType.MOUSE_MOVE,
+            deltaX : (event.screenX - lastX),
+            deltaY : (event.screenY - lastY)
+        });
+
+        lastX = event.screenX;
+        lastY = event.screenY;
+    };
+
+    onWheel = function onWheelFn(event)
+    {
+        var scrollDelta;
+
+        event.stopPropagation();
+        event.preventDefault();
 
         if (event.wheelDelta)
         {
             if (window.opera)
             {
-                wheelEvent.deltaZ = event.wheelDelta < 0 ? 1 : -1;
+                scrollDelta = event.wheelDelta < 0 ? 1 : -1;
             }
             else
             {
-                wheelEvent.deltaZ = event.wheelDelta > 0 ? 1 : -1;
+                scrollDelta = event.wheelDelta > 0 ? 1 : -1;
             }
         }
         else
         {
-            wheelEvent.deltaZ = event.detail  < 0 ? 1 : -1;
+            scrollDelta = event.detail < 0 ? 1 : -1;
         }
 
-        id.eventQueue.push(wheelEvent);
-    }
+        id.eventQueue.push({
+            type : eventType.MOUSE_WHEEL,
+            delta : scrollDelta
+        });
+    };
 
-    function onKeyDown(event)
+    onKeyDown = function onKeyDownFn(event)
     {
         event.stopPropagation();
         event.preventDefault();
@@ -512,8 +713,8 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         var keyCode = event.keyCode;
         keyCode = keyMap[keyCode];
 
-        if (undefined !== keyCode && 
-		   (keyCodes.ESCAPE !== keyCode))
+        if (undefined !== keyCode &&
+           (keyCodes.ESCAPE !== keyCode))
         {
             id.eventQueue.push({
                 type : eventType.KEY_DOWN,
@@ -521,15 +722,15 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
                 key : keyCode
             });
         }
-    }
+    };
 
-    function emptyEvent(event)
+    emptyEvent = function emptyEventFn(event)
     {
         event.stopPropagation();
         event.preventDefault();
-    }
+    };
 
-    function onKeyUp(event)
+    onKeyUp = function onKeyUpFn(event)
     {
         event.stopPropagation();
         event.preventDefault();
@@ -539,22 +740,11 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
 
         if (keyCode === keyCodes.ESCAPE)
         {
+            id.unlockMouse();
+
             id.eventQueue.push({
-                type : eventType.INPUT_RELEASE
+                type : eventType.MOUSE_LOCK_LOST
             });
-
-            window.removeEventListener('keydown', onKeyDown, true);
-            window.removeEventListener('keyup', onKeyUp, true);
-            window.removeEventListener('mousedown', onMouseDown, true);
-            window.removeEventListener('mousemove', onMouseMove, true);
-            window.removeEventListener('mouseup', onMouseUp, true);
-            window.removeEventListener('DOMMouseScroll', onWheel, true);
-            window.removeEventListener('mousewheel', onWheel, true);
-            window.removeEventListener('click', emptyEvent, true);
-
-            document.body.style.cursor = previousCursor;
-
-            canvas.oncontextmenu = null;
         }
         else if (undefined !== keyCode)
         {
@@ -563,61 +753,145 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
                 key : keyCode
             });
         }
-    }
+    };
 
-    canvas.onmouseup = function (event)
+    onMouseDown = function onMouseDownFn(event)
     {
         var button = event.button;
+        var position = {};
 
-        button = mouseMap[button];
+        event.stopPropagation();
+        event.preventDefault();
 
-        if (mouseCodes.BUTTON_0 === button)
+        if (button < 3)
         {
-            if (!id.capturing)
+            button = mouseMap[button];
+        }
+
+        id.getCanvasPosition(event, position);
+
+        id.eventQueue.push({
+            type: eventType.MOUSE_DOWN,
+            down: true,
+            button: button,
+            x : position.x,
+            y : position.y
+        });
+    };
+
+    onMouseUp = function onMouseUpFn(event)
+    {
+        var position = {};
+        var button;
+
+        if (id.isHovering)
+        {
+            if (!id.isFocused)
             {
-                event.stopPropagation();
-                event.preventDefault();
+                // Focus
 
-                id.eventQueue.length = 0;
-
-                var captureEvent =
-                {
-                    type : eventType.INPUT_CAPTURE
-                };
-
-                id.eventQueue.push(captureEvent);
-
-                id.capturing = true;
-
-                previousCursor = document.body.style.cursor;
-
-                lastX = event.screenX;
-                lastY = event.screenY;
-
-                window.addEventListener('keydown', onKeyDown, true);
-                window.addEventListener('keyup', onKeyUp, true);
-                window.addEventListener('mousedown', onMouseDown, true);
-                window.addEventListener('mousemove', onMouseMove, true);
-                window.addEventListener('mouseup', onMouseUp, true);
-                window.addEventListener('DOMMouseScroll', onWheel, true);
-                window.addEventListener('mousewheel', onWheel, true);
-                window.addEventListener('click', emptyEvent, true);
-
+                id.isFocused = true;
                 window.focus();
+                canvas.focus();
 
-                document.body.style.cursor = 'none';
+                addEventHandlersFocus();
 
                 canvas.oncontextmenu = function () {
                     return false;
                 };
 
-                return;
+                id.eventQueue.push({
+                        type : eventType.FOCUS
+                    });
             }
+
+            event.stopPropagation();
+            event.preventDefault();
+
+            button = event.button;
+
+            if (button < 3)
+            {
+                button = mouseMap[button];
+            }
+
+            id.getCanvasPosition(event, position);
+
+            id.eventQueue.push({
+                type : eventType.MOUSE_UP,
+                button : button,
+                x : position.x,
+                y : position.y
+            });
+        }
+        else
+        {
+            if (id.isFocused)
+            {
+                // Blur
+                id.isFocused = false;
+                removeEventHandlersBlur();
+                canvas.oncontextmenu = null;
+
+                id.eventQueue.push({
+                        type : eventType.BLUR
+                    });
+            }
+        }
+    };
+
+    canvas.onmouseover = function (event)
+    {
+        if (!id.isMouseLocked)
+        {
+            id.isHovering = true;
+
+            // Send mouseover event
+            id.eventQueue.push({
+                    type : eventType.MOUSE_ENTER
+                });
+
+            lastX = event.screenX;
+            lastY = event.screenY;
+
+            addEventHandlersMouseEnter();
+        }
+        else
+        {
+            id.isOutsideEngine = false;
+        }
+    };
+
+    canvas.onmouseout = function (event)
+    {
+        if (!id.isMouseLocked)
+        {
+            id.isHovering = false;
+
+            // Send mouseout event
+            id.eventQueue.push({
+                    type : eventType.MOUSE_LEAVE
+                });
+
+            if (id.isCursorHidden)
+            {
+                id.showMouse();
+            }
+
+            removeEventHandlersMouseLeave();
+        }
+        else
+        {
+            id.isOutsideEngine = true;
         }
     };
 
     id.keyCodes = keyCodes;
     id.mouseCodes = mouseCodes;
+    id.onKeyUp = onKeyUp;
+    id.onKeyDown = onKeyDown;
+    id.onMouseMove = onMouseMove;
+    id.onMouseOver = onMouseOver;
 
     return id;
 };

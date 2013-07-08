@@ -36,7 +36,14 @@ Observer.prototype = {
         }
     },
 
-    notify: function observerNotifyFn(data)
+    unsubscribeAll: function observerUnsubscribeAllFn(subscriber)
+    {
+        this.subscribers.length = 0;
+    },
+
+    // this function can take any number of arguments
+    // they are passed on to the subscribers
+    notify: function observerNotifyFn()
     {
         // Note that the callbacks might unsubscribe
         var subscribers = this.subscribers;
@@ -45,7 +52,7 @@ Observer.prototype = {
 
         while (index < length)
         {
-            subscribers[index].call(null, data);
+            subscribers[index].apply(null, arguments);
             if (subscribers.length === length)
             {
                 index += 1;

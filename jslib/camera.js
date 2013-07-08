@@ -82,18 +82,11 @@ Camera.prototype =
             w1 = 0.0;
         }
 
-        var md = this.md;
-
-        var projectionRight = md.v4Build(rcpvwX,  0.0,     0.0, 0.0);
-        var projectionUp    = md.v4Build(0.0,     rcpvwY,  0.0, 0.0);
-        var projectionAt    = md.v4Build(-shearX, -shearY,  z0,  z1);
-        var projectionPos   = md.v4Build(-shearX, -shearY,  w0,  w1);
-
-        this.projectionMatrix = md.m44Build(projectionRight,
-                                       projectionUp,
-                                       projectionAt,
-                                       projectionPos,
-                                       this.projectionMatrix);
+        this.projectionMatrix = this.md.m44Build(rcpvwX,  0.0,     0.0, 0.0,
+                                                 0.0,     rcpvwY,  0.0, 0.0,
+                                                 -shearX, -shearY,  z0,  z1,
+                                                 0.0,     0.0,      w0,  w1,
+                                                 this.projectionMatrix);
     },
 
     updateViewMatrix : function updateViewMatrixFn()
@@ -527,7 +520,7 @@ CameraController.prototype =
         }
 
         var right = ((this.right + this.padright) - (this.left + this.padleft));
-        var up = this.up;
+        var up = this.up - this.down;
         var forward = ((this.forward + this.padforward) - (this.backward + this.padbackward));
         if (right !== 0.0 ||
             up !== 0.0 ||
@@ -568,6 +561,7 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
     c.right = 0.0;
     c.left = 0.0;
     c.up = 0.0;
+    c.down = 0.0;
     c.forward = 0.0;
     c.backward = 0.0;
     c.step = 0.0;
@@ -576,15 +570,20 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
     c.padforward = 0.0;
     c.padbackward = 0.0;
 
-    var oldOnKeyDown, oldOnKeyUp, oldOnMouseMove, oldOnPadMove,
-        keyCodes;
+    var oldOnKeyDown, oldOnKeyUp, oldOnMouseUp, oldOnMouseWheel, oldOnMouseMove,
+    oldOnPadMove, oldOnMouseLockLost;
+
+    var keyCodes;
 
     if (id)
     {
         oldOnKeyDown = id.onkeydown;
         oldOnKeyUp = id.onkeyup;
+        oldOnMouseUp = id.onmouseup;
+        oldOnMouseWheel = id.onmousewheel;
         oldOnMouseMove = id.onmousemove;
         oldOnPadMove = id.onpadmove;
+        oldOnMouseLockLost = id.onmouselocklost;
 
         keyCodes = id.keyCodes;
     }
@@ -625,7 +624,7 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
 
         case keyCodes.Q:
         case keyCodes.NUMPAD_7:
-            c.up = -1.0;
+            c.down = 1.0;
             break;
         }
 
@@ -665,9 +664,12 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
 
         case keyCodes.E:
         case keyCodes.NUMPAD_9:
+            c.up = 0.0;
+            break;
+
         case keyCodes.Q:
         case keyCodes.NUMPAD_7:
-            c.up = 0.0;
+            c.down = 0.0;
             break;
 
         case keyCodes.RETURN:
@@ -709,19 +711,37 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
     }
 
     // Mouse handling
-    c.onmousemove = function onmousemoveFn(deltaX, deltaY, deltaZ)
+    c.onmouseup = function onmouseupFn(button, x, y)
     {
-        c.turn  += deltaX;
-        c.pitch -= deltaY;
-
-        if (deltaZ !== 0.0)
+        if (!id.isLocked())
         {
-            c.step = deltaZ * 5;
+            id.lockMouse();
         }
+
+        if (oldOnMouseUp)
+        {
+            oldOnMouseUp(button, x, y);
+        }
+    };
+
+    c.onmousewheel = function onmousewheelFn(delta)
+    {
+        c.step = delta * 5;
 
         if (oldOnMouseMove)
         {
-            oldOnMouseMove(deltaX, deltaY, deltaZ);
+            oldOnMouseMove(delta);
+        }
+    };
+
+    c.onmousemove = function onmousemoveFn(deltaX, deltaY)
+    {
+        c.turn  += deltaX;
+        c.pitch += deltaY;
+
+        if (oldOnMouseMove)
+        {
+            oldOnMouseMove(deltaX, deltaY);
         }
     };
 
@@ -759,13 +779,21 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
         }
     };
 
+    c.onmouselocklost = function onmouselocklostFn()
+    {
+        id.unlockMouse();
+    };
+
     // Attach to an InputDevice
     c.attach = function attachFn(id)
     {
-        id.onkeydown   = c.onkeydown;
-        id.onkeyup     = c.onkeyup;
-        id.onmousemove = c.onmousemove;
-        id.onpadmove   = c.onpadmove;
+        id.onkeydown        = c.onkeydown;
+        id.onkeyup          = c.onkeyup;
+        id.onmouseup        = c.onmouseup;
+        id.onmousewheel     = c.onmousewheel;
+        id.onmousemove      = c.onmousemove;
+        id.onpadmove        = c.onpadmove;
+        id.onmouselocklost  = c.onmouselocklost;
     };
 
     if (id)

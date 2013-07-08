@@ -2,7 +2,7 @@
 /*global window: false*/
 /*jslint nomen: false*/
 
-//an object that takes care of communmication with the gamesite.
+//an object that takes care of communication with the gamesite.
 // The are  Eventemitters registered under window.document._turbulenzGamesiteBridge.Events
 // then call emit to emit events
 function TurbulenzGamesiteBridge(gameSession)
@@ -24,8 +24,10 @@ function TurbulenzGamesiteBridge(gameSession)
         // bridge.Events.emit('ready'); //bridge events exists on the gamesite an is an eventemitter
     }
 }
+
 TurbulenzGamesiteBridge.prototype = {
     version: 1,
+
     _getGamesiteDocument: function _getGamesiteDocumentFn() {
         var topLevelWindow = window;
         var counter = 15;
@@ -37,15 +39,17 @@ TurbulenzGamesiteBridge.prototype = {
         this.doc = topLevelWindow.document;
         return this.doc;
     },
+
     emit: function emitFn(event, arg) {
         if (this.Events) {
             this.Events.emit(event, arg);
         }
-
     }
 };
+
 // Singleton function
 var tgsObject;
+
 TurbulenzGamesiteBridge.getSingleton = function TurbulenzGamesiteBridgeCreateFn(gameSession)
 {
     if (!tgsObject)
@@ -54,6 +58,7 @@ TurbulenzGamesiteBridge.getSingleton = function TurbulenzGamesiteBridgeCreateFn(
     }
     return tgsObject;
 };
+
 TurbulenzGamesiteBridge.emit = function TurbulenzGamesiteBridgeEmitFn(args)
 {
     //first emit will lazily create the singleton

@@ -22,12 +22,14 @@ var TurbulenzServices = {
 
     defaultErrorCallback: function turbulenzServicesDefaultErrorCallbackFn(errorMsg, httpStatus) {},
 
-    createGameSession: function turbulenzServicesCreateGameSession(sessionCreatedFn, errorCallbackFn)
+    createGameSession: function turbulenzServicesCreateGameSession(requestHandler, sessionCreatedFn, errorCallbackFn)
     {
         var gameSession = new GameSession();
 
         var gameSlug = window.gameSlug;
         gameSession.gameSlug = gameSlug;
+
+        gameSession.requestHandler = requestHandler;
         gameSession.errorCallbackFn = errorCallbackFn || TurbulenzServices.defaultErrorCallback;
         gameSession.gameSessionId = null;
 
@@ -39,17 +41,23 @@ var TurbulenzServices = {
         if (!TurbulenzServices.available())
         {
             // Call sessionCreatedFn on a timeout to get the same behaviour as the AJAX call
-            TurbulenzEngine.setTimeout(sessionCreatedCall, 0);
+            if (sessionCreatedFn)
+            {
+                TurbulenzEngine.setTimeout(sessionCreatedCall, 0);
+            }
             return gameSession;
         }
 
-        function gameSessionRequestCallbackFn(jsonResponse, status, statusText)
+        function gameSessionRequestCallbackFn(jsonResponse, status)
         {
             if (status === 200)
             {
                 gameSession.mappingTable = jsonResponse.mappingTable;
                 gameSession.gameSessionId = jsonResponse.gameSessionId;
-                sessionCreatedFn(gameSession);
+                if (sessionCreatedFn)
+                {
+                    sessionCreatedFn(gameSession);
+                }
             }
             else
             {
@@ -61,13 +69,15 @@ var TurbulenzServices = {
             url: '/api/v1/games/create-session/' + gameSlug,
             method: 'POST',
             async: true,
-            callback: gameSessionRequestCallbackFn
+            callback: gameSessionRequestCallbackFn,
+            requestHandler: requestHandler
         });
 
         return gameSession;
     },
 
-    createMappingTable: function turbulenzServicesCreateMappingTable(gameSession,
+    createMappingTable: function turbulenzServicesCreateMappingTable(requestHandler,
+                                                                     gameSession,
                                                                      tableRecievedFn,
                                                                      defaultMappingSettings,
                                                                      errorCallbackFn)
@@ -130,7 +140,7 @@ var TurbulenzServices = {
                 url: mappingTable.mappingTableURL,
                 method: 'GET',
                 async: true,
-                callback: function createMappingTableAjaxErrorCheck(jsonResponse, status, statusText) {
+                callback: function createMappingTableAjaxErrorCheck(jsonResponse, status) {
                     if (status === 200)
                     {
                         createMappingTableCallbackFn(jsonResponse);
@@ -141,23 +151,26 @@ var TurbulenzServices = {
                         mappingTable.urlMapping = defaultMappingSettings && (defaultMappingSettings.urnMapping || {});
                         tableRecievedFn(mappingTable);
                     }
-                }
+                },
+                requestHandler: requestHandler
             });
         }
         else
         {
-            TurbulenzEngine.request(mappingTable.mappingTableURL,
-                function createMappingTablePluginErrorCheck(responseText, status, statusText)
-                {
-                    if (responseText)
+            requestHandler.request({
+                    src: mappingTable.mappingTableURL,
+                    onload: function createMappingTablePluginErrorCheck(responseText, status)
                     {
-                        createMappingTableCallbackFn(JSON.parse(responseText));
-                    }
-                    else
-                    {
-                        mappingTable.errorCallbackFn("TurbulenzServices.createMappingTable could not load mapping table");
-                        mappingTable.urlMapping = defaultMappingSettings.urnMapping || {};
-                        tableRecievedFn(mappingTable);
+                        if (responseText)
+                        {
+                            createMappingTableCallbackFn(JSON.parse(responseText));
+                        }
+                        else
+                        {
+                            mappingTable.errorCallbackFn("TurbulenzServices.createMappingTable could not load mapping table");
+                            mappingTable.urlMapping = defaultMappingSettings.urnMapping || {};
+                            tableRecievedFn(mappingTable);
+                        }
                     }
                 });
         }
@@ -165,11 +178,14 @@ var TurbulenzServices = {
         return mappingTable;
     },
 
-    createLeaderboardManager: function turbulenzServicesCreateLeaderboardManager(gameSession,
+    createLeaderboardManager: function turbulenzServicesCreateLeaderboardManager(requestHandler,
+                                                                                 gameSession,
                                                                                  leaderboardMetaRecieved,
                                                                                  errorCallbackFn)
     {
         var leaderboardManager = new LeaderboardManager();
+
+        leaderboardManager.requestHandler = requestHandler;
         leaderboardManager.gameSession = gameSession;
         leaderboardManager.gameSessionId = gameSession.gameSessionId;
         leaderboardManager.errorCallbackFn = errorCallbackFn || this.defaultErrorCallback;
@@ -191,7 +207,7 @@ var TurbulenzServices = {
             method: 'GET',
             async: true,
             data: dataSpec,
-            callback: function createLeaderboardManagerAjaxErrorCheck(jsonResponse, status, statusText) {
+            callback: function createLeaderboardManagerAjaxErrorCheck(jsonResponse, status) {
                 if (status === 200)
                 {
                     var metaArray = jsonResponse.data;
@@ -214,16 +230,19 @@ var TurbulenzServices = {
                 {
                     leaderboardManager.errorCallbackFn("TurbulenzServices.createLeaderboardManager error with HTTP status " + status + ": " + jsonResponse.msg, status);
                 }
-            }
+            },
+            requestHandler: requestHandler
         });
 
         return leaderboardManager;
     },
 
     //just a factory, Badges have to be included from the caller!->TODO change to a less obtrusive pattern
-    createBadgeManager: function turbulenzServicesCreateBadgeManager(gameSession)
+    createBadgeManager: function turbulenzServicesCreateBadgeManager(requestHandler, gameSession)
     {
         var badgemanager = new BadgeManager();
+
+        badgemanager.requestHandler = requestHandler;
         badgemanager.gameSession = gameSession;
         badgemanager.gameSessionId = gameSession.gameSessionId;
         //got to init the global event Object at the beginning to register it in the window.document
@@ -231,7 +250,8 @@ var TurbulenzServices = {
         return badgemanager;
     },
 
-    createUserProfile: function turbulenzServicesCreateUserProfile(profileRecievedFn,
+    createUserProfile: function turbulenzServicesCreateUserProfile(requestHandler,
+                                                                   profileRecievedFn,
                                                                    errorCallbackFn)
     {
         var userProfile = {};
@@ -264,7 +284,7 @@ var TurbulenzServices = {
                 url: url,
                 method: 'GET',
                 async: true,
-                callback: function createUserProfileAjaxErrorCheck(jsonResponse, status, statusText)
+                callback: function createUserProfileAjaxErrorCheck(jsonResponse, status)
                 {
                     if (status === 200)
                     {
@@ -275,24 +295,9 @@ var TurbulenzServices = {
                         errorCallbackFn("TurbulenzServices.createUserProfile error with HTTP status " + status + ": " + jsonResponse.msg, status);
                     }
                     profileRecievedFn(userProfile);
-                }
+                },
+                requestHandler: requestHandler
             });
-        }
-        else
-        {
-            TurbulenzEngine.request(url,
-                function createUserProfilePluginErrorCheck(responseText)
-                {
-                    if (responseText)
-                    {
-                        loadUserProfileCallbackFn(JSON.parse(responseText));
-                    }
-                    else
-                    {
-                        errorCallbackFn("TurbulenzServices.createUserProfile could not load user profile");
-                    }
-                    profileRecievedFn(userProfile);
-                });
         }
 
         return userProfile;

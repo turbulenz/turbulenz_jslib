@@ -1,5 +1,27 @@
 // Copyright (c) 2009-2011 Turbulenz Limited
 
+/*global Camera: false*/
+/*global CameraController: false*/
+/*global Floor: false*/
+/*global ResourceLoader: false*/
+/*global RequestHandler: false*/
+/*global TextureManager: false*/
+/*global ShaderManager: false*/
+/*global EffectManager: false*/
+/*global AnimationManager: false*/
+/*global PhysicsManager: false*/
+/*global Scene: false*/
+/*global DefaultRendering: false*/
+/*global VMath: false*/
+/*global InterpolatorController: false*/
+/*global PoseController: false*/
+/*global NodeTransformController: false*/
+/*global SkinnedNode: false*/
+
+/*global jQuery: false*/
+/*global window: false*/
+/*global alert: false*/
+
 //
 // Viewer
 //
@@ -95,8 +117,10 @@ Viewer.create = function viewerCreateFn(tz, applicationSettings)
 
     var floor = Floor.create(gd, md);
 
-    var tm = TextureManager.create(gd, null, errorCallback);
-    var sm = ShaderManager.create(gd, null, errorCallback);
+    var rh = RequestHandler.create({});
+
+    var tm = TextureManager.create(gd, rh, null, errorCallback);
+    var sm = ShaderManager.create(gd, rh, null, errorCallback);
     var em = EffectManager.create(gd, md, sm, null, errorCallback);
     var animationManager = AnimationManager.create(errorCallback);
 
@@ -124,7 +148,10 @@ Viewer.create = function viewerCreateFn(tz, applicationSettings)
 
     var request = function requestFn(url, onload)
     {
-        return tz.request(((urlRemapping && urlRemapping[url]) || (vi.pathPrefix + url)), onload);
+        return rh.request({
+            src: ((urlRemapping && urlRemapping[url]) || (vi.pathPrefix + url)),
+            onload: onload
+        });
     };
 
     function remappingTableReceivedFn(text)
@@ -156,7 +183,7 @@ Viewer.create = function viewerCreateFn(tz, applicationSettings)
         urlRemappingReceived = true;
     }
 
-    tz.request(applicationSettings.remappingTableURL, remappingTableReceivedFn);
+    request(applicationSettings.remappingTableURL, remappingTableReceivedFn);
 
     var baseMaterialsScene = Scene.create(md);
     baseMaterialsScene.load({
@@ -550,7 +577,7 @@ Viewer.create = function viewerCreateFn(tz, applicationSettings)
             resourceLoader.resolve({
                 data : sceneData,
                 append : false,
-                request : request,
+                requestHandler: rh,
                 onload : sceneReceived
             });
         }

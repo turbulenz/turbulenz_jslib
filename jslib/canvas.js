@@ -2257,13 +2257,14 @@ CanvasContext.prototype =
             var fontName = this.buildFontName();
             if (fontName)
             {
-                return fm.calculateTextDimensions(fontName, text, 1.0, 0);
+                return {
+                        width : fm.calculateTextDimensions(fontName, text, 1.0, 0).width
+                    };
             }
         }
 
         return {
-                width : 0,
-                height : 0
+                width : 0
             };
     },
 

@@ -141,23 +141,37 @@ MouseForces.create = function mouseForcesCreateFn(gd, id, md, pd, dragExtentsMin
 
     // Mouse handling
     var oldmousemove = id.onmousemove;
+    var oldmouseup = id.onmouseup;
+    var oldmousewheel = id.onmousewheel;
 
-    c.onmousemove = function onmousemoveFn(deltaX, deltaY, deltaZ)
+    c.onmousewheel = function onmousewheelFn(delta)
+    {
+        c.mouseZ += delta;
+
+        if (oldmousewheel)
+        {
+            oldmousewheel(delta);
+        }
+
+        return false;
+    };
+    id.onmousewheel = c.onmousewheel;
+
+    c.onmousemove = function onmousemoveFn(deltaX, deltaY)
     {
         c.mouseX += (deltaX / gd.width);
-        c.mouseY -= (deltaY / gd.height);
-        c.mouseZ += deltaZ;
+        c.mouseY += (deltaY / gd.height);
 
         if (oldmousemove)
         {
-            oldmousemove(deltaX, deltaY, deltaZ);
+            oldmousemove(deltaX, deltaY);
         }
 
         return false;
     };
     id.onmousemove = c.onmousemove;
 
-    c.onmousedown = function onmousedownFn(button)
+    c.onmousedown = function onmousedownFn(button, x, y)
     {
         c.mouseX = 0.5;
         c.mouseY = 0.5;
@@ -166,11 +180,17 @@ MouseForces.create = function mouseForcesCreateFn(gd, id, md, pd, dragExtentsMin
         return false;
     };
 
-    c.onmouseup = function onmouseupFn(button)
+    c.onmouseup = function onmouseupFn(button, x, y)
     {
         c.mouseX = 0.5;
         c.mouseY = 0.5;
         c.mouseZ = 0.0;
+
+        if (oldmouseup)
+        {
+            oldmouseup(button, x, y);
+        }
+
         c.grabBody = false;
         return false;
     };

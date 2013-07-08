@@ -1,5 +1,8 @@
 // Copyright (c) 2011 Turbulenz Limited
 
+/*global TurbulenzEngine: false*/
+/*global Utilities: false*/
+
 //
 // API
 //
@@ -11,7 +14,7 @@ LeaderboardManager.prototype =
     getOverview: function leaderboardManagerGetOverviewFn(spec, callbackFn, errorCallbackFn)
     {
         var that = this;
-        function getOverviewCallbackFn(jsonResponse, status, statusText)
+        function getOverviewCallbackFn(jsonResponse, status)
         {
             if (status === 200)
             {
@@ -27,7 +30,7 @@ LeaderboardManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("LeaderboardManager.getKeys failed with status " + status + " " + statusText + ": " + jsonResponse.msg,
+                errorCallback("LeaderboardManager.getKeys failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               that.getOverview,
                               [spec, callbackFn]);
@@ -47,7 +50,8 @@ LeaderboardManager.prototype =
             method: 'GET',
             async: true,
             data : dataSpec,
-            callback: getOverviewCallbackFn
+            callback: getOverviewCallbackFn,
+            requestHandler: this.requestHandler
         });
     },
 
@@ -59,7 +63,7 @@ LeaderboardManager.prototype =
         }
 
         var that = this;
-        function getCallbackFn(jsonResponse, status, statusText)
+        function getCallbackFn(jsonResponse, status)
         {
             if (status === 200)
             {
@@ -73,7 +77,7 @@ LeaderboardManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("LeaderboardManager.get failed with status " + status + " " + statusText + ": " + jsonResponse.msg,
+                errorCallback("LeaderboardManager.get failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               that.get,
                               [key, spec, callbackFn]);
@@ -101,7 +105,8 @@ LeaderboardManager.prototype =
             method: 'GET',
             async: true,
             data : dataSpec,
-            callback: getCallbackFn
+            callback: getCallbackFn,
+            requestHandler: this.requestHandler
         });
     },
 
@@ -125,7 +130,7 @@ LeaderboardManager.prototype =
         }
 
         var that = this;
-        function setCallbackFn(jsonResponse, status, statusText)
+        function setCallbackFn(jsonResponse, status)
         {
             if (status === 200)
             {
@@ -142,7 +147,7 @@ LeaderboardManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("LeaderboardManager.set failed with status " + status + " " + statusText + ": " + jsonResponse.msg,
+                errorCallback("LeaderboardManager.set failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               that.set,
                               [key, score, callbackFn]);
@@ -159,7 +164,8 @@ LeaderboardManager.prototype =
             async: true,
             data : dataSpec,
             callback: setCallbackFn,
-            encrypt: true
+            encrypt: true,
+            requestHandler: this.requestHandler
         });
     }
 };

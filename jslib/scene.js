@@ -674,7 +674,7 @@ Scene.prototype =
             } /*
             else
             {
-                console.log("Camera outside areas!");
+                Utilities.log("Camera outside areas!");
             }*/
         }
 
@@ -2281,7 +2281,7 @@ Scene.prototype =
                         }
                         else
                         {
-                            //console.log("" + surface.primitive + " ," + surface.numVertices + " ," + surface.first);
+                            //Utilities.log("" + surface.primitive + " ," + surface.numVertices + " ," + surface.first);
                             draw.call(gd, surface.primitive, surface.numVertices, surface.first);
                         }
                     }
@@ -3551,7 +3551,7 @@ Scene.prototype =
                                         while (vs < numVertexSources);
                                     }
 
-                                    //console.log("VertexBuffer creation time: " + (TurbulenzEngine.time - startTime));
+                                    //Utilities.log("VertexBuffer creation time: " + (TurbulenzEngine.time - startTime));
 
                                     var vertexDataIndexData = [];
                                     vertexDataIndexData.length = numIndices;
@@ -3646,7 +3646,7 @@ Scene.prototype =
                     }
                 }
 
-                //console.log("Buffers creation time: " + (TurbulenzEngine.time - startTime));
+                //Utilities.log("Buffers creation time: " + (TurbulenzEngine.time - startTime));
 
                 var semanticsHash = semanticsNames.join();
                 var semantics = cachedSemantics[semanticsHash];
@@ -4010,7 +4010,7 @@ Scene.prototype =
 
                                 if (!sharedMaterial)
                                 {
-                                    //console.log("Unknown material '" + sharedMaterialName + "'");
+                                    //Utilities.log("Unknown material '" + sharedMaterialName + "'");
                                     return undefined;
                                 }
                                 materials[sharedMaterialName] = sharedMaterial;
@@ -4175,7 +4175,7 @@ Scene.prototype =
 
                     if (overloadedNode)
                     {
-                        //console.log("Overloaded node '" + nodePath + "'");
+                        //Utilities.log("Overloaded node '" + nodePath + "'");
 
                         var overloadedMatrix = overloadedNode.local;
                         if (overloadedMatrix && node.local)
@@ -4188,7 +4188,7 @@ Scene.prototype =
                         var overloadedChildren = overloadedNode.children;
                         if (overloadedChildren && node.children)
                         {
-                            //console.log("Concat children of node '" + nodePath + "'");
+                            //Utilities.log("Concat children of node '" + nodePath + "'");
                             while (node.children.length)
                             {
                                 var child = node.children[0];
@@ -4268,7 +4268,7 @@ Scene.prototype =
             var target = this.findNode(targetName);
             if (!target)
             {
-                //console.log("Missing target: " + targetName);
+                //Utilities.log("Missing target: " + targetName);
                 baseIndex -= 1;
                 continue;
             }

@@ -145,7 +145,7 @@ ResourceLoader.prototype =
                         }
                     }
                 }
-                //console.log("resolved ref for " + anim + " count now " + (currentLoader.numReferencesPending-1));
+                //Utilities.log("resolved ref for " + anim + " count now " + (currentLoader.numReferencesPending-1));
                 currentLoader.numReferencesPending -= 1;
                 if (currentLoader.numReferencesPending <= 0)
                 {
@@ -169,9 +169,14 @@ ResourceLoader.prototype =
                     {
                         this.animationsPending[a] = true;
                         this.numReferencesPending += 1;
-                        //console.log("adding ref for " + a + " count now " + this.numReferencesPending);
+                        //Utilities.log("adding ref for " + a + " count now " + this.numReferencesPending);
                         delete fileAnims[a].reference;
-                        requestOwner.request(reference, resolveRef(this));
+
+                        loadParams.requestHandler.request({
+                            src: reference,
+                            requestOwner: requestOwner,
+                            onload: resolveRef(this)
+                        });
                     }
                 }
                 else
@@ -224,7 +229,7 @@ ResourceLoader.prototype =
             var reference = node.reference;
             if (reference)
             {
-                //console.log("Reference resolve for " + nodePath);
+                //Utilities.log("Reference resolve for " + nodePath);
 
                 var internalReferenceIndex = reference.indexOf("#");
                 if (internalReferenceIndex === -1)
@@ -233,7 +238,7 @@ ResourceLoader.prototype =
                     if (!referenceParameters || referenceParameters.length === 0 || !node.inplace)
                     {
                         numReferences += 1;
-                        //console.log("adding ref for " + nodePath + " numrefs now " + numReferences);
+                        //Utilities.log("adding ref for " + nodePath + " numrefs now " + numReferences);
 
                         var sceneParameters = copyObjectFn(loadParams);
                         sceneParameters.append = true;
@@ -284,7 +289,11 @@ ResourceLoader.prototype =
                                 referenceParameters.length = 0;
                             };
 
-                            requestOwner.request(reference, loadReference);
+                            loadParams.requestHandler.request({
+                                    src: reference,
+                                    requestOwner: requestOwner,
+                                    onload: loadReference
+                                });
                         }
                         else
                         {
@@ -308,7 +317,7 @@ ResourceLoader.prototype =
                         node.geometryinstances[gi] = copyObjectFn(geometryinstances[gi]);
                         var geometryInstance = node.geometryinstances[gi];
 
-                        //console.log("prefixing " + geometryInstance.geometry + " with " + shapesNamePrefix);
+                        //Utilities.log("prefixing " + geometryInstance.geometry + " with " + shapesNamePrefix);
                         geometryInstance.geometry = shapesNamePrefix + "-" + geometryInstance.geometry;
                     }
                 }
@@ -349,7 +358,7 @@ ResourceLoader.prototype =
 
                 if (overloadedNode)
                 {
-                    //console.log("Overloaded node '" + nodePath + "'");
+                    //Utilities.log("Overloaded node '" + nodePath + "'");
 
                     var overloadedMatrix = overloadedNode.matrix;
                     if (overloadedMatrix && fileNode.matrix)
@@ -361,7 +370,7 @@ ResourceLoader.prototype =
                     var overloadedChildren = overloadedNode.nodes;
                     if (overloadedChildren && fileNode.nodes)
                     {
-                        //console.log("Concat children of node '" + nodePath + "'");
+                        //Utilities.log("Concat children of node '" + nodePath + "'");
                         for (var c in fileNode.nodes)
                         {
                             if (fileNode.nodes.hasOwnProperty(c))
@@ -405,7 +414,7 @@ ResourceLoader.prototype =
         }
 
         this.numReferencesPending += numReferences;
-        //console.log("total refs now " + this.numReferencesPending);
+        //Utilities.log("total refs now " + this.numReferencesPending);
     },
 
     //
@@ -594,7 +603,7 @@ ResourceLoader.prototype =
         if (loadParams.isReference)
         {
             this.numReferencesPending -= 1;
-            //console.log("loaded ref now " + this.numReferencesPending);
+            //Utilities.log("loaded ref now " + this.numReferencesPending);
         }
 
         if (this.numReferencesPending <= 0)
@@ -623,9 +632,13 @@ ResourceLoader.prototype =
             loader.resolve(loadParams);
         };
 
-        var requestOwner = (loadParams.request ? loadParams : TurbulenzEngine);
-        requestOwner.request(assetPath, dataReceived);
+        loadParams.requestHandler.request({
+                src: assetPath,
+                requestOwner: loadParams.request ? loadParams : TurbulenzEngine,
+                onload: dataReceived
+            });
     }
+
 };
 
 // Constructor function

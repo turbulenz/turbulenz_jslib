@@ -1,5 +1,7 @@
 // Copyright (c) 2009-2011 Turbulenz Limited
+
 /*global TurbulenzEngine: false*/
+/*global Observer: false*/
 
 "use strict";
 
@@ -25,12 +27,11 @@ FontManager.prototype =
   @constructs Constructs a FontManager object.
 
   @param {GraphicsDevice} gd Graphics device
-  @param {String} request Function used to request JSON files
-  @param {Element} log Logging element
+  @param {RequestHandler} rh RequestHandler object
 
   @return {FontManager} object, null if failed
 */
-FontManager.create = function fontManagerCreateFn(gd, df, errorCallback, log)
+FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log)
 {
     if (!errorCallback)
     {
@@ -327,8 +328,9 @@ FontManager.create = function fontManagerCreateFn(gd, df, errorCallback, log)
 
     var fonts = {};
     var loadingFont = {};
+    var loadedObservers = {};
+    var loadingPages = {};
     var numLoadingFonts = 0;
-    var numLoadingPages = 0;
     var internalFont = {};
     var pathRemapping = null;
     var pathPrefix = "";
@@ -397,38 +399,6 @@ FontManager.create = function fontManagerCreateFn(gd, df, errorCallback, log)
         }
     }
 
-    function createLoadedPage(pages, i, path)
-    {
-        return function (t) {
-
-            var font = fonts[path];
-            if (font)
-            {
-                if (t)
-                {
-                    pages[i] = t;
-
-                    if (i === 0)
-                    {
-                        font.texture = t;
-                    }
-                }
-                else
-                {
-                    errorCallback("Failed to load font page: '" + pages[i] + "'.");
-                    delete fonts[path];
-                }
-            }
-
-            numLoadingPages -= 1;
-            if (numLoadingPages === 0)
-            {
-                delete loadingFont[path];
-                numLoadingFonts -= 1;
-            }
-        };
-    }
-
     /**
       Creates a font from an '.fnt' or '.fontdat'file and its associated image file
 
@@ -438,18 +408,63 @@ FontManager.create = function fontManagerCreateFn(gd, df, errorCallback, log)
       @name load
 
       @param {string} path Path to the font file without the extension
+      @param {function} onFontLoaded function to call once the font has loaded
 
       @return {object} Font object if it exists, undefined otherwise
     */
-    function loadFontFn(path)
+    function loadFontFn(path, onFontLoaded)
     {
+        function pageComplete()
+        {
+            loadingPages[path] -= 1;
+            if (loadingPages[path] === 0)
+            {
+                // Last page response
+                delete loadingPages[path];
+                delete loadingFont[path];
+                numLoadingFonts -= 1;
+                return true;
+            }
+            return false;
+        }
+        
+        function requestFn(url, onload, callContext)
+        {
+            var font = fonts[path];
+            if (!font)
+            {
+                pageComplete();
+                return;
+            }
+            
+            if (!gd.createTexture({
+                src     : url,
+                mipmaps : true,
+                onload  : onload
+            }))
+            {
+                errorCallback("Failed to create texture for font '" + path + "'.");
+                delete fonts[path];
+
+                pageComplete();
+            }
+        }
+
         var font = fonts[path];
         if (!font)
         {
             if (!(path in loadingFont))
             {
                 loadingFont[path] = true;
+                loadingPages[path] = 0;
                 numLoadingFonts += 1;
+
+                var observer = Observer.create();
+                loadedObservers[path] = observer;
+                if (onFontLoaded)
+                {
+                    observer.subscribe(onFontLoaded);
+                }
 
                 var fontDataLoaded = function fontDataLoadedFn(text)
                 {
@@ -481,47 +496,70 @@ FontManager.create = function fontManagerCreateFn(gd, df, errorCallback, log)
                     }
 
                     fonts[path] = font;
-
                     var texturePath;
                     var pages = font.pages;
+
                     if (pages)
                     {
                         var numPages = pages.length;
-                        numLoadingPages += numPages;
+                        loadingPages[path] += numPages;
+
+                        var onloadFn = function onloadFn(t, status, callContext)
+                        {
+                            var font = fonts[path];
+                            var i = callContext.index;
+
+                            if (font)
+                            {
+                                if (t)
+                                {
+                                    pages[i] = t;
+
+                                    if (i === 0)
+                                    {
+                                        font.texture = t;
+                                    }
+                                    
+                                    if (pageComplete())
+                                    {
+                                        observer.notify(font);
+                                        delete loadedObservers[path];
+                                    }
+                                    return;
+                                }
+                                else
+                                {
+                                    errorCallback("Failed to load font page: '" + pages[i] + "'.");
+                                    delete fonts[path];
+                                }
+                            }
+                            pageComplete();
+                        };
+
                         for (var i = 0; i < numPages; i += 1)
                         {
                             texturePath = pages[i];
-                            if (!gd.createTexture({
-                                src     : ((pathRemapping && pathRemapping[texturePath]) || (pathPrefix + texturePath)),
-                                mipmaps : true,
-                                onload  : createLoadedPage(pages, i, path)
-                            }))
-                            {
-                                errorCallback("Failed to create texture for font '" + path + "'.");
-                                delete fonts[path];
-
-                                numLoadingPages -= (numPages - i);
-
-                                if (i === 0)
-                                {
-                                    delete loadingFont[path];
-                                    numLoadingFonts -= 1;
-                                }
-                                break;
-                            }
+                            rh.request({
+                                src: ((pathRemapping && pathRemapping[texturePath]) || (pathPrefix + texturePath)),
+                                onload: onloadFn,
+                                requestFn: requestFn,
+                                index: i
+                            });
                         }
                     }
                     else
                     {
                         texturePath = (path + ".dds");
-                        if (!gd.createTexture({
-                            src     : ((pathRemapping && pathRemapping[texturePath]) || (pathPrefix + texturePath)),
-                            mipmaps : false,
-                            onload  : function (t)
+                        rh.request({
+                            src: ((pathRemapping && pathRemapping[texturePath]) || (pathPrefix + texturePath)),
+                            onload: function (t)
                             {
                                 if (t)
                                 {
                                     textureLoaded(font, t);
+
+                                    observer.notify(font);
+                                    delete loadedObservers[path];
                                 }
                                 else
                                 {
@@ -529,24 +567,33 @@ FontManager.create = function fontManagerCreateFn(gd, df, errorCallback, log)
                                     delete fonts[path];
                                 }
 
+                                delete loadingPages[path];
                                 delete loadingFont[path];
                                 numLoadingFonts -= 1;
-                            }
-                        }))
-                        {
-                            if (text)
+                            },
+                            requestFn: function (url, onload)
                             {
-                                errorCallback("Failed to create texture for font '" + path + "'.");
+                                if (!gd.createTexture({
+                                    src     : url,
+                                    mipmaps : false,
+                                    onload  : onload
+                                }))
+                                {
+                                    if (text)
+                                    {
+                                        errorCallback("Failed to create texture for font '" + path + "'.");
+                                    }
+                                    else
+                                    {
+                                        errorCallback("Failed to load font '" + path + "'.");
+                                    }
+                                    delete fonts[path];
+                                    delete loadingPages[path];
+                                    delete loadingFont[path];
+                                    numLoadingFonts -= 1;
+                                }
                             }
-                            else
-                            {
-                                errorCallback("Failed to load font '" + path + "'.");
-                            }
-                            delete fonts[path];
-
-                            delete loadingFont[path];
-                            numLoadingFonts -= 1;
-                        }
+                        });
                     }
                 };
 
@@ -564,8 +611,25 @@ FontManager.create = function fontManagerCreateFn(gd, df, errorCallback, log)
                     dataPath += ".fontdat";
                 }
 
-                TurbulenzEngine.request(((pathRemapping && pathRemapping[dataPath]) || (pathPrefix + dataPath)),
-                                        fontDataLoaded);
+                rh.request({
+                    src: (pathRemapping && pathRemapping[dataPath]) || (pathPrefix + dataPath),
+                    onload: fontDataLoaded
+                });
+            }
+            else if (onFontLoaded)
+            {
+                loadedObservers[path].subscribe(onFontLoaded);
+            }
+        }
+        else
+        {
+            if (onFontLoaded)
+            {
+                // the callback should always be called asynchronously
+                TurbulenzEngine.setTimeout(function fontAlreadyLoadedFn()
+                    {
+                        onFontLoaded(font);
+                    }, 0);
             }
         }
         return font;
@@ -760,6 +824,7 @@ FontManager.create = function fontManagerCreateFn(gd, df, errorCallback, log)
     {
         fonts = {};
         loadingFont = {};
+        loadingPages = {};
         numLoadingFonts = 0;
         internalFont = {};
         pathRemapping = null;

@@ -13,7 +13,7 @@
 /*global ArrayBuffer*/
 /*global DataView*/
 /*global window*/
-/*global console*/
+/*global Utilities*/
 "use strict";
 
 //
@@ -410,7 +410,7 @@ WebGLTexture.create = function webGLTextureCreateFn(gd, params)
             {
                 var tgaParams = {
                     gd: gd,
-                    onload : function tgaLoadedFn(data, width, height, format)
+                    onload : function tgaLoadedFn(data, width, height, format, status)
                     {
                         tex.width = width;
                         tex.height = height;
@@ -420,7 +420,7 @@ WebGLTexture.create = function webGLTextureCreateFn(gd, params)
                         var result = tex.createGLTexture(data);
                         if (params.onload)
                         {
-                            params.onload(result ? tex : null);
+                            params.onload(result ? tex : null, status);
                         }
                     },
                     onerror : function tgaFailedFn()
@@ -447,7 +447,7 @@ WebGLTexture.create = function webGLTextureCreateFn(gd, params)
             {
                 var ddsParams = {
                     gd: gd,
-                    onload : function ddsLoadedFn(data, width, height, format, numLevels, cubemap, depth)
+                    onload : function ddsLoadedFn(data, width, height, format, numLevels, cubemap, depth, status)
                     {
                         tex.width = width;
                         tex.height = height;
@@ -459,7 +459,7 @@ WebGLTexture.create = function webGLTextureCreateFn(gd, params)
                         var result = tex.createGLTexture(data);
                         if (params.onload)
                         {
-                            params.onload(result ? tex : null);
+                            params.onload(result ? tex : null, status);
                         }
                     },
                     onerror : function ddsFailedFn()
@@ -484,7 +484,7 @@ WebGLTexture.create = function webGLTextureCreateFn(gd, params)
             }
             else
             {
-                console.log('Missing image loader required for ' + src);
+                Utilities.log('Missing image loader required for ' + src);
 
                 tex = webGLTextureCreateFn(gd, {
                     name    : (params.name || src),
@@ -507,13 +507,13 @@ WebGLTexture.create = function webGLTextureCreateFn(gd, params)
                     if (TurbulenzEngine)
                     {
                         TurbulenzEngine.setTimeout(function () {
-                            params.onload(tex);
+                            params.onload(tex, 200);
                         }, 0);
                     }
                     else
                     {
                         window.setTimeout(function () {
-                            params.onload(tex);
+                            params.onload(tex, 200);
                         }, 0);
                     }
                 }
@@ -532,7 +532,7 @@ WebGLTexture.create = function webGLTextureCreateFn(gd, params)
             var result = tex.createGLTexture(img);
             if (params.onload)
             {
-                params.onload(result ? tex : null);
+                params.onload(result ? tex : null, 200);
             }
         };
         img.onerror = function imageFailedFn()
@@ -595,7 +595,7 @@ WebGLTexture.create = function webGLTextureCreateFn(gd, params)
 
         if (params.onload)
         {
-            params.onload(tex);
+            params.onload(tex, 200);
         }
     }
 
@@ -1094,33 +1094,67 @@ WebGLVertexBuffer.prototype =
             var maxNumValues = (numVertices * numValuesPerVertex);
             var format = attributes[0].format;
 
-            if (format === gl.BYTE)
+            if (this.bufferData)
             {
-                data = new Int8Array(maxNumValues);
+                if (format === gl.BYTE)
+                {
+                    data = new Int8Array(this.bufferData, 0, maxNumValues);
+                }
+                else if (format === gl.UNSIGNED_BYTE)
+                {
+                    data = new Uint8Array(this.bufferData, 0, maxNumValues);
+                }
+                else if (format === gl.SHORT)
+                {
+                    data = new Int16Array(this.bufferData, 0, maxNumValues);
+                }
+                else if (format === gl.UNSIGNED_SHORT)
+                {
+                    data = new Uint16Array(this.bufferData, 0, maxNumValues);
+                }
+                else if (format === gl.INT)
+                {
+                    data = new Int32Array(this.bufferData, 0, maxNumValues);
+                }
+                else if (format === gl.UNSIGNED_INT)
+                {
+                    data = new Uint32Array(this.bufferData, 0, maxNumValues);
+                }
+                else if (format === gl.FLOAT)
+                {
+                    data = new Float32Array(this.bufferData, 0, maxNumValues);
+                }
             }
-            else if (format === gl.UNSIGNED_BYTE)
+            else
             {
-                data = new Uint8Array(maxNumValues);
-            }
-            else if (format === gl.SHORT)
-            {
-                data = new Int16Array(maxNumValues);
-            }
-            else if (format === gl.UNSIGNED_SHORT)
-            {
-                data = new Uint16Array(maxNumValues);
-            }
-            else if (format === gl.INT)
-            {
-                data = new Int32Array(maxNumValues);
-            }
-            else if (format === gl.UNSIGNED_INT)
-            {
-                data = new Uint32Array(maxNumValues);
-            }
-            else if (format === gl.FLOAT)
-            {
-                data = new Float32Array(maxNumValues);
+                if (format === gl.BYTE)
+                {
+                    data = new Int8Array(maxNumValues);
+                }
+                else if (format === gl.UNSIGNED_BYTE)
+                {
+                    data = new Uint8Array(maxNumValues);
+                }
+                else if (format === gl.SHORT)
+                {
+                    data = new Int16Array(maxNumValues);
+                }
+                else if (format === gl.UNSIGNED_SHORT)
+                {
+                    data = new Uint16Array(maxNumValues);
+                }
+                else if (format === gl.INT)
+                {
+                    data = new Int32Array(maxNumValues);
+                }
+                else if (format === gl.UNSIGNED_INT)
+                {
+                    data = new Uint32Array(maxNumValues);
+                }
+                else if (format === gl.FLOAT)
+                {
+                    data = new Float32Array(maxNumValues);
+                }
             }
 
             writer = function vertexBufferWriterFn()
@@ -1200,12 +1234,20 @@ WebGLVertexBuffer.prototype =
         }
         else
         {
-            data = new ArrayBuffer(numVertices * this.strideInBytes);
-
             var destOffset = 0;
+            var bufferSize = (numVertices * this.strideInBytes);
+
             if (typeof DataView !== 'undefined' && 'setFloat32' in DataView.prototype)
             {
-                data = new DataView(data);
+                if (this.bufferData)
+                {
+                    data = new DataView(this.bufferData, 0, bufferSize);
+                }
+                else
+                {
+                    data = new ArrayBuffer(bufferSize);
+                    data = new DataView(data);
+                }
 
                 writer = function vertexBufferWriterFn()
                 {
@@ -1289,6 +1331,16 @@ WebGLVertexBuffer.prototype =
             }
             else
             {
+                if (this.bufferData &&
+                    this.bufferData.byteLength === bufferSize)
+                {
+                    data = this.bufferData;
+                }
+                else
+                {
+                    data = new ArrayBuffer(bufferSize);
+                }
+
                 writer = function vertexBufferWriterFn()
                 {
                     var numArguments = arguments.length;
@@ -1494,12 +1546,21 @@ WebGLVertexBuffer.prototype =
         }
         else
         {
-            bufferData = new ArrayBuffer(numVertices * stride);
+            var bufferSize = (numVertices * stride);
 
-            var srcOffset = 0, destOffset = 0, v, c, a, numComponents, componentStride, dest, scale, setter;
+            var srcOffset = 0, destOffset = 0, v, c, a, numComponents, componentStride, scale;
             if (typeof DataView !== 'undefined' && 'setFloat32' in DataView.prototype)
             {
-                dest = new DataView(bufferData);
+                if (this.bufferData)
+                {
+                    bufferData = new DataView(this.bufferData, 0, bufferSize);
+                }
+                else
+                {
+                    bufferData = new ArrayBuffer(bufferSize);
+                    bufferData = new DataView(bufferData);
+                }
+
                 for (v = 0; v < numVertices; v += 1)
                 {
                     for (a = 0; a < numAttributes; a += 1)
@@ -1507,13 +1568,13 @@ WebGLVertexBuffer.prototype =
                         attribute = attributes[a];
                         numComponents = attribute.numComponents;
                         componentStride = attribute.componentStride;
-                        setter = attribute.typedSetter;
+                        var setter = attribute.typedSetter;
                         if (attribute.normalized)
                         {
                             scale = attribute.normalizationScale;
                             for (c = 0; c < numComponents; c += 1)
                             {
-                                setter.call(dest, destOffset, (data[srcOffset] * scale), true);
+                                setter.call(bufferData, destOffset, (data[srcOffset] * scale), true);
                                 destOffset += componentStride;
                                 srcOffset += 1;
                             }
@@ -1522,7 +1583,7 @@ WebGLVertexBuffer.prototype =
                         {
                             for (c = 0; c < numComponents; c += 1)
                             {
-                                setter.call(dest, destOffset, data[srcOffset], true);
+                                setter.call(bufferData, destOffset, data[srcOffset], true);
                                 destOffset += componentStride;
                                 srcOffset += 1;
                             }
@@ -1532,13 +1593,23 @@ WebGLVertexBuffer.prototype =
             }
             else
             {
+                if (this.bufferData &&
+                    this.bufferData.byteLength === bufferSize)
+                {
+                    bufferData = this.bufferData;
+                }
+                else
+                {
+                    bufferData = new ArrayBuffer(bufferSize);
+                }
+
                 for (v = 0; v < numVertices; v += 1)
                 {
                     for (a = 0; a < numAttributes; a += 1)
                     {
                         attribute = attributes[a];
                         numComponents = attribute.numComponents;
-                        dest = new attribute.typedArray(bufferData, destOffset, numComponents);
+                        var dest = new attribute.typedArray(bufferData, destOffset, numComponents);
                         destOffset += attribute.stride;
                         if (attribute.normalized)
                         {
@@ -1560,7 +1631,6 @@ WebGLVertexBuffer.prototype =
                     }
                 }
             }
-            dest = undefined;
         }
         data = undefined;
 
@@ -1677,6 +1747,11 @@ WebGLVertexBuffer.prototype =
 
             var bufferSize = gl.getBufferParameter(bufferType, gl.BUFFER_SIZE);
             this.numVertices = Math.floor(bufferSize / this.strideInBytes);
+
+            if (this.dynamic)
+            {
+                this.bufferData = new ArrayBuffer(bufferSize);
+            }
         }
     }
 };
@@ -1694,9 +1769,15 @@ WebGLVertexBuffer.create = function webGLVertexBufferCreateFn(gd, params)
 
     var stride = vb.setAttributes(params.attributes);
 
-    vb.dynamic = params.dynamic;
-    vb.usage = (params.dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
+    vb.transient = params.transient;
+    vb.dynamic = (params.dynamic || params.transient);
+    vb.usage = (vb.dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
     vb.glBuffer = gl.createBuffer();
+
+    if (vb.dynamic)
+    {
+        vb.bufferData = new ArrayBuffer(numVertices * stride);
+    }
 
     if (params.data)
     {
@@ -1821,7 +1902,7 @@ WebGLPass.create = function webGLPassCreateFn(gd, shader, params)
         else
         {
             //var info = gl.getProgramInfoLog(glProgram);
-            //console.log(info);
+            //Utilities.log(info);
             gl.deleteProgram(glProgram);
             glProgram = null;
         }
@@ -1833,7 +1914,7 @@ WebGLPass.create = function webGLPassCreateFn(gd, shader, params)
     }
     else
     {
-        //console.log('Reused program ' + compoundProgramName);
+        //Utilities.log('Reused program ' + compoundProgramName);
         glProgram = linkedProgram.glProgram;
         if (glProgram)
         {
@@ -1919,7 +2000,7 @@ WebGLPass.create = function webGLPassCreateFn(gd, shader, params)
                 }
                 else
                 {
-                    console.log('Unknown value for state ' + s + ': ' + states[s]);
+                    Utilities.log('Unknown value for state ' + s + ': ' + states[s]);
                 }
             }
         }
@@ -1943,42 +2024,40 @@ WebGLTechnique.prototype =
 
         var pass = this.passes[0];
         var parameters = pass.parameters;
-        var hasProperty = Object.prototype.hasOwnProperty;
+        /*jslint forin: true*/
         for (var p in techniqueParameters)
         {
-            if (hasProperty.call(techniqueParameters, p))
+            var parameter = parameters[p];
+            if (parameter)
             {
-                var parameter = parameters[p];
-                if (parameter)
+                var paramInfo = parameter.info;
+                var parameterValues = techniqueParameters[p];
+                if (parameterValues !== undefined)
                 {
-                    var paramInfo = parameter.info;
-                    var parameterValues = techniqueParameters[p];
-                    if (parameterValues !== undefined)
+                    if (paramInfo.sampler)
                     {
-                        if (paramInfo.sampler)
-                        {
-                            gd.setTexture(parameter, parameterValues);
-                        }
-                        else
-                        {
-                            var floatArray = parameterValues.floatArray;
-                            if (floatArray)
-                            {
-                                parameterValues = floatArray;
-                            }
-                            paramInfo.setter.call(gl, parameter.location, parameterValues);
-                        }
+                        gd.setTexture(parameter, parameterValues);
                     }
                     else
                     {
-                        if (paramInfo.sampler)
+                        var floatArray = parameterValues.floatArray;
+                        if (floatArray)
                         {
-                            gd.setTexture(parameter, null);
+                            parameterValues = floatArray;
                         }
+                        paramInfo.setter.call(gl, parameter.location, parameterValues);
+                    }
+                }
+                else
+                {
+                    if (paramInfo.sampler)
+                    {
+                        gd.setTexture(parameter, null);
                     }
                 }
             }
         }
+        /*jslint forin: false*/
     },
 
     setParametersDeferred : function setParametersDeferredFn(gd, techniqueParameters)
@@ -1987,50 +2066,48 @@ WebGLTechnique.prototype =
         var numPasses = passes.length;
         var min = Math.min;
         var max = Math.max;
-        var hasProperty = Object.prototype.hasOwnProperty;
         for (var n = 0; n < numPasses; n += 1)
         {
             var pass = this.passes[n];
             var parameters = pass.parameters;
             pass.dirty = true;
 
+            /*jslint forin: true*/
             for (var p in techniqueParameters)
             {
-                if (hasProperty.call(techniqueParameters, p))
+                var parameter = parameters[p];
+                if (parameter)
                 {
-                    var parameter = parameters[p];
-                    if (parameter)
+                    var parameterValues = techniqueParameters[p];
+                    var paramInfo = parameter.info;
+                    if (paramInfo.sampler)
                     {
-                        var parameterValues = techniqueParameters[p];
-                        var paramInfo = parameter.info;
-                        if (paramInfo.sampler)
+                        paramInfo.values = parameterValues;
+                        parameter.dirty = 1;
+                    }
+                    else if (typeof parameterValues !== 'number')
+                    {
+                        var floatArray = parameterValues.floatArray;
+                        if (floatArray)
                         {
-                            paramInfo.values = parameterValues;
-                            parameter.dirty = 1;
+                            parameterValues = floatArray;
                         }
-                        else if (typeof parameterValues !== 'number')
+                        var values = paramInfo.values;
+                        var numValues = min(paramInfo.numValues, parameterValues.length);
+                        for (var v = 0; v < numValues; v += 1)
                         {
-                            var floatArray = parameterValues.floatArray;
-                            if (floatArray)
-                            {
-                                parameterValues = floatArray;
-                            }
-                            var values = paramInfo.values;
-                            var numValues = min(paramInfo.numValues, parameterValues.length);
-                            for (var v = 0; v < numValues; v += 1)
-                            {
-                                values[v] = parameterValues[v];
-                            }
-                            parameter.dirty = max(numValues, (parameter.dirty || 0));
+                            values[v] = parameterValues[v];
                         }
-                        else
-                        {
-                            paramInfo.values[0] = parameterValues;
-                            parameter.dirty = (parameter.dirty || 1);
-                        }
+                        parameter.dirty = max(numValues, (parameter.dirty || 0));
+                    }
+                    else
+                    {
+                        paramInfo.values[0] = parameterValues;
+                        parameter.dirty = (parameter.dirty || 1);
                     }
                 }
             }
+            /*jslint forin: false*/
         }
     },
 
@@ -2683,7 +2760,7 @@ WebGLShader.create = function webGLShaderCreateFn(gd, params)
             if (!compiled)
             {
                 var info = gl.getShaderInfoLog(glShader);
-                console.log('Program "' + p + '" failed to compile: ' + info);
+                Utilities.log('Program "' + p + '" failed to compile: ' + info);
                 gl.deleteShader(glShader);
                 glShader = null;
             }
@@ -2740,12 +2817,8 @@ WebGLTechniqueParameterBuffer.prototype =
                 }
                 else
                 {
-                    var numValues = value.length;
-                    for (var n = 0; n < numValues; n += 1)
-                    {
-                        data[offset] = value[n];
-                        offset += 1;
-                    }
+                    data.set(value, offset);
+                    offset += value.length;
                 }
             }
         };
@@ -3067,12 +3140,15 @@ WebGLGraphicsDevice.prototype =
 
     drawArray : function drawArrayFn(drawParametersArray, globalTechniqueParametersArray, sortMode)
     {
+        var gl = this.gl;
+        var drawElements = gl.drawElements;
+        var drawArrays = gl.drawArrays;
+
         var setTechnique = this.setTechnique;
         var setTechniqueParameters = this.setTechniqueParameters;
         var setStream = this.setStream;
         var setIndexBuffer = this.setIndexBuffer;
-        var drawIndexed = this.drawIndexed;
-        var draw = this.draw;
+        var enableClientState = this.enableClientState;
 
         var numDrawParameters = drawParametersArray.length;
         if (numDrawParameters > 1 && sortMode)
@@ -3093,8 +3169,9 @@ WebGLGraphicsDevice.prototype =
 
         var lastTechnique = null;
         var currentStreams = [undefined, undefined, undefined];
-        var maxStreams = 0;
+        var maxStreams = -1;
         var v, streamsMatch, vertexBuffer, semantics, offset;
+        var passes, numPasses, mask, attributeMask, p, pass, format;
 
         for (var n = 0; n < numDrawParameters; n += 1)
         {
@@ -3111,7 +3188,13 @@ WebGLGraphicsDevice.prototype =
             if (lastTechnique !== technique)
             {
                 lastTechnique = technique;
+
+                passes = technique.passes;
+                numPasses = passes.length;
+
                 setTechnique.call(this, technique);
+
+                technique.checkProperties(this);
 
                 setTechniqueParameters.apply(this, globalTechniqueParametersArray);
             }
@@ -3144,18 +3227,82 @@ WebGLGraphicsDevice.prototype =
 
                     setStream.call(this, vertexBuffer, semantics, offset);
                 }
+
+                attributeMask = this.attributeMask;
             }
 
+            /*jslint bitwise: false*/
             if (indexBuffer)
             {
                 setIndexBuffer.call(this, indexBuffer);
 
-                drawIndexed.call(this, primitive, count, firstIndex);
+                offset = firstIndex;
+                if (offset)
+                {
+                    offset *= indexBuffer.stride;
+                }
+
+                format = indexBuffer.format;
+
+                if (1 === numPasses)
+                {
+                    mask = (passes[0].semanticsMask & attributeMask);
+                    if (mask !== this.clientStateMask)
+                    {
+                        enableClientState.call(this, mask);
+                    }
+
+                    drawElements.call(gl, primitive, count, format, offset);
+                }
+                else
+                {
+                    for (p = 0; p < numPasses; p += 1)
+                    {
+                        pass = passes[p];
+
+                        mask = (pass.semanticsMask & attributeMask);
+                        if (mask !== this.clientStateMask)
+                        {
+                            enableClientState.call(this, mask);
+                        }
+
+                        this.setPass(pass);
+
+                        drawElements.call(gl, primitive, count, format, offset);
+                    }
+                }
             }
             else
             {
-                draw.call(this, primitive, count, firstIndex);
+                if (1 === numPasses)
+                {
+                    mask = (passes[0].semanticsMask & attributeMask);
+                    if (mask !== this.clientStateMask)
+                    {
+                        enableClientState.call(this, mask);
+                    }
+
+                    drawArrays.call(gl, primitive, firstIndex, count);
+                }
+                else
+                {
+                    for (p = 0; p < numPasses; p += 1)
+                    {
+                        pass = passes[p];
+
+                        mask = (pass.semanticsMask & attributeMask);
+                        if (mask !== this.clientStateMask)
+                        {
+                            enableClientState.call(this, mask);
+                        }
+
+                        this.setPass(pass);
+
+                        drawArrays.call(gl, primitive, firstIndex, count);
+                    }
+                }
             }
+            /*jslint bitwise: true*/
         }
     },
 
@@ -3195,25 +3342,12 @@ WebGLGraphicsDevice.prototype =
             }
 
             var size = (stride * numVertices);
-            var offset;
             if (size > oldSize)
             {
                 immediateVertexBuffer.resize(size);
-                this.immediateOffset = 0;
-                offset = 0;
-            }
-            else
-            {
-                offset = Math.floor((this.immediateOffset + (stride - 1)) / stride);
-                this.immediateOffset = (offset * stride);
-                if ((this.immediateOffset + size) > oldSize)
-                {
-                    this.immediateOffset = 0;
-                    offset = 0;
-                }
             }
 
-            return immediateVertexBuffer.map(offset, numVertices);
+            return immediateVertexBuffer.map(0, numVertices);
         }
         return null;
     },
@@ -3230,14 +3364,10 @@ WebGLGraphicsDevice.prototype =
         {
             var gl = this.gl;
 
-            var offset = this.immediateOffset;
             var stride = immediateVertexBuffer.strideInBytes;
-            var size = (stride * numVerticesWritten);
+            var offset = 0;
 
             /*jslint bitwise: false*/
-            //this.immediateOffset = (offset + ((size + 0x0f) & (~0x0f)));
-            this.immediateOffset = (offset + size);
-
             var vertexAttributes = immediateVertexBuffer.format;
 
             var semantics = this.immediateSemantics;
@@ -3478,6 +3608,41 @@ WebGLGraphicsDevice.prototype =
             this.setViewport(0, 0, width, height);
             this.setScissor(0, 0, width, height);
         }
+
+        if (this.oldFullscreen !== this.fullscreen)
+        {
+            if (this.fullscreen)
+            {
+                if (canvas.webkitRequestFullScreenWithKeys)
+                {
+                    canvas.webkitRequestFullScreenWithKeys();
+                }
+                else if (canvas.requestFullScreenWithKeys)
+                {
+                    canvas.requestFullScreenWithKeys();
+                }
+                else if (canvas.webkitRequestFullScreen)
+                {
+                    canvas.webkitRequestFullScreen();
+                }
+                else if (canvas.requestFullScreen)
+                {
+                    canvas.requestFullScreen();
+                }
+            }
+            else
+            {
+                if (document.webkitCancelFullScreen)
+                {
+                    document.webkitCancelFullScreen();
+                }
+                else if (document.cancelFullScreen)
+                {
+                    document.cancelFullScreen();
+                }
+            }
+            this.oldFullscreen = this.fullscreen;
+        }
     },
 
     createTechniqueParameters : function createTechniqueParametersFn(params)
@@ -3625,7 +3790,7 @@ WebGLGraphicsDevice.prototype =
                 {
                     params.ontextureload(texture);
                 },
-                onload : function tarLoadedFn()
+                onload : function tarLoadedFn(success, status)
                 {
                     if (params.onload)
                     {
@@ -3644,20 +3809,20 @@ WebGLGraphicsDevice.prototype =
         }
         else
         {
-            console.log('Missing archive loader required for ' + src);
+            Utilities.log('Missing archive loader required for ' + src);
             return false;
         }
     },
-	
+
 	getSupportedDisplayModes : function getSupportedDisplayModesFn()
 	{
 		var args = Array.prototype.slice.call(arguments);
-		
+
 		if (args[0] && args[1])
 		{
 			var width = args[0];
 			var height = args[1];
-			
+
 			if (screen.width >= width && screen.height >= height)
 			{
 				return [{ width: screen.width, height: screen.height }];
@@ -4766,6 +4931,7 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
     gd.desktopWidth = window.screen.width;
     gd.desktopHeight = window.screen.height;
     gd.fullscreen = false;
+    gd.oldFullscreen = false;
     gd.fullscreenWidth = 0;
     gd.fullscreenHeight = 0;
     gd.videoRam = 0;
@@ -4782,11 +4948,11 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
     gd.immediateVertexBuffer = gd.createVertexBuffer({
             numVertices: (256 * 1024 / 16),
             attributes: ['FLOAT4'],
-            dynamic: true
+            dynamic: true,
+            transient: true
         });
     gd.immediatePrimitive = -1;
     gd.immediateSemantics = [];
-    gd.immediateOffset = 0;
 
     gd.fps = 0;
     gd.numFrames = 0;

@@ -1,4 +1,6 @@
 // Copyright (c) 2009-2011 Turbulenz Limited
+/*global TurbulenzEngine: false*/
+/*global window: false*/
 
 //
 // Animation
@@ -416,36 +418,50 @@ InterpolatorController.prototype =
             endBound += 1;
         }
 
-        var startBound = endBound - 1;
-        var startTime = bounds[startBound].time;
-        var endTime = bounds[endBound].time;
+        var startBound = (endBound - 1);
+        var boundsStart = bounds[startBound];
+        var boundsEnd = bounds[endBound];
+        var startTime = boundsStart.time;
+        var endTime = boundsEnd.time;
         var delta = (currentTime - startTime) / (endTime - startTime);
 
-        // If the delta is small enough we just copy the first keyframe
-        if (delta < Animation.minKeyframeDelta)
+        var mathDevice = this.mathDevice;
+        var v3Copy, v3Add;
+
+        var ibounds = this.bounds;
+
+        // If delta is close to the limits we just copy the bounds
+        var minKeyframeDelta = Animation.minKeyframeDelta;
+        if (delta < minKeyframeDelta)
         {
             // copy the bounds
-            var firstBound = bounds[startBound];
-            this.bounds.center = firstBound.center;
-            this.bounds.halfExtent = firstBound.halfExtent;
+            v3Copy = mathDevice.v3Copy;
+
+            ibounds.center = v3Copy.call(mathDevice, boundsStart.center, ibounds.center);
+            ibounds.halfExtent = v3Copy.call(mathDevice, boundsStart.halfExtent, ibounds.halfExtent);
+        }
+        else if ((1.0 - delta) < minKeyframeDelta)
+        {
+            // copy the bounds
+            v3Copy = mathDevice.v3Copy;
+
+            ibounds.center = v3Copy.call(mathDevice, boundsEnd.center, ibounds.center);
+            ibounds.halfExtent = v3Copy.call(mathDevice, boundsEnd.halfExtent, ibounds.halfExtent);
         }
         else
         {
             // accumulate the bounds as average of the center position and max of the extent
             // plus the half distance between the centers
-            var boundsStart = bounds[startBound];
-            var boundsEnd = bounds[endBound];
+            v3Add = mathDevice.v3Add;
 
-            var mathDevice = this.mathDevice;
-            var v3Add = mathDevice.v3Add;
+            var centerSum = v3Add.call(mathDevice, boundsStart.center, boundsEnd.center, ibounds.center);
+            var newCenter = mathDevice.v3ScalarMul(centerSum, 0.5, centerSum);
+            ibounds.center = newCenter;
 
-            var centerSum = v3Add.call(mathDevice, boundsStart.center, boundsEnd.center);
-            var newCenter = mathDevice.v3ScalarMul(centerSum, 0.5);
-            this.bounds.center = newCenter;
-            var newExtent = mathDevice.v3Max(boundsStart.halfExtent, boundsEnd.halfExtent);
+            var newExtent = mathDevice.v3Max(boundsStart.halfExtent, boundsEnd.halfExtent, ibounds.halfExtent);
             var centerOffset = mathDevice.v3Sub(boundsStart.center, newCenter);
-            centerOffset = mathDevice.v3Abs(centerOffset);
-            this.bounds.halfExtent = v3Add.call(mathDevice, newExtent, centerOffset);
+            centerOffset = mathDevice.v3Abs(centerOffset, centerOffset);
+            ibounds.halfExtent = v3Add.call(mathDevice, newExtent, centerOffset, newExtent);
         }
 
         this.dirtyBounds = false;
@@ -912,7 +928,7 @@ TransitionController.prototype =
         var v3Add = mathDevice.v3Add;
 
         var centerSum = v3Add.call(mathDevice, boundsStart.center, boundsEnd.center);
-        var newCenter = mathDevice.v3ScalarMul(centerSum, 0.5);
+        var newCenter = mathDevice.v3ScalarMul(centerSum, 0.5, centerSum);
         this.bounds.center = newCenter;
         var newExtent = mathDevice.v3Max(boundsStart.halfExtent, boundsEnd.halfExtent);
 
@@ -922,8 +938,8 @@ TransitionController.prototype =
         newExtent = mathDevice.v3Build(maxExt, maxExt, maxExt);
 
         var centerOffset = mathDevice.v3Sub(boundsStart.center, newCenter);
-        centerOffset = mathDevice.v3Abs(centerOffset);
-        this.bounds.halfExtent = v3Add.call(mathDevice, newExtent, centerOffset);
+        centerOffset = mathDevice.v3Abs(centerOffset, centerOffset);
+        this.bounds.halfExtent = v3Add.call(mathDevice, newExtent, centerOffset, newExtent);
 
         this.dirtyBounds = false;
     },
@@ -1139,12 +1155,12 @@ BlendController.prototype =
         var v3Add = mathDevice.v3Add;
 
         var centerSum = v3Add.call(mathDevice, boundsStart.center, boundsEnd.center);
-        var newCenter = mathDevice.v3ScalarMul(centerSum, 0.5);
+        var newCenter = mathDevice.v3ScalarMul(centerSum, 0.5, centerSum);
         this.bounds.center = newCenter;
         var newExtent = mathDevice.v3Max(boundsStart.halfExtent, boundsEnd.halfExtent);
         var centerOffset = mathDevice.v3Sub(boundsStart.center, newCenter);
-        centerOffset = mathDevice.v3Abs(centerOffset);
-        this.bounds.halfExtent = v3Add.call(mathDevice, newExtent, centerOffset);
+        centerOffset = mathDevice.v3Abs(centerOffset, centerOffset);
+        this.bounds.halfExtent = v3Add.call(mathDevice, newExtent, centerOffset, newExtent);
 
         this.dirtyBounds = false;
     },
@@ -1343,12 +1359,12 @@ MaskController.prototype =
                 var cBounds = controller.bounds;
 
                 var centerSum = v3Add.call(mathDevice, bounds.center, cBounds.center);
-                var newCenter = v3ScalarMul.call(mathDevice, centerSum, 0.5);
+                var newCenter = v3ScalarMul.call(mathDevice, centerSum, 0.5, centerSum);
                 bounds.center = newCenter;
                 var newExtent = v3Max.call(mathDevice, bounds.halfExtent, cBounds.halfExtent);
                 var centerOffset = v3Sub.call(mathDevice, bounds.center, newCenter);
-                centerOffset = v3Abs.call(mathDevice, centerOffset);
-                bounds.halfExtent = v3Add.call(mathDevice, newExtent, centerOffset);
+                centerOffset = v3Abs.call(mathDevice, centerOffset, centerOffset);
+                bounds.halfExtent = v3Add.call(mathDevice, newExtent, centerOffset, newExtent);
             }
 
             this.bounds = bounds;
@@ -2003,8 +2019,9 @@ GPUSkinController.prototype =
             var invBoneLTMs = this.skeleton.invBoneLTMs;
             var jointParents = this.skeleton.parents;
             var ltms = this.ltms;
-            var outputMat, ltm;
-            var convertedquatPos;
+            var outputMat = this.outputMat;
+            var convertedquatPos = this.convertedquatPos;
+            var ltm;
             var numBones = this.skeleton.numNodes;
             for (var b = 0; b < numBones; b += 1)
             {
@@ -2039,6 +2056,9 @@ GPUSkinController.prototype =
                 writer(outputMat);
             }
 
+            this.outputMat = outputMat;
+            this.convertedquatPos = convertedquatPos;
+
             output.unmap(writer);
         }
         this.dirty = false;
@@ -2054,6 +2074,8 @@ GPUSkinController.create = function skinControllerCreateFn(gd, md)
     c.gd = gd;
     c.dirty = true;
     c.ltms = [];
+    c.outputMat = undefined;
+    c.convertedquatPos = undefined;
 
     return c;
 };

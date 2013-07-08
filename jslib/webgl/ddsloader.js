@@ -839,7 +839,20 @@ DDSLoader.create = function ddsLoaderFn(params)
             {
                 if (!TurbulenzEngine || !TurbulenzEngine.isUnloading())
                 {
-                    if (xhr.status === 200 || xhr.status === 0)
+                    var xhrStatus = xhr.status;
+                    var xhrStatusText = xhr.status !== 0 && xhr.statusText || 'No connection';
+
+                    // Sometimes the browser sets status to 200 OK when the connection is closed
+                    // before the message is sent (weird!).
+                    // In order to address this we fail any completely empty responses.
+                    // Hopefully, nobody will get a valid response with no headers and no body!
+                    if (xhr.getAllResponseHeaders() === "" && xhr.responseText === "" && xhrStatus === 200 && xhrStatusText === 'OK')
+                    {
+                        loader.onload('', 0);
+                        return;
+                    }
+
+                    if (xhrStatus === 200 || xhrStatus === 0)
                     {
                         var buffer;
                         if (xhr.responseType === "arraybuffer")
@@ -869,7 +882,8 @@ DDSLoader.create = function ddsLoaderFn(params)
                             if (loader.onload)
                             {
                                 loader.onload(loader.data, loader.width, loader.height, loader.format,
-                                              loader.numLevels, (loader.numFaces > 1), loader.depth);
+                                              loader.numLevels, (loader.numFaces > 1), loader.depth,
+                                              xhrStatus);
                             }
                         }
                         else

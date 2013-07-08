@@ -17,7 +17,8 @@ GameSession.prototype =
                 method: 'POST',
                 async: true,
                 data: {'gameSessionId': this.gameSessionId},
-                callback: callbackFn
+                callback: callbackFn,
+                requestHandler: this.requestHandler
             });
         }
         else

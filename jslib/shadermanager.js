@@ -1,5 +1,8 @@
 // Copyright (c) 2009-2011 Turbulenz Limited
 
+/*global Observer: false*/
+/*global TurbulenzEngine: false*/
+
 "use strict";
 
 /**
@@ -24,12 +27,13 @@ ShaderManager.prototype =
   @constructs Constructs a ShaderManager object.
 
   @param {GraphicsDevice} gd Graphics device
+  @param {RequestHandler} rh RequestHandler device
   @param {Shader} ds Default shader
   @param {Element} log Logging element
 
   @return {ShaderManager} object, null if failed
 */
-ShaderManager.create = function shaderManagerCreateFn(gd, ds, errorCallback, log)
+ShaderManager.create = function shaderManagerCreateFn(gd, rh, ds, errorCallback, log)
 {
     if (!errorCallback)
     {
@@ -127,7 +131,7 @@ ShaderManager.create = function shaderManagerCreateFn(gd, ds, errorCallback, log
 
       @return {Shader} object, returns the default shader if the file at given path is not yet loaded
     */
-    function loadShaderFn(path, callback)
+    function loadShaderFn(path, onShaderLoaded)
     {
         if (path === undefined)
         {
@@ -141,62 +145,66 @@ ShaderManager.create = function shaderManagerCreateFn(gd, ds, errorCallback, log
                 loadingShader[path] = true;
                 numLoadingShaders += 1;
 
-                var loadedObserver = Observer.create();
-                if (callback)
+                var observer = Observer.create();
+                loadedObservers[path] = observer;
+                if (onShaderLoaded)
                 {
-                    loadedObserver.subscribe(callback);
+                    observer.subscribe(onShaderLoaded);
                 }
-                loadedObservers[path] = loadedObserver;
 
-                TurbulenzEngine.request(((pathRemapping && pathRemapping[path]) || (pathPrefix + path)),
-                            function loadedShaderFn(shaderText)
-                            {
-                                if (shaderText)
-                                {
-                                    var shaderParameters = JSON.parse(shaderText);
-                                    var s = gd.createShader(shaderParameters);
-                                    if (s)
-                                    {
-                                        shaders[path] = s;
-                                        loadedObserver.notify(s);
-                                    }
-                                    else
-                                    {
-                                        delete shaders[path];
-                                    }
-                                }
-                                else
-                                {
-                                    if (log)
-                                    {
-                                        log.innerHTML += "ShaderManager.load:&nbsp;'" + path + "' failed to load<br>";
-                                    }
-                                    delete shaders[path];
-                                }
-                                delete loadingShader[path];
+                var shaderLoaded = function shaderLoadedFn(shaderText, status, callContext)
+                {
+                    if (shaderText)
+                    {
+                        var shaderParameters = JSON.parse(shaderText);
+                        var s = gd.createShader(shaderParameters);
+                        if (s)
+                        {
+                            shaders[path] = s;
+                        }
+                        else
+                        {
+                            delete shaders[path];
+                        }
 
-                                numLoadingShaders -= 1;
-                            });
+                        observer.notify(s);
+                        delete loadedObservers[path];
+                    }
+                    else
+                    {
+                        if (log)
+                        {
+                            log.innerHTML += "ShaderManager.load:&nbsp;'" + path + "' failed to load<br>";
+                        }
+                        delete shaders[path];
+                    }
+                    delete loadingShader[path];
+
+                    numLoadingShaders -= 1;
+                };
+
+                rh.request({
+                    src: ((pathRemapping && pathRemapping[path]) || (pathPrefix + path)),
+                    onload: shaderLoaded
+                });
             }
-            else
+            else if (onShaderLoaded)
             {
-                if (callback)
-                {
-                    loadedObservers[path].subscribe(callback);
-                }
+                loadedObservers[path].subscribe(onShaderLoaded);
             }
+
             return defaultShader;
         }
-        else
+        else if (onShaderLoaded)
         {
-            if (callback)
-            {
-                // if the shader is reloaded then tell the effects manager
-                loadedObservers[path].subscribe(callback);
-                callback(shader);
-            }
-            return shader;
+            // the callback should always be called asynchronously
+            TurbulenzEngine.setTimeout(function shaderAlreadyLoadedFn()
+                {
+                    onShaderLoaded(shader);
+                }, 0);
         }
+
+        return shader;
     }
 
     /**
@@ -299,7 +307,7 @@ ShaderManager.create = function shaderManagerCreateFn(gd, ds, errorCallback, log
             removeShaderFn(path);
         };
 
-        sm. reload = function  reloadShaderLogFn(path, callback)
+        sm.reload = function reloadShaderLogFn(path, callback)
         {
             log.innerHTML += "ShaderManager. reload:&nbsp;'" + path + "'<br>";
             reloadShaderFn(path, callback);
