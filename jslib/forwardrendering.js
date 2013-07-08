@@ -1,9 +1,9 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 
 //
 // ForwardRendering
 //
-/*global TurbulenzEngine: false, ShadowMapping: false, VMath: false, Effect: false,
+/*global ShadowMapping: false, VMath: false, Effect: false,
          renderingCommonCreateRendererInfoFn: false,  renderingCommonGetTechniqueIndexFn: false,
          renderingCommonSortKeyFn: false*/
 
@@ -98,8 +98,11 @@ ForwardRendering.prototype =
         if (numVisibleRenderables > 0)
         {
             var n, renderable, rendererInfo, pass, passIndex;
-            var drawParametersArray, numDrawParameters, drawParametersIndex, drawParameters;
+            var drawParametersArray, numDrawParameters, drawParametersIndex, drawParameters, sortDistance;
             var transparentPassIndex = this.passIndex.transparent;
+            var fillZPassIndex = this.passIndex.fillZ;
+            var maxDistance = scene.maxDistance;
+            var invMaxDistance = (0.0 < maxDistance ? (1.0 / maxDistance) : 0.0);
             n = 0;
             do
             {
@@ -121,13 +124,35 @@ ForwardRendering.prototype =
                 drawParametersArray = renderable.drawParameters;
                 numDrawParameters = drawParametersArray.length;
 
+                sortDistance = renderable.distance;
+                if (0.0 < sortDistance)
+                {
+                    sortDistance *= invMaxDistance;
+                    // Make sure it is lower than 1.0 to avoid changing the integer part of sortKey
+                    if (0.999 < sortDistance)
+                    {
+                        sortDistance = 0.999;
+                    }
+                }
+                else
+                {
+                    // Make sure it is positive to avoid changing the integer part of sortKey
+                    sortDistance = 0;
+                }
+
                 for (drawParametersIndex = 0; drawParametersIndex < numDrawParameters; drawParametersIndex += 1)
                 {
                     drawParameters = drawParametersArray[drawParametersIndex];
                     passIndex = drawParameters.userData.passIndex;
                     if (passIndex === transparentPassIndex)
                     {
-                        drawParameters.sortKey = renderable.distance;
+                        drawParameters.sortKey = sortDistance;
+                    }
+                    else if (passIndex === fillZPassIndex)
+                    {
+                        /*jslint bitwise:false*/
+                        drawParameters.sortKey = ((drawParameters.sortKey | 0) + sortDistance);
+                        /*jslint bitwise:true*/
                     }
                     pass = passes[passIndex];
                     pass[pass.length] = drawParameters;
@@ -399,7 +424,8 @@ ForwardRendering.prototype =
         var numGlobalLights = globalLights.length;
         var ambientColorR = 0, ambientColorG = 0, ambientColorB = 0;
         var globalLight, globalLightColor;
-        for (var g = 0; g < numGlobalLights; g += 1)
+        var g;
+        for (g = 0; g < numGlobalLights; g += 1)
         {
             globalLight = globalLights[g];
             if (!globalLight.disabled)
@@ -414,14 +440,18 @@ ForwardRendering.prototype =
             }
         }
 
-        delete this.ambientColor;
         if (ambientColorR || ambientColorG || ambientColorB)
         {
             var lightingScale = this.globalTechniqueParameters.lightingScale;
             this.ambientColor = v3Build.call(md,
                                         (lightingScale * ambientColorR),
                                         (lightingScale * ambientColorG),
-                                        (lightingScale * ambientColorB));
+                                        (lightingScale * ambientColorB),
+                                        this.ambientColor);
+        }
+        else
+        {
+            delete this.ambientColor;
         }
 
         var l, node, light, lightInstance, matrix, techniqueParameters, origin, halfExtents, worldView;
@@ -623,10 +653,21 @@ ForwardRendering.prototype =
 
     destroyBuffers: function destroyBuffersFn()
     {
-        this.depthTexture = null;
-        this.finalTexture = null;
-        this.finalRenderTarget = null;
-        TurbulenzEngine.flush();
+        if (this.finalRenderTarget)
+        {
+            this.finalRenderTarget.destroy();
+            this.finalRenderTarget = null;
+        }
+        if (this.finalTexture)
+        {
+            this.finalTexture.destroy();
+            this.finalTexture = null;
+        }
+        if (this.depthBuffer)
+        {
+            this.depthBuffer.destroy();
+            this.depthBuffer = null;
+        }
     },
 
     updateBuffers: function forwardRenderingUpdateBuffersFn(gd, deviceWidth, deviceHeight)
@@ -1057,6 +1098,10 @@ ForwardRendering.prototype =
         delete this.ambientTechniqueParameters;
         delete this.directionalLightsTechniqueParameters;
         delete this.passes;
+        delete this.passIndex;
+
+        delete this.sceneExtents;
+        delete this.visibleRenderables;
 
         delete this.globalCameraMatrix;
 
@@ -1073,22 +1118,70 @@ ForwardRendering.prototype =
 
         delete this.lightPrimitive;
         delete this.lightSemantics;
-        delete this.spotLightVolumeVertexBuffer;
 
-        delete this.pointLightVolumeVertexBuffer;
+        if (this.spotLightVolumeVertexBuffer)
+        {
+            this.spotLightVolumeVertexBuffer.destroy();
+            delete this.spotLightVolumeVertexBuffer;
+        }
+
+        if (this.pointLightVolumeVertexBuffer)
+        {
+            this.pointLightVolumeVertexBuffer.destroy();
+            delete this.pointLightVolumeVertexBuffer;
+        }
+
         delete this.lightProjection;
 
         delete this.quadPrimitive;
         delete this.quadSemantics;
-        delete this.quadVertexBuffer;
 
+        if (this.quadVertexBuffer)
+        {
+            this.quadVertexBuffer.destroy();
+            delete this.quadVertexBuffer;
+        }
+
+        delete this.camera;
+        delete this.ambientColor;
+
+        if (this.zonlyShader)
+        {
+            delete this.zonlyShader;
+            delete this.zonlyRigidTechnique;
+            delete this.zonlySkinnedTechnique;
+            delete this.zonlyRigidAlphaTechnique;
+            delete this.zonlySkinnedAlphaTechnique;
+            delete this.zonlyRigidNoCullTechnique;
+            delete this.zonlySkinnedNoCullTechnique;
+            delete this.stencilSetTechnique;
+            delete this.stencilClearTechnique;
+            delete this.stencilSetSpotLightTechnique;
+            delete this.stencilClearSpotLightTechnique;
+        }
+
+        if (this.forwardShader)
+        {
+            delete this.forwardShader;
+            delete this.skyboxTechnique;
+            delete this.ambientRigidTechnique;
+            delete this.ambientSkinnedTechnique;
+            delete this.ambientGlowmapRigidTechnique;
+            delete this.ambientGlowmapSkinnedTechnique;
+            delete this.glowmapRigidTechnique;
+            delete this.glowmapSkinnedTechnique;
+        }
 
         var shadowMaps = this.shadowMaps;
         if (shadowMaps)
         {
             shadowMaps.destroy();
+            delete this.shadowMaps;
         }
-        delete this.shadowMaps;
+
+        this.destroyBuffers();
+
+        delete this.md;
     }
 };
 
@@ -1260,7 +1353,6 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
         var geometryInstanceTechniqueParameters = geometryInstance.techniqueParameters;
         var materialColor = geometryInstanceTechniqueParameters.materialColor || sharedMaterialTechniqueParameters.materialColor || this.v4One;
         geometryInstance.drawParameters = [];
-        geometryInstance.shadowMappingDrawParameters = [];
         var numTechniqueParameters;
 
         //
@@ -1338,7 +1430,15 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
                     drawParameters.technique = fr.zonlyRigidTechnique;
                 }
             }
-            drawParameters.sortKey = renderingCommonSortKeyFn(renderingCommonGetTechniqueIndexFn(drawParameters.technique.name), meta.materialIndex);
+            var techniqueIndex = renderingCommonGetTechniqueIndexFn(drawParameters.technique.name);
+            if (alpha)
+            {
+                drawParameters.sortKey = renderingCommonSortKeyFn(techniqueIndex, meta.materialIndex);
+            }
+            else
+            {
+                drawParameters.sortKey = renderingCommonSortKeyFn(techniqueIndex, 0);
+            }
             //Now add common for world and skin data
             drawParameters.setTechniqueParameters(numTechniqueParameters, geometryInstanceTechniqueParameters);
         }
@@ -1478,7 +1578,7 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
                 rendererInfo.shadowMappingUpdate = this.shadowMappingUpdate;
                 drawParameters.technique = this.shadowMappingTechnique;
 
-                drawParameters.sortKey = renderingCommonSortKeyFn(this.shadowMappingTechniqueIndex, meta.materialIndex);
+                drawParameters.sortKey = renderingCommonSortKeyFn(this.shadowMappingTechniqueIndex, 0);
                 drawParameters.setTechniqueParameters(0, geometryInstance.techniqueParameters);   //TODO: This is excessive
             }
             else
@@ -1630,6 +1730,7 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
                     semantics: flareSemantics,
                     vertexBuffer: vertexBuffer,
                     numIndices: 8,
+                    first: 0,
                     indexBuffer: flareIndexBuffer,
                     lastTimeVisible: true
                 };

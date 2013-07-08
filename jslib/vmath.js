@@ -410,14 +410,32 @@ var VMath =
         return [min(a[0], b), min(a[1], b), min(a[2], b)];
     },
 
-    v3ScalarAdd : function v3ScalarAddFn(a, b)
+    v3ScalarAdd : function v3ScalarAddFn(a, b, dst)
     {
-        return [(a[0] + b), (a[1] + b), (a[2] + b)];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
+
+        dst[0] = (a[0] + b);
+        dst[1] = (a[1] + b);
+        dst[2] = (a[2] + b);
+
+        return dst;
     },
 
-    v3ScalarSub : function v3ScalarSubFn(a, b)
+    v3ScalarSub : function v3ScalarSubFn(a, b, dst)
     {
-        return [(a[0] - b), (a[1] - b), (a[2] - b)];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
+
+        dst[0] = (a[0] - b);
+        dst[1] = (a[1] - b);
+        dst[2] = (a[2] - b);
+
+        return dst;
     },
 
     v3ScalarMul : function v3ScalarMulFn(a, b, dst)
@@ -438,6 +456,20 @@ var VMath =
             dst[1] = (a[1] * b);
             dst[2] = (a[2] * b);
         }
+        return dst;
+    },
+
+    v3AddScalarMul : function v3AddScalarMulFn(a, b, c, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(3);
+        }
+
+        dst[0] = a[0] + b[0] * c;
+        dst[1] = a[1] + b[1] * c;
+        dst[2] = a[2] + b[2] * c;
+
         return dst;
     },
 
@@ -799,14 +831,34 @@ var VMath =
         return [min(a[0], b), min(a[1], b), min(a[2], b), min(a[3], b)];
     },
 
-    v4ScalarAdd : function v4ScalarAddFn(a, b)
+    v4ScalarAdd : function v4ScalarAddFn(a, b, dst)
     {
-        return [(a[0] + b), (a[1] + b), (a[2] + b), (a[3] + b)];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(4);
+        }
+
+        dst[0] = (a[0] + b);
+        dst[1] = (a[1] + b);
+        dst[2] = (a[2] + b);
+        dst[3] = (a[3] + b);
+
+        return dst;
     },
 
-    v4ScalarSub : function v4ScalarSubFn(a, b)
+    v4ScalarSub : function v4ScalarSubFn(a, b, dst)
     {
-        return [(a[0] - b), (a[1] - b), (a[2] - b), (a[3] - b)];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(4);
+        }
+
+        dst[0] = (a[0] - b);
+        dst[1] = (a[1] - b);
+        dst[2] = (a[2] - b);
+        dst[3] = (a[3] - b);
+
+        return dst;
     },
 
     v4ScalarMul : function v4ScalarMulFn(a, b, dst)
@@ -829,6 +881,21 @@ var VMath =
 
             return dst;
         }
+    },
+
+    v4AddScalarMul : function v4AddScalarMulFn(a, b, c, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(4);
+        }
+
+        dst[0] = a[0] + b[0] * c;
+        dst[1] = a[1] + b[1] * c;
+        dst[2] = a[2] + b[2] * c;
+        dst[3] = a[3] + b[3] * c;
+
+        return dst;
     },
 
     v4ScalarEqual : function v4ScalarEqualFn(a, b)
@@ -1424,11 +1491,31 @@ var VMath =
         m[8] = v[2];
     },
 
-    m33Transpose : function m33TransposeFn(m)
+    m33Transpose : function m33TransposeFn(m, dst)
     {
-        return [m[0], m[3], m[6],
-                m[1], m[4], m[7],
-                m[2], m[5], m[8]];
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(9);
+        }
+        var m0 = m[0];
+        var m1 = m[1];
+        var m2 = m[2];
+        var m3 = m[3];
+        var m4 = m[4];
+        var m5 = m[5];
+        var m6 = m[6];
+        var m7 = m[7];
+        var m8 = m[8];
+        dst[0] = m0;
+        dst[1] = m3;
+        dst[2] = m6;
+        dst[3] = m1;
+        dst[4] = m4;
+        dst[5] = m7;
+        dst[6] = m2;
+        dst[7] = m5;
+        dst[8] = m8;
+        return dst;
     },
 
     m33Determinant : function m33DeterminantFn(m)
@@ -2182,7 +2269,7 @@ var VMath =
         return dst;
     },
 
-    m43Orthonormalize : function m43OrthonormalizeFn(m)
+    m43Orthonormalize : function m43OrthonormalizeFn(m, dst)
     {
         var normalize = VMath.v3Normalize;
         var length    = VMath.v3Length;
@@ -2199,9 +2286,9 @@ var VMath =
         var innerY = length(up);
         var innerZ = length(at);
 
-        right = normalize(right);
-        up    = normalize(up);
-        at    = normalize(at);
+        normalize(right, right);
+        normalize(up, up);
+        normalize(at, at);
 
         var vpU, vpV, vpW;
         if (innerX > 0.0)
@@ -2264,12 +2351,32 @@ var VMath =
             vpV = at;
             vpW = right;
         }
-        VMath.v3Set(vpW, normalize(cross(vpV, vpU)));
-        VMath.v3Set(vpV, normalize(cross(vpU, vpW)));
-        return VMath.m43Build(right,
-                               up,
-                               at,
-                               pos);
+
+        cross(vpU, vpV, vpW);
+        normalize(vpW, vpW);
+
+        cross(vpW, vpU, vpV);
+        normalize(vpV, vpV);
+
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(12);
+        }
+
+        dst[0] = right[0];
+        dst[1] = right[1];
+        dst[2] = right[2];
+        dst[3] = up[0];
+        dst[4] = up[1];
+        dst[5] = up[2];
+        dst[6] = at[0];
+        dst[7] = at[1];
+        dst[8] = at[2];
+        dst[9] = pos[0];
+        dst[10] = pos[1];
+        dst[11] = pos[2];
+
+        return dst;
     },
 
     m43Determinant : function m43DeterminantFn(m)
@@ -3527,9 +3634,9 @@ var VMath =
         */
 
         // Inlined from above
-        var qx = -q[0];
-        var qy = -q[1];
-        var qz = -q[2];
+        var qx = q[0];
+        var qy = q[1];
+        var qz = q[2];
         var qw = q[3];
 
         var vx = v[0];

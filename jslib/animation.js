@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2012 Turbulenz Limited
 /*global TurbulenzEngine: false*/
+/*global Utilities: false*/
 /*global window: false*/
 
 //
@@ -182,6 +183,8 @@ function InterpolatorController() {}
 InterpolatorController.prototype =
 {
     version : 1,
+
+    scratchV3 : null,
 
     addTime : function addTimeFn(delta)
     {
@@ -459,7 +462,7 @@ InterpolatorController.prototype =
             ibounds.center = newCenter;
 
             var newExtent = mathDevice.v3Max(boundsStart.halfExtent, boundsEnd.halfExtent, ibounds.halfExtent);
-            var centerOffset = mathDevice.v3Sub(boundsStart.center, newCenter);
+            var centerOffset = mathDevice.v3Sub(boundsStart.center, newCenter, this.scratchV3);
             centerOffset = mathDevice.v3Abs(centerOffset, centerOffset);
             ibounds.halfExtent = v3Add.call(mathDevice, newExtent, centerOffset, newExtent);
         }
@@ -672,6 +675,11 @@ InterpolatorController.create = function interpolatorControllerCreateFn(hierarch
     i.dirty = true;
     i.dirtyBounds = true;
 
+    if (i.scratchV3 === null)
+    {
+        InterpolatorController.prototype.scratchV3 = md.v3BuildZero();
+    }
+
     return i;
 };
 
@@ -789,6 +797,7 @@ ReferenceController.prototype =
 // Constructor function
 ReferenceController.create = function referenceControllerCreateFn(baseController)
 {
+    /*jshint proto:true*/
     var c = new ReferenceController();
     c.__proto__ = baseController;
     c.referenceSource = baseController;
@@ -809,6 +818,7 @@ ReferenceController.create = function referenceControllerCreateFn(baseController
         this.referenceSource = controller;
         this.setReferenceController = setReferenceControllerFn;
     };
+    /*jshint proto:false*/
     return c;
 };
 

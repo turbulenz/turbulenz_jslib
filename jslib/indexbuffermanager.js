@@ -1,49 +1,49 @@
-// Copyright (c) 2010-2012 Turbulenz Limited
+// Copyright (c) 2012 Turbulenz Limited
 
 /*global Utilities: false*/
 
 //
-// VertexBufferManager
+// IndexBufferManager
 //
 
-function VertexBufferManager() {}
+function IndexBufferManager() {}
 
-VertexBufferManager.prototype =
+IndexBufferManager.prototype =
 {
     version: 1,
 
-    maxVerticesPerVertexBuffer: 65535,
+    maxIndicesPerIndexBuffer: 65535,
 
     numBuckets: 10,
 
     //
     // bucket
     //
-    bucket: function bucketFn(numVertices)
+    bucket: function bucketFn(numIndices)
     {
-        if (numVertices <= 64)
+        if (numIndices <= 64)
         {
-            if (numVertices <= 16)
+            if (numIndices <= 16)
             {
-                if (numVertices <= 8)
+                if (numIndices <= 8)
                 {
                     return 0;
                 }
                 return 1;
             }
 
-            if (numVertices <= 32)
+            if (numIndices <= 32)
             {
                 return 2;
             }
             return 3;
         }
 
-        if (numVertices <= 512)
+        if (numIndices <= 512)
         {
-            if (numVertices <= 256)
+            if (numIndices <= 256)
             {
-                if (numVertices <= 128)
+                if (numIndices <= 128)
                 {
                     return 4;
                 }
@@ -52,9 +52,9 @@ VertexBufferManager.prototype =
             return 6;
         }
 
-        if (numVertices <= 2048)
+        if (numIndices <= 2048)
         {
-            if (numVertices <= 1024)
+            if (numIndices <= 1024)
             {
                 return 7;
             }
@@ -80,66 +80,70 @@ VertexBufferManager.prototype =
     //
     // allocate
     //
-    allocate: function vertexBufferManagerAllocate(numVertices, attributes)
+    allocate: function indexBufferManagerAllocate(numIndices, format)
     {
-        var vertexbuffer = null;
+        var indexbuffer = null;
         var baseIndex = 0;
 
-        var vertexbufferParameters =
+        if (typeof format === "string")
         {
-            attributes: attributes,
-            dynamic: this.dynamicVertexBuffers
+            format = this.graphicsDevice['INDEXFORMAT_' + format];
+        }
+
+        var indexbufferParameters =
+        {
+            format: format,
+            dynamic: this.dynamicIndexBuffers
         };
 
         var poolIndex;
-        var maxVerticesPerVertexBuffer = this.maxVerticesPerVertexBuffer;
+        var maxIndicesPerIndexBuffer = this.maxIndicesPerIndexBuffer;
 
-        var attributesHash = attributes.join();
-        var numVertexBuffersPools = this.vertexBuffersPools.length;
-        var vertexBuffersPool;
+        var numIndexBuffersPools = this.indexBuffersPools.length;
+        var indexBuffersPool;
 
         //Find the pool to allocate from
-        for (poolIndex = 0; poolIndex < numVertexBuffersPools; poolIndex += 1)
+        for (poolIndex = 0; poolIndex < numIndexBuffersPools; poolIndex += 1)
         {
-            if (this.vertexBuffersPools[poolIndex].attributesHash === attributesHash)
+            if (this.indexBuffersPools[poolIndex].format === format)
             {
-                vertexBuffersPool = this.vertexBuffersPools[poolIndex];
+                indexBuffersPool = this.indexBuffersPools[poolIndex];
                 break;
             }
         }
 
-        if (!vertexBuffersPool)
+        if (!indexBuffersPool)
         {
-            vertexBuffersPool = { attributesHash: attributesHash,
-                                  vertexBufferData: [] };
-            this.vertexBuffersPools.push(vertexBuffersPool);
+            indexBuffersPool = { format: format,
+                                  indexBufferData: [] };
+            this.indexBuffersPools.push(indexBuffersPool);
         }
 
-        var vertexBufferData;
-        if (numVertices < maxVerticesPerVertexBuffer)
+        var indexBufferData;
+        if (numIndices < maxIndicesPerIndexBuffer)
         {
             //Start at the correct size bucket and then look in bigger buckets if there is no suitable space
             //TODO: track last allocation as start point - but needs to be valid.
-            for (var bucketIndex = this.bucket(numVertices); !vertexbuffer && bucketIndex < this.numBuckets; bucketIndex += 1)
+            for (var bucketIndex = this.bucket(numIndices); !indexbuffer && bucketIndex < this.numBuckets; bucketIndex += 1)
             {
                 var previousChunk;
-                for (var vertexBufferIndex = 0; !vertexbuffer && (vertexBufferIndex < vertexBuffersPool.vertexBufferData.length); vertexBufferIndex += 1)
+                for (var indexBufferIndex = 0; !indexbuffer && (indexBufferIndex < indexBuffersPool.indexBufferData.length); indexBufferIndex += 1)
                 {
-                    vertexBufferData = vertexBuffersPool.vertexBufferData[vertexBufferIndex];
+                    indexBufferData = indexBuffersPool.indexBufferData[indexBufferIndex];
 
                     //Now find a to chunk allocate from
                     previousChunk = null;
 
-                    for (var chunk = vertexBufferData.bucket[bucketIndex].headChunk; chunk;  chunk = chunk.nextChunk)
+                    for (var chunk = indexBufferData.bucket[bucketIndex].headChunk; chunk;  chunk = chunk.nextChunk)
                     {
-                        if (numVertices <= chunk.length)
+                        if (numIndices <= chunk.length)
                         {
-                            vertexbuffer = vertexBufferData.vertexBuffer;
+                            indexbuffer = indexBufferData.indexBuffer;
                             baseIndex = chunk.baseIndex;
-                            if (numVertices < chunk.length)
+                            if (numIndices < chunk.length)
                             {
-                                chunk.baseIndex = (baseIndex + numVertices);
-                                chunk.length -= numVertices;
+                                chunk.baseIndex = (baseIndex + numIndices);
+                                chunk.length -= numIndices;
                                 var newBucketIndex = this.bucket(chunk.length);
                                 if (newBucketIndex !== bucketIndex)
                                 {
@@ -149,11 +153,11 @@ VertexBufferManager.prototype =
                                     }
                                     else
                                     {
-                                        vertexBufferData.bucket[bucketIndex].headChunk = chunk.nextChunk;
+                                        indexBufferData.bucket[bucketIndex].headChunk = chunk.nextChunk;
                                     }
                                     //Add to new bucket
-                                    chunk.nextChunk = vertexBufferData.bucket[newBucketIndex].headChunk;
-                                    vertexBufferData.bucket[newBucketIndex].headChunk = chunk;
+                                    chunk.nextChunk = indexBufferData.bucket[newBucketIndex].headChunk;
+                                    indexBufferData.bucket[newBucketIndex].headChunk = chunk;
                                 }
                             }
                             else
@@ -165,9 +169,9 @@ VertexBufferManager.prototype =
                                 }
                                 else
                                 {
-                                    vertexBufferData.bucket[bucketIndex].headChunk = chunk.nextChunk;
+                                    indexBufferData.bucket[bucketIndex].headChunk = chunk.nextChunk;
                                 }
-                                chunk.vertexBuffer = null;
+                                chunk.indexBuffer = null;
                             }
                             break;
                         }
@@ -176,47 +180,47 @@ VertexBufferManager.prototype =
                 }
             }
 
-            if (!vertexbuffer)
+            if (!indexbuffer)
             {
-                vertexbufferParameters.numVertices = maxVerticesPerVertexBuffer;
-                vertexbuffer = this.graphicsDevice.createVertexBuffer(vertexbufferParameters);
-                this.debugCreatedVertexBuffers += 1;
+                indexbufferParameters.numIndices = maxIndicesPerIndexBuffer;
+                indexbuffer = this.graphicsDevice.createIndexBuffer(indexbufferParameters);
+                this.debugCreatedIndexBuffers += 1;
 
-                Utilities.assert(vertexbuffer, "VertexBuffer not created.");
+                Utilities.assert(indexbuffer, "IndexBuffer not created.");
 
-                if (vertexbuffer)
+                if (indexbuffer)
                 {
-                    vertexBufferData = {vertexBuffer: vertexbuffer,
+                    indexBufferData = {indexBuffer: indexbuffer,
                                         bucket: this.makeBuckets()};
 
-                    vertexBufferData.bucket[this.bucket(maxVerticesPerVertexBuffer - numVertices)].headChunk = {baseIndex: numVertices,
-                                                                                                                length: maxVerticesPerVertexBuffer - numVertices,
+                    indexBufferData.bucket[this.bucket(maxIndicesPerIndexBuffer - numIndices)].headChunk = {baseIndex: numIndices,
+                                                                                                                length: maxIndicesPerIndexBuffer - numIndices,
                                                                                                                 nextChunk: null };
 
-                    vertexBuffersPool.vertexBufferData.push(vertexBufferData);
+                    indexBuffersPool.indexBufferData.push(indexBufferData);
                 }
             }
         }
 
-        if (!vertexbuffer)
+        if (!indexbuffer)
         {
-            vertexbufferParameters.numVertices = numVertices;
-            vertexbuffer = this.graphicsDevice.createVertexBuffer(vertexbufferParameters);
-            this.debugCreatedVertexBuffers += 1;
+            indexbufferParameters.numIndices = numIndices;
+            indexbuffer = this.graphicsDevice.createIndexBuffer(indexbufferParameters);
+            this.debugCreatedIndexBuffers += 1;
 
-            Utilities.assert(vertexbuffer, "VertexBuffer not created.");
+            Utilities.assert(indexbuffer, "IndexBuffer not created.");
 
-            if (vertexbuffer)
+            if (indexbuffer)
             {
-                vertexBuffersPool.vertexBufferData.push({vertexBuffer: vertexbuffer,
+                indexBuffersPool.indexBufferData.push({indexBuffer: indexbuffer,
                                                          bucket: this.makeBuckets()});
             }
         }
 
         return {
-            vertexBuffer: vertexbuffer,
+            indexBuffer: indexbuffer,
             baseIndex: baseIndex,
-            length: numVertices,
+            length: numIndices,
             poolIndex: poolIndex
         };
     },
@@ -224,15 +228,15 @@ VertexBufferManager.prototype =
     //
     // free
     //
-    free: function vertexBufferManagerFree(allocation)
+    free: function indexBufferManagerFree(allocation)
     {
-        var vertexBuffersPool = this.vertexBuffersPools[allocation.poolIndex];
-        var vertexBufferData;
-        for (var vertexBufferIndex = 0; vertexBufferIndex < vertexBuffersPool.vertexBufferData.length; vertexBufferIndex += 1)
+        var indexBuffersPool = this.indexBuffersPools[allocation.poolIndex];
+        var indexBufferData;
+        for (var indexBufferIndex = 0; indexBufferIndex < indexBuffersPool.indexBufferData.length; indexBufferIndex += 1)
         {
-            if (allocation.vertexBuffer === vertexBuffersPool.vertexBufferData[vertexBufferIndex].vertexBuffer)
+            if (allocation.indexBuffer === indexBuffersPool.indexBufferData[indexBufferIndex].indexBuffer)
             {
-                vertexBufferData = vertexBuffersPool.vertexBufferData[vertexBufferIndex];
+                indexBufferData = indexBuffersPool.indexBufferData[indexBufferIndex];
                 break;
             }
         }
@@ -245,7 +249,7 @@ VertexBufferManager.prototype =
         for (var bucketIndex = 0; !(leftChunk && rightChunk) && (bucketIndex < this.numBuckets); bucketIndex += 1)
         {
             previous = null;
-            for (var chunk = vertexBufferData.bucket[bucketIndex].headChunk; chunk && !(leftChunk && rightChunk);  chunk = chunk.nextChunk)
+            for (var chunk = indexBufferData.bucket[bucketIndex].headChunk; chunk && !(leftChunk && rightChunk);  chunk = chunk.nextChunk)
             {
                 if (!leftChunk)
                 {
@@ -285,7 +289,7 @@ VertexBufferManager.prototype =
             }
             else
             {
-                vertexBufferData.bucket[this.bucket(rightChunk.length)].headChunk = rightChunk.nextChunk;
+                indexBufferData.bucket[this.bucket(rightChunk.length)].headChunk = rightChunk.nextChunk;
                 if (rightChunk === leftChunkPrevious)
                 {
                     leftChunkPrevious = null;
@@ -302,11 +306,11 @@ VertexBufferManager.prototype =
                 }
                 else
                 {
-                    vertexBufferData.bucket[oldBucketIndex].headChunk = leftChunk.nextChunk;
+                    indexBufferData.bucket[oldBucketIndex].headChunk = leftChunk.nextChunk;
                 }
                 //Add to new bucket
-                leftChunk.nextChunk = vertexBufferData.bucket[newBucketIndex].headChunk;
-                vertexBufferData.bucket[newBucketIndex].headChunk = leftChunk;
+                leftChunk.nextChunk = indexBufferData.bucket[newBucketIndex].headChunk;
+                indexBufferData.bucket[newBucketIndex].headChunk = leftChunk;
             }
         }
         else if (leftChunk)
@@ -324,11 +328,11 @@ VertexBufferManager.prototype =
                 }
                 else
                 {
-                    vertexBufferData.bucket[oldBucketIndex].headChunk = leftChunk.nextChunk;
+                    indexBufferData.bucket[oldBucketIndex].headChunk = leftChunk.nextChunk;
                 }
                 //Add to new bucket
-                leftChunk.nextChunk = vertexBufferData.bucket[newBucketIndex].headChunk;
-                vertexBufferData.bucket[newBucketIndex].headChunk = leftChunk;
+                leftChunk.nextChunk = indexBufferData.bucket[newBucketIndex].headChunk;
+                indexBufferData.bucket[newBucketIndex].headChunk = leftChunk;
             }
         }
         else if (rightChunk)
@@ -347,72 +351,72 @@ VertexBufferManager.prototype =
                 }
                 else
                 {
-                    vertexBufferData.bucket[oldBucketIndex].headChunk = rightChunk.nextChunk;
+                    indexBufferData.bucket[oldBucketIndex].headChunk = rightChunk.nextChunk;
                 }
                 //Add to new bucket
-                rightChunk.nextChunk = vertexBufferData.bucket[newBucketIndex].headChunk;
-                vertexBufferData.bucket[newBucketIndex].headChunk = rightChunk;
+                rightChunk.nextChunk = indexBufferData.bucket[newBucketIndex].headChunk;
+                indexBufferData.bucket[newBucketIndex].headChunk = rightChunk;
             }
         }
         else
         {
-            var bucket = vertexBufferData.bucket[this.bucket(allocation.length)];
+            var bucket = indexBufferData.bucket[this.bucket(allocation.length)];
             bucket.headChunk = {baseIndex: allocation.baseIndex,
                                 length: allocation.length,
                                 nextChunk: bucket.headChunk};
         }
 
         //See if the whole thing is free and if so free the VB
-        var lastChunk = vertexBufferData.bucket[this.numBuckets - 1].headChunk;
-        if (lastChunk && lastChunk.length >= this.maxVerticesPerVertexBuffer)
+        var lastChunk = indexBufferData.bucket[this.numBuckets - 1].headChunk;
+        if (lastChunk && lastChunk.length >= this.maxIndicesPerIndexBuffer)
         {
-            vertexBuffersPool.vertexBufferData.splice(vertexBufferIndex, 1);
-            vertexBufferData.vertexBuffer.destroy();
-            vertexBufferData.vertexBuffer = null;
-            vertexBufferData.bucket.length = 0;
-            vertexBufferData.bucket = null;
+            indexBuffersPool.indexBufferData.splice(indexBufferIndex, 1);
+            indexBufferData.indexBuffer.destroy();
+            indexBufferData.indexBuffer = null;
+            indexBufferData.bucket.length = 0;
+            indexBufferData.bucket = null;
         }
     },
 
     //
     // destroy
     //
-    destroy: function vertexBufferManagerDestroyFn()
+    destroy: function indexBufferManagerDestroyFn()
     {
-        var vertexBuffersPools = this.vertexBuffersPools;
-        if (vertexBuffersPools)
+        var indexBuffersPools = this.indexBuffersPools;
+        if (indexBuffersPools)
         {
-            var numVertexBuffersPools = vertexBuffersPools.length;
+            var numIndexBuffersPools = indexBuffersPools.length;
             var i, j;
-            for (i = 0; i < numVertexBuffersPools; i += 1)
+            for (i = 0; i < numIndexBuffersPools; i += 1)
             {
-                var vertexBuffersPool = vertexBuffersPools[i];
+                var indexBuffersPool = indexBuffersPools[i];
 
-                var vertexBufferDataArray = vertexBuffersPool.vertexBufferData;
-                var numVertexBufferData = vertexBufferDataArray.length;
-                for (j = 0; j < numVertexBufferData; j += 1)
+                var indexBufferDataArray = indexBuffersPool.indexBufferData;
+                var numIndexBufferData = indexBufferDataArray.length;
+                for (j = 0; j < numIndexBufferData; j += 1)
                 {
-                    var vertexBufferData = vertexBufferDataArray[j];
+                    var indexBufferData = indexBufferDataArray[j];
 
-                    var bucketArray = vertexBufferData.bucket;
+                    var bucketArray = indexBufferData.bucket;
                     if (bucketArray)
                     {
                         bucketArray.length = 0;
-                        vertexBufferData.bucket = null;
+                        indexBufferData.bucket = null;
                     }
 
-                    var vertexbuffer = vertexBufferData.vertexBuffer;
-                    if (vertexbuffer)
+                    var indexbuffer = indexBufferData.indexBuffer;
+                    if (indexbuffer)
                     {
-                        vertexbuffer.destroy();
-                        vertexBufferData.vertexBuffer = null;
+                        indexbuffer.destroy();
+                        indexBufferData.indexBuffer = null;
                     }
                 }
-                vertexBufferDataArray.length = 0;
+                indexBufferDataArray.length = 0;
             }
-            vertexBuffersPools.length = 0;
+            indexBuffersPools.length = 0;
 
-            this.vertexBuffersPools = null;
+            this.indexBuffersPools = null;
         }
 
         this.graphicsDevice = null;
@@ -422,14 +426,14 @@ VertexBufferManager.prototype =
 //
 // create
 //
-VertexBufferManager.create = function vertexBufferManagerCreateFn(graphicsDevice, dynamicVertexBuffers)
+IndexBufferManager.create = function indexBufferManagerCreateFn(graphicsDevice, dynamicIndexBuffers)
 {
-    var manager = new VertexBufferManager();
+    var manager = new IndexBufferManager();
 
-    manager.vertexBuffersPools = [];    //Array keyed-off attribute
-    manager.debugCreatedVertexBuffers = 0;
+    manager.indexBuffersPools = [];    //Array keyed-off attribute
+    manager.debugCreatedIndexBuffers = 0;
     manager.graphicsDevice = graphicsDevice;
-    manager.dynamicVertexBuffers = dynamicVertexBuffers ? true : false;
+    manager.dynamicIndexBuffers = dynamicIndexBuffers ? true : false;
 
     return manager;
 };

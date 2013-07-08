@@ -48,8 +48,6 @@ LeaderboardManager.prototype =
             dataSpec.friendsonly = spec.friendsOnly && 1;
         }
 
-        dataSpec.gameSessionId = that.gameSessionId;
-
         this.service.request({
             url: '/api/v1/leaderboards/scores/read/' + that.gameSession.gameSlug,
             method: 'GET',
@@ -96,7 +94,6 @@ LeaderboardManager.prototype =
 
                 var rankingLength = ranking.length;
                 var i;
-                var topEqualRank;
                 for (i = 0; i < rankingLength; i += 1)
                 {
                     var rank = ranking[i];
@@ -153,8 +150,6 @@ LeaderboardManager.prototype =
         {
             dataSpec.friendsonly = spec.friendsOnly && 1;
         }
-
-        dataSpec.gameSessionId = that.gameSessionId;
 
         this.service.request({
             url: '/api/v1/leaderboards/scores/read/' + that.gameSession.gameSlug + '/' + key,

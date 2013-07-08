@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 
 "use strict";
 
@@ -858,6 +858,52 @@ TextureManager.create = function textureManagerCreateFn(gd, rh, dt, errorCallbac
         data    : nofalloffData
     });
     nofalloffData = null;
+
+    tm.destroy = function textureManagerDestroyFn()
+    {
+        if (textureInstances)
+        {
+            var p;
+            for (p in textureInstances)
+            {
+                if (textureInstances.hasOwnProperty(p))
+                {
+                    var textureInstance = textureInstances[p];
+                    if (textureInstance)
+                    {
+                        var texture = textureInstance.getTexture();
+                        if (texture)
+                        {
+                            texture.destroy();
+                        }
+
+                        textureInstance.destroy();
+                    }
+                }
+            }
+            textureInstances = null;
+        }
+
+        if (defaultTexture)
+        {
+            defaultTexture.destroy();
+            defaultTexture = null;
+        }
+
+        loadingTexture = null;
+        loadedTextureObservers = null;
+        delayedTextures = null;
+        numLoadingTextures = 0;
+        archivesLoaded = null;
+        loadingArchives = null;
+        loadedArchiveObservers = null;
+        numLoadingArchives = 0;
+        internalTexture = null;
+        pathRemapping = null;
+        pathPrefix = null;
+        rh = null;
+        gd = null;
+    };
 
     return tm;
 };

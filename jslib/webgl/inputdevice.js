@@ -212,7 +212,7 @@ WebGLInputDevice.prototype = {
 
     update : function inputDeviceUpdateFn()
     {
-        if (!this.isFocused)
+        if (!this.isWindowFocused)
         {
             return;
         }
@@ -259,10 +259,15 @@ WebGLInputDevice.prototype = {
         return this.isCursorHidden;
     },
 
+    isFocused : function isFocused()
+    {
+        return this.isWindowFocused;
+    },
+
     lockMouse : function lockMouseFn()
     {
         if (this.isHovering &&
-            this.isFocused)
+            this.isWindowFocused)
         {
             this.isMouseLocked = true;
             this.hideMouse();
@@ -273,7 +278,7 @@ WebGLInputDevice.prototype = {
                 pointer.lock(this.canvas);
             }
 
-            this.addEventHandlersLock();
+            this.setEventHandlersLock();
 
             return true;
         }
@@ -296,7 +301,7 @@ WebGLInputDevice.prototype = {
                 pointer.unlock();
             }
 
-            this.addEventHandlersUnlock();
+            this.setEventHandlersUnlock();
 
             if (this.isOutsideEngine)
             {
@@ -304,10 +309,13 @@ WebGLInputDevice.prototype = {
 
                 this.isHovering = false;
 
-                this.removeEventHandlersMouseLeave();
+                this.setEventHandlersMouseLeave();
 
                 // Send mouseout event
                 this.sendEventToHandlers(this.handlers.mouseleave);
+
+                // Send mouselocklost event
+                this.sendEventToHandlers(this.handlers.mouselocklost);
             }
 
             return true;
@@ -326,6 +334,7 @@ WebGLInputDevice.prototype = {
     // Cannot convert keycodes to unicode in javascript so return empty strings
     convertToUnicode : function convertToUnicodeFn(keyCodeArray)
     {
+        var keyCodeToUnicode = this.keyCodeToUnicode;
         var result = {};
         var length = keyCodeArray.length;
         var i;
@@ -334,7 +343,7 @@ WebGLInputDevice.prototype = {
         for (i = 0; i < length; i += 1)
         {
             keyCode = keyCodeArray[i];
-            result[keyCode] = "";
+            result[keyCode] = keyCodeToUnicode[keyCode] || "";
         }
 
         return result;
@@ -374,6 +383,30 @@ WebGLInputDevice.prototype = {
                 pressedKeys[keyName] = false;
             }
         }
+    },
+
+    destroy : function destroyFn()
+    {
+        // Remove all event listeners
+        if (this.isLocked())
+        {
+            this.setEventHandlersUnlock();
+        }
+
+        if (this.isHovering)
+        {
+            this.setEventHandlersMouseLeave();
+        }
+
+        if (this.isWindowFocused)
+        {
+            this.setEventHandlersBlur();
+        }
+
+        var canvas = this.canvas;
+        canvas.onmouseover = null;
+        canvas.onmouseout = null;
+        canvas.onmousedown = null;
     }
 };
 
@@ -397,7 +430,7 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
     id.canvas = canvas;
     id.isMouseLocked = false;
     id.isHovering = false;
-    id.isFocused = false;
+    id.isWindowFocused = false;
     id.isCursorHidden = false;
     id.isOutsideEngine = false; // Used for determining where we are when unlocking
     id.previousCursor = '';
@@ -493,6 +526,8 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         APOSTROPHE : 506,
         COMMA : 507,
         PERIOD : 508,
+        SLASH: 509,
+        BACKSLASH: 510,
         F1 : 600,
         F2 : 601,
         F3 : 602,
@@ -533,6 +568,16 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         PAGE_DOWN: 637
     };
 
+    var keyCodeToUnicodeTable = {};
+    for (var k in keyCodes)
+    {
+        if (keyCodes.hasOwnProperty(k))
+        {
+            var code = keyCodes[k];
+            keyCodeToUnicodeTable[code] = k;
+        }
+    }
+
     var mouseCodes =
     {
         BUTTON_0 : 0,
@@ -567,8 +612,9 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         BACK : 19
     };
 
-    // KeyMap: Maps JavaScript keycodes to Turbulenz keycodes - some keycodes are consistent across all browsers,
-    // Some mappings are browser specific
+    // KeyMap: Maps JavaScript keycodes to Turbulenz keycodes - some
+    // keycodes are consistent across all browsers and some mappings
+    // are browser specific.
     var keyMap = {};
 
     // A-Z
@@ -738,7 +784,7 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         15 : 3  // RIGHT
     };
 
-    function addEventHandlersMouseEnter()
+    function setEventHandlersMouseEnter()
     {
         // Add event listener to get focus event
         window.addEventListener('mousedown', onMouseDown, true);
@@ -748,32 +794,36 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         window.addEventListener('mousewheel', onWheel, true);
         window.addEventListener('click', emptyEvent, true);
     }
+    id.setEventHandlersMouseEnter = setEventHandlersMouseEnter;
 
-    function removeEventHandlersMouseLeave()
+    function setEventHandlersMouseLeave()
     {
         // Remove mouse event listeners
-        window.removeEventListener('mousedown', onMouseDown, true);
+        window.removeEventListener('mouseup', onMouseUp, true);
         window.removeEventListener('mousemove', onMouseOver, true);
         window.removeEventListener('DOMMouseScroll', onWheel, true);
         window.removeEventListener('mousewheel', onWheel, true);
         window.removeEventListener('click', emptyEvent, true);
     }
-    id.removeEventHandlersMouseLeave = removeEventHandlersMouseLeave;
+    id.setEventHandlersMouseLeave = setEventHandlersMouseLeave;
 
-    function addEventHandlersFocus()
+    function setEventHandlersFocus()
     {
         window.addEventListener('keydown', onKeyDown, true);
         window.addEventListener('keyup', onKeyUp, true);
     }
+    id.setEventHandlersFocus = setEventHandlersFocus;
 
-    function removeEventHandlersBlur()
+
+    function setEventHandlersBlur()
     {
         window.removeEventListener('keydown', onKeyDown, true);
         window.removeEventListener('keyup', onKeyUp, true);
-        window.removeEventListener('mouseup', onMouseUp, true);
+        window.removeEventListener('mousedown', onMouseDown, true);
     }
+    id.setEventHandlersBlur = setEventHandlersBlur;
 
-    function addEventHandlersLock()
+    function setEventHandlersLock()
     {
         window.removeEventListener('mousemove', onMouseOver, true);
         window.addEventListener('mousemove', onMouseMove, true);
@@ -781,9 +831,9 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         window.addEventListener('mozfullscreenchange', onFullscreenChanged, true);
         window.addEventListener('webkitfullscreenchange', onFullscreenChanged, true);
     }
-    id.addEventHandlersLock = addEventHandlersLock;
+    id.setEventHandlersLock = setEventHandlersLock;
 
-    function addEventHandlersUnlock()
+    function setEventHandlersUnlock()
     {
         window.removeEventListener('webkitfullscreenchange', onFullscreenChanged, true);
         window.removeEventListener('mozfullscreenchange', onFullscreenChanged, true);
@@ -791,7 +841,7 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         window.removeEventListener('mousemove', onMouseMove, true);
         window.addEventListener('mousemove', onMouseOver, true);
     }
-    id.addEventHandlersUnlock = addEventHandlersUnlock;
+    id.setEventHandlersUnlock = setEventHandlersUnlock;
 
     onMouseOver = function onMouseOverFn(event)
     {
@@ -893,8 +943,6 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         if (keyCode === keyCodes.ESCAPE)
         {
             id.unlockMouse();
-
-            id.sendEventToHandlers(handlers.mouselocklost);
         }
         else if (undefined !== keyCode)
         {
@@ -908,38 +956,20 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
 
     onMouseDown = function onMouseDownFn(event)
     {
-        var button = event.button;
-        var position = {};
-
-        event.stopPropagation();
-        event.preventDefault();
-
-        if (button < 3)
-        {
-            button = mouseMap[button];
-        }
-
-        id.getCanvasPosition(event, position);
-
-        id.sendEventToHandlers(handlers.mousedown, button, position.x, position.y);
-    };
-
-    onMouseUp = function onMouseUpFn(event)
-    {
-        var position = {};
-        var button;
-
         if (id.isHovering)
         {
-            if (!id.isFocused)
+            var button = event.button;
+            var position = {};
+
+            if (!id.isWindowFocused)
             {
                 // Focus
 
-                id.isFocused = true;
+                id.isWindowFocused = true;
                 window.focus();
                 canvas.focus();
 
-                addEventHandlersFocus();
+                setEventHandlersFocus();
 
                 canvas.oncontextmenu = function () {
                     return false;
@@ -951,7 +981,39 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
             event.stopPropagation();
             event.preventDefault();
 
-            button = event.button;
+            if (button < 3)
+            {
+                button = mouseMap[button];
+            }
+
+            id.getCanvasPosition(event, position);
+
+            id.sendEventToHandlers(handlers.mousedown, button, position.x, position.y);
+        }
+        else
+        {
+            if (id.isWindowFocused)
+            {
+                // Blur
+                id.isWindowFocused = false;
+                id.resetKeyStates();
+                setEventHandlersBlur();
+                canvas.oncontextmenu = null;
+
+                id.sendEventToHandlers(handlers.blur);
+            }
+        }
+    };
+
+    onMouseUp = function onMouseUpFn(event)
+    {
+        if (id.isHovering)
+        {
+            var button = event.button;
+            var position = {};
+
+            event.stopPropagation();
+            event.preventDefault();
 
             if (button < 3)
             {
@@ -961,19 +1023,6 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
             id.getCanvasPosition(event, position);
 
             id.sendEventToHandlers(handlers.mouseup, button, position.x, position.y);
-        }
-        else
-        {
-            if (id.isFocused)
-            {
-                // Blur
-                id.isFocused = false;
-                id.resetKeyStates();
-                removeEventHandlersBlur();
-                canvas.oncontextmenu = null;
-
-                id.sendEventToHandlers(handlers.blur);
-            }
         }
     };
 
@@ -993,8 +1042,6 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
             {
                 // Browsers capture the escape key whilst in fullscreen
                 id.unlockMouse();
-
-                id.sendEventToHandlers(handlers.mouselocklost);
             }
         }
     };
@@ -1008,7 +1055,7 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
             lastX = event.screenX;
             lastY = event.screenY;
 
-            addEventHandlersMouseEnter();
+            setEventHandlersMouseEnter();
 
             // Send mouseover event
             id.sendEventToHandlers(handlers.mouseenter);
@@ -1030,7 +1077,7 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
                 id.showMouse();
             }
 
-            removeEventHandlersMouseLeave();
+            setEventHandlersMouseLeave();
 
             // Send mouseout event
             id.sendEventToHandlers(handlers.mouseleave);
@@ -1041,7 +1088,30 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         }
     };
 
+    // This is required in order to detect hovering when we missed the initial mouseover event
+    canvas.onmousedown = function (event)
+    {
+        canvas.onmousedown = null;
+
+        if (!id.isHovering)
+        {
+            id.isHovering = true;
+
+            lastX = event.screenX;
+            lastY = event.screenY;
+
+            setEventHandlersMouseEnter();
+
+            id.sendEventToHandlers(handlers.mouseenter);
+
+            onMouseDown(event);
+        }
+
+        return false;
+    };
+
     id.keyCodes = keyCodes;
+    id.keyCodeToUnicode = keyCodeToUnicodeTable;
     id.mouseCodes = mouseCodes;
     id.padCodes = padCodes;
     id.onKeyUp = onKeyUp;

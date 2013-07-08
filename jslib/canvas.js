@@ -2212,17 +2212,27 @@ CanvasContext.prototype =
         var p1 = rect[1];
         var p2 = rect[2];
         x = p2[0];
-        y = (p2[1] - font.baseline);
+        y = p2[1];
 
-        if (this.textBaseline !== 'top' &&
-            this.textBaseline !== 'hanging')
+        var scale = this.calculateFontScale(font);
+
+        if (this.textBaseline === 'alphabetic')
         {
-            y -= font.baseline;
+            y -= (font.baseline * scale);
+        }
+        else if (this.textBaseline === 'middle')
+        {
+            y -= ((font.baseline * 0.5) * scale);
+        }
+        else if (this.textBaseline === 'bottom' ||
+                 this.textBaseline === 'ideographic')
+        {
+            y -= (font.lineHeight * scale);
         }
 
         var params = {
             rect : [x, y, (p1[0] - x), (p1[1] - y)],
-            scale : 1.0,
+            scale : scale,
             spacing : 0
         };
 
@@ -2257,9 +2267,14 @@ CanvasContext.prototype =
             var fontName = this.buildFontName();
             if (fontName)
             {
-                return {
-                        width : fm.calculateTextDimensions(fontName, text, 1.0, 0).width
-                    };
+                var font = fm.load(fontName);
+                if (font)
+                {
+                    var scale = this.calculateFontScale(font);
+                    return {
+                            width : font.calculateTextDimensions(text, scale, 0).width
+                        };
+                }
             }
         }
 
@@ -2768,6 +2783,19 @@ CanvasContext.prototype =
         return fontName;
     },
 
+    calculateFontScale : function calculateFontScaleFn(font)
+    {
+        var requiredHeight = parseInt(this.font, 10);
+        if (isNaN(requiredHeight))
+        {
+            return 1;
+        }
+        else
+        {
+            return (requiredHeight / font.lineHeight);
+        }
+    },
+
     transformPoint : function transformPointFn(x, y)
     {
         var m = this.matrix;
@@ -3234,7 +3262,7 @@ CanvasContext.prototype =
                 numVertices: numVertices,
                 attributes: this.flatVertexFormats,
                 dynamic: true,
-                transient: true
+                'transient': true
             });
         }
 
@@ -3262,7 +3290,7 @@ CanvasContext.prototype =
                 numVertices: numVertices,
                 attributes: this.textureVertexFormats,
                 dynamic: true,
-                transient: true
+                'transient': true
             });
         }
 
@@ -4965,7 +4993,7 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
         numVertices: 256,
         attributes: c.textureVertexFormats,
         dynamic: true,
-        transient: true
+        'transient': true
     });
 
     c.flatVertexFormats = [gd.VERTEXFORMAT_FLOAT2];
@@ -4975,7 +5003,7 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
         numVertices: 256,
         attributes: c.flatVertexFormats,
         dynamic: true,
-        transient: true
+        'transient': true
     });
 
     c.tempVertices = [];

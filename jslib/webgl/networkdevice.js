@@ -17,14 +17,27 @@ WebGLNetworkDevice.prototype = {
         var WebSocketConstructor = this.WebSocketConstructor;
         if (WebSocketConstructor)
         {
+            var ws;
             if (protocol)
             {
-                return new WebSocketConstructor(url, protocol);
+                ws = new WebSocketConstructor(url, protocol);
             }
             else
             {
-                return new WebSocketConstructor(url);
+                ws = new WebSocketConstructor(url);
             }
+            if (typeof ws.destroy === "undefined")
+            {
+                ws.destroy = function websocketDestroyFn()
+                {
+                    this.onopen = null;
+                    this.onerror = null;
+                    this.onclose = null;
+                    this.onmessage = null;
+                    this.close();
+                };
+            }
+            return ws;
         }
         else
         {
@@ -32,7 +45,7 @@ WebGLNetworkDevice.prototype = {
         }
     },
 
-    update : function networkDeviceUpdateFn(params)
+    update : function networkDeviceUpdateFn()
     {
     }
 };

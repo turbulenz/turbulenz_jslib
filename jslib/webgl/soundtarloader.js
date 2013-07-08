@@ -1,14 +1,14 @@
-// Copyright (c) 2011-2012 Turbulenz Limited
+// Copyright (c) 2012 Turbulenz Limited
 /*global TurbulenzEngine*/
 /*global Uint8Array*/
 /*global window*/
 "use strict";
 
 //
-// TARLoader
+// SoundTARLoader
 //
-function TARLoader() {}
-TARLoader.prototype = {
+function SoundTARLoader() {}
+SoundTARLoader.prototype = {
 
     version : 1,
 
@@ -68,19 +68,19 @@ TARLoader.prototype = {
             return header;
         }
 
-        var gd = this.gd;
-        var mipmaps = this.mipmaps;
-        var ontextureload = this.ontextureload;
+        var sd = this.sd;
+        var uncompress = this.uncompress;
+        var onsoundload = this.onsoundload;
         var result = true;
 
-        this.texturesLoading = 0;
+        this.soundsLoading = 0;
         var that = this;
-        function onload(texture)
+        function onload(sound)
         {
-            that.texturesLoading -= 1;
-            if (texture)
+            that.soundsLoading -= 1;
+            if (sound)
             {
-                ontextureload(texture);
+                onsoundload(sound);
             }
             else
             {
@@ -119,11 +119,11 @@ TARLoader.prototype = {
                 if ('' === header.fileType || '0' === header.fileType)
                 {
                     //console.log('Loading "' + fileName + '" (' + header.length + ')');
-                    this.texturesLoading += 1;
-                    gd.createTexture({
+                    this.soundsLoading += 1;
+                    sd.createSound({
                         src : fileName,
-                        data : bytes.subarray(offset, (offset + header.length)),
-                        mipmaps : mipmaps,
+                        data : bytes.buffer.slice(offset, (offset + header.length)),
+                        uncompress : uncompress,
                         onload : onload
                     });
                 }
@@ -143,15 +143,15 @@ TARLoader.prototype = {
 };
 
 // Constructor function
-TARLoader.create = function tgaLoaderFn(params)
+SoundTARLoader.create = function tgaLoaderFn(params)
 {
-    var loader = new TARLoader();
-    loader.gd = params.gd;
-    loader.mipmaps = params.mipmaps;
-    loader.ontextureload = params.ontextureload;
+    var loader = new SoundTARLoader();
+    loader.sd = params.sd;
+    loader.uncompress = params.uncompress;
+    loader.onsoundload = params.onsoundload;
     loader.onload = params.onload;
     loader.onerror = params.onerror;
-    loader.texturesLoading = 0;
+    loader.soundsLoading = 0;
 
     var src = params.src;
     if (src)
@@ -209,9 +209,10 @@ TARLoader.create = function tgaLoaderFn(params)
                             /*jslint bitwise: false*/
                             var text = xhr.responseText;
                             var numChars = text.length;
+                            var i;
                             buffer = [];
                             buffer.length = numChars;
-                            for (var i = 0; i < numChars; i += 1)
+                            for (i = 0; i < numChars; i += 1)
                             {
                                 buffer[i] = (text.charCodeAt(i) & 0xff);
                             }
@@ -223,7 +224,7 @@ TARLoader.create = function tgaLoaderFn(params)
                             {
                                 var callOnload = function callOnloadFn()
                                 {
-                                    if (0 < loader.texturesLoading)
+                                    if (0 < loader.soundsLoading)
                                     {
                                         if (!TurbulenzEngine || !TurbulenzEngine.isUnloading())
                                         {

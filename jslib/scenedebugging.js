@@ -284,10 +284,12 @@ Scene.prototype.drawLights = function sceneDrawLightsFn(gd, sm, camera)
 
         gd.setTechniqueParameters(techniqueParameters);
 
+        var sem = this.getDebugSemanticsPosCol();
+        var vformatFloat3 = gd.VERTEXFORMAT_FLOAT3;
         var writer = gd.beginDraw(gd.PRIMITIVE_LINES,
                                   ((24 * numPoint) + (16 * numSpot) + (24 * numFog)),
-                                  ['FLOAT3',   'FLOAT3'],
-                                  ['POSITION', 'COLOR']);
+                                  [ vformatFloat3, vformatFloat3 ],
+                                  sem);
         if (writer)
         {
             var md = this.md;
@@ -422,10 +424,12 @@ Scene.prototype.drawLightsScreenExtents = function sceneDrawLightsScreenExtentsF
 
         technique.clipSpace = this.md.v4Build(1.0, 1.0, 0.0, 0.0);
 
+        var sem = this.getDebugSemanticsPosCol();
         var writer = gd.beginDraw(gd.PRIMITIVE_LINES,
                                   (8 * numLights),
-                                  ['FLOAT2',   'FLOAT3'],
-                                  ['POSITION', 'COLOR']);
+                                  [ gd.VERTEXFORMAT_FLOAT2,
+                                    gd.VERTEXFORMAT_FLOAT3 ],
+                                  sem);
         if (writer)
         {
             var screenExtents, minX, maxX, minY, maxY, color, r, g, b;
@@ -548,10 +552,12 @@ Scene.prototype.drawAreas = function sceneDrawAreasFn(gd, sm, camera)
 
         gd.setTechniqueParameters(techniqueParameters);
 
-        var writer = gd.beginDraw('LINES',
+        var sem = this.getDebugSemanticsPosCol();
+        var vformatFloat3 = gd.VERTEXFORMAT_FLOAT3;
+        var writer = gd.beginDraw(gd.PRIMITIVE_LINES,
                                   (24 * numVisibleAreas),
-                                  ['FLOAT3', 'FLOAT3'],
-                                  ['POSITION', 'COLOR']);
+                                  [ vformatFloat3, vformatFloat3 ],
+                                  sem);
         if (writer)
         {
             var writeBox = this.writeBox;
@@ -637,10 +643,11 @@ Scene.prototype.drawPortals = function sceneDrawPortalsFn(gd, sm, camera)
         technique.worldViewProjection = camera.viewProjectionMatrix;
         technique.constantColor = md.v4Build(1.0, 1.0, 1.0, 1.0);
 
+        var sem = this.getDebugSemanticsPos();
         var writer = gd.beginDraw(gd.PRIMITIVE_LINES,
                                   numVertices,
                                   [gd.VERTEXFORMAT_FLOAT3],
-                                  [gd.SEMANTIC_POSITION]);
+                                  sem);
         if (writer)
         {
             var numPortalsToRender = portalsToRender.length;
@@ -683,7 +690,7 @@ Scene.prototype.drawPortals = function sceneDrawPortalsFn(gd, sm, camera)
         writer = gd.beginDraw(gd.PRIMITIVE_LINES,
                               numVertices,
                               [gd.VERTEXFORMAT_FLOAT3],
-                              [gd.SEMANTIC_POSITION]);
+                              sem);
         if (writer)
         {
             for (n = 0; n < numVisiblePortals; n += 1)
@@ -745,10 +752,11 @@ Scene.prototype.drawTransforms = function sceneDrawTransformsFn(gd, sm, camera, 
 
         gd.setTechniqueParameters(techniqueParameters);
 
+        var sem = this.getDebugSemanticsPosCol();
         var writer = gd.beginDraw(gd.PRIMITIVE_LINES,
                                   numVertices,
                                   [gd.VERTEXFORMAT_FLOAT3, gd.VERTEXFORMAT_FLOAT3],
-                                  [gd.SEMANTIC_POSITION, gd.SEMANTIC_COLOR]);
+                                  sem);
         if (writer)
         {
             for (n = 0; n < numNodes; n += 1)
@@ -842,10 +850,11 @@ Scene.prototype.drawAnimationHierarchy = function sceneDrawAnimationHierarchyFn(
 
     gd.setTechniqueParameters(techniqueParameters);
 
+    var sem = this.getDebugSemanticsPosCol();
     var writer = gd.beginDraw(gd.PRIMITIVE_LINES,
                               numVertices,
                               [gd.VERTEXFORMAT_FLOAT3, gd.VERTEXFORMAT_FLOAT3],
-                              [gd.SEMANTIC_POSITION, gd.SEMANTIC_COLOR]);
+                              sem);
     if (writer)
     {
         var md = this.md;
@@ -1005,10 +1014,11 @@ Scene.prototype.drawSceneNodeHierarchy = function drawSceneNodeHierarchy(gd, sm,
 
     gd.setTechniqueParameters(techniqueParameters);
 
+    var sem = this.getDebugSemanticsPosCol();
     var writer = gd.beginDraw(gd.PRIMITIVE_LINES,
                               numVertices,
                               [gd.VERTEXFORMAT_FLOAT3, gd.VERTEXFORMAT_FLOAT3],
-                              [gd.SEMANTIC_POSITION, gd.SEMANTIC_COLOR]);
+                              sem);
     if (writer)
     {
         var md = this.md;
@@ -1869,10 +1879,12 @@ Scene.prototype.drawPhysicsNodes = function sceneDrawPhysicsNodesFn(gd, sm, came
 
     gd.setTechniqueParameters(techniqueParameters);
 
+    var sem = this.getDebugSemanticsPosCol();
+    var vformatFloat3 = gd.VERTEXFORMAT_FLOAT3;
     var writer = gd.beginDraw('LINES',
                               (24 * numNodes),
-                              ['FLOAT3',   'FLOAT3'],
-                              ['POSITION', 'COLOR']);
+                              [vformatFloat3, vformatFloat3],
+                              sem);
     if (writer)
     {
         for (n = 0; n < numNodes; n += 1)
@@ -2043,9 +2055,11 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
 
     gd.setTechnique(technique);
 
-    // Cache math functions
+    // Cache math functions and vertex formats
     var v4Build = md.v4Build;
     var m43MulM44 = md.m43MulM44;
+    var vformatFloat3 = gd.VERTEXFORMAT_FLOAT3;
+    var vformatFloat4 = gd.VERTEXFORMAT_FLOAT4;
 
     for (n = 0; n < numNodes; n += 1)
     {
@@ -2086,7 +2100,8 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
         numIndices = triangles.length;
 
         var wireframeBuffer = physicsNode.wireframeBuffer;
-        var attributes = ['FLOAT4', 'FLOAT3', 'FLOAT3'];
+
+        var attributes = [ vformatFloat4, vformatFloat3, vformatFloat3 ];
         var numAttributeComponents = 10;
         var wireframeSemantics = physicsNode.wireframeSemantics;
         if (!wireframeSemantics)
@@ -2266,10 +2281,11 @@ Scene.prototype.drawVisibleRenderablesExtents = function sceneDrawVisibleRendera
 
         gd.setTechniqueParameters(techniqueParameters);
 
+        var sem = this.getDebugSemanticsPosCol();
         var writer = gd.beginDraw(gd.PRIMITIVE_LINES,
                                   numVertices,
                                   [gd.VERTEXFORMAT_FLOAT3, gd.VERTEXFORMAT_FLOAT3],
-                                  [gd.SEMANTIC_POSITION,   gd.SEMANTIC_COLOR]);
+                                  sem);
         if (writer)
         {
             var writeBox = this.writeBox;
@@ -2470,10 +2486,11 @@ Scene.prototype.drawNodesTree = function sceneDrawNodesTreeFn(tree, gd, sm, came
 
         var numVertices = 24 * md.truncate(Math.pow(2, drawLevel));
 
+        var sem = this.getDebugSemanticsPos();
         var writer = gd.beginDraw(gd.PRIMITIVE_LINES,
                                   numVertices,
                                   [gd.VERTEXFORMAT_FLOAT3],
-                                  [gd.SEMANTIC_POSITION]);
+                                  sem);
         if (writer)
         {
             drawNodeFn(writer, nodes, 0, drawLevel);
@@ -2500,7 +2517,7 @@ Scene.prototype.updateNormals = function updateNormalsFn(gd, scale, drawNormals,
     {
         var normalsVertexBuffer = gd.createVertexBuffer({
                 numVertices: normalsNumVerts,
-                attributes: ['FLOAT3'],
+                attributes: [ gd.VERTEXFORMAT_FLOAT3 ],
                 dynamic: true
             });
 
@@ -2520,7 +2537,9 @@ Scene.prototype.updateNormals = function updateNormalsFn(gd, scale, drawNormals,
                 primitive: gd.PRIMITIVE_LINES
             };
 
-        var normalGeometryInstance = GeometryInstance.create(normalsGeometry, normalsSurface, material);
+        var normalGeometryInstance = GeometryInstance.create(normalsGeometry,
+                                                             normalsSurface,
+                                                             material);
         node.addRenderable(normalGeometryInstance);
 
         return normalGeometryInstance;
@@ -2678,15 +2697,10 @@ Scene.prototype.updateNormals = function updateNormalsFn(gd, scale, drawNormals,
                                 binormalRenderable.binormal = true;
                                 binormalOffset = offset;
                             }
-                            var lastChar = attribute.charAt(attribute.length - 1) - '0';
-                            if (lastChar <= 9 && lastChar >= 0)
-                            {
-                                offset += lastChar;
-                            }
-                            else
-                            {
-                                offset += 1;
-                            }
+
+                            var numComponents =
+                                this.attributeComponents(attribute);
+                            offset += numComponents;
                         }
 
                         Utilities.assert(positionOffset !== -1);
@@ -2779,35 +2793,41 @@ Scene.prototype.updateNormals = function updateNormalsFn(gd, scale, drawNormals,
 //
 Scene.prototype.attributeComponents = function attributeComponentsFn(attribute)
 {
-    switch (attribute)
+    if (TurbulenzEngine.canvas)
     {
-    case "BYTE4":
-    case "BYTE4N":
-    case "UBYTE4":
-    case "UBYTE4N":
-    case "SHORT4":
-    case "SHORT4N":
-    case "USHORT4":
-    case "USHORT4N":
-    case "FLOAT4":
-        return 4;
-
-    case "SHORT2":
-    case "SHORT2N":
-    case "USHORT2":
-    case "USHORT2N":
-    case "FLOAT2":
-        return 2;
-
-    case "FLOAT1":
-        return 1;
-
-    case "FLOAT3":
-        return 3;
-
-    default:
-        Utilities.assert(false, "Unknown attribute type");
+        // Shortcut for canvas mode
+        return attribute.numComponents;
     }
+
+    var attrToComponents = this.vertexAttrToNumComponents;
+    if (!attrToComponents)
+    {
+        var gd = TurbulenzEngine.getGraphicsDevice();
+
+        attrToComponents = {};
+        attrToComponents[gd.VERTEXFORMAT_BYTE4] = 4;
+        attrToComponents[gd.VERTEXFORMAT_BYTE4N] = 4;
+        attrToComponents[gd.VERTEXFORMAT_UBYTE4] = 4;
+        attrToComponents[gd.VERTEXFORMAT_UBYTE4N] = 4;
+        attrToComponents[gd.VERTEXFORMAT_SHORT4] = 4;
+        attrToComponents[gd.VERTEXFORMAT_SHORT4N] = 4;
+        attrToComponents[gd.VERTEXFORMAT_USHORT4] = 4;
+        attrToComponents[gd.VERTEXFORMAT_USHORT4N] = 4;
+        attrToComponents[gd.VERTEXFORMAT_FLOAT4] = 4;
+        attrToComponents[gd.VERTEXFORMAT_SHORT2] = 2;
+        attrToComponents[gd.VERTEXFORMAT_SHORT2N] = 2;
+        attrToComponents[gd.VERTEXFORMAT_USHORT2] = 2;
+        attrToComponents[gd.VERTEXFORMAT_USHORT2N] = 2;
+        attrToComponents[gd.VERTEXFORMAT_FLOAT2] = 2;
+        attrToComponents[gd.VERTEXFORMAT_FLOAT1] = 1;
+        attrToComponents[gd.VERTEXFORMAT_FLOAT3] = 3;
+
+        this.vertexAttrToNumComponents = attrToComponents;
+    }
+
+    var numComponents = attrToComponents[attribute];
+    Utilities.assert(numComponents, "Unknown attribute type");
+    return numComponents;
 };
 
 
@@ -2840,24 +2860,30 @@ Scene.prototype.drawWireframe = function drawWireframeFn(gd, sm, camera, wirefra
         var currentTechnique, wvp, wireframeSemantics, attributes,
             numAttributeComponents, numBlendComponents;
 
+        var vformatFloat4 = gd.VERTEXFORMAT_FLOAT4;
+        var vformatFloat3 = gd.VERTEXFORMAT_FLOAT3;
+        var vformatByte4 = gd.VERTEXFORMAT_BYTE4;
+
         for (var n = 0; n < numNodes; n += 1)
         {
             var node = nodes[n];
             var renderables = node.renderables;
-            if (renderables)
+            if (renderables && !node.disabled)
             {
                 var numRenderables = renderables.length;
                 for (var i = 0; i < numRenderables; i += 1)
                 {
                     var renderable = renderables[i];
                     var oldSurface = renderable.surface;
-                    var surfacePrimitive = oldSurface.primitive;
+
                     if (!renderable.disabled &&
+                        oldSurface &&
                         oldSurface.vertexData &&
-                        (surfacePrimitive === gd.PRIMITIVE_TRIANGLES ||
-                         surfacePrimitive === gd.PRIMITIVE_TRIANGLE_STRIP ||
-                         surfacePrimitive === gd.PRIMITIVE_TRIANGLE_FAN))
+                        (oldSurface.primitive === gd.PRIMITIVE_TRIANGLES ||
+                         oldSurface.primitive === gd.PRIMITIVE_TRIANGLE_STRIP ||
+                         oldSurface.primitive === gd.PRIMITIVE_TRIANGLE_FAN))
                     {
+                        var surfacePrimitive = oldSurface.primitive;
                         var skinController = renderable.skinController;
                         if (skinController)
                         {
@@ -2868,7 +2894,12 @@ Scene.prototype.drawWireframe = function drawWireframeFn(gd, sm, camera, wirefra
                             }
 
                             currentTechnique.skinBones = skinController.output;
-                            attributes = ['FLOAT4', 'FLOAT3', 'FLOAT3', 'BYTE4', 'FLOAT4', 'BYTE4', 'FLOAT4', 'BYTE4', 'FLOAT4'];
+
+                            attributes = [ vformatFloat4, vformatFloat3,
+                                           vformatFloat3, vformatByte4,
+                                           vformatFloat4, vformatByte4,
+                                           vformatFloat4, vformatByte4,
+                                           vformatFloat4 ];
                             wireframeSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0', 'TEXCOORD1', 'BLENDINDICES', 'BLENDWEIGHT', 'TEXCOORD2', 'TEXCOORD3', 'TEXCOORD4', 'TEXCOORD5']);
                             numAttributeComponents = 34;
                             numBlendComponents = 24;
@@ -2881,7 +2912,9 @@ Scene.prototype.drawWireframe = function drawWireframeFn(gd, sm, camera, wirefra
                                 setTechnique.call(gd, technique);
                             }
 
-                            attributes = ['FLOAT4', 'FLOAT3', 'FLOAT3'];
+                            attributes = [vformatFloat4,
+                                          vformatFloat3,
+                                          vformatFloat3];
                             wireframeSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0', 'TEXCOORD1']);
                             numAttributeComponents = 10;
                             numBlendComponents = 0;
@@ -3237,4 +3270,35 @@ Scene.prototype.getVisibilityMetrics = function getVisibilityMetricsFn()
     metrics.numLights = this.visibleLights.length;
 
     return metrics;
+};
+
+//
+// getDebugSemanticsPosCol
+//
+Scene.prototype.getDebugSemanticsPosCol = function getDebugSemanticsPosColFn()
+{
+    var debugSemantics = this.debugSemanticsPosCol;
+    if (!debugSemantics)
+    {
+        var gd = TurbulenzEngine.getGraphicsDevice();
+        debugSemantics = gd.createSemantics([ gd.SEMANTIC_POSITION,
+                                              gd.SEMANTIC_COLOR ]);
+        this.debugSemanticsPosCol = debugSemantics;
+    }
+    return debugSemantics;
+};
+
+//
+// getDebugSemanticsPos
+//
+Scene.prototype.getDebugSemanticsPos = function getDebugSemanticsPosFn()
+{
+    var debugSemantics = this.debugSemanticsPos;
+    if (!debugSemantics)
+    {
+        var gd = TurbulenzEngine.getGraphicsDevice();
+        debugSemantics = gd.createSemantics([ gd.SEMANTIC_POSITION ]);
+        this.debugSemanticsPos = debugSemantics;
+    }
+    return debugSemantics;
 };

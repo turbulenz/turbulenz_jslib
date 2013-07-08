@@ -1,4 +1,7 @@
-// Copyright (c) 2010-2011 Turbulenz Limited
+// Copyright (c) 2010-2012 Turbulenz Limited
+/*global TurbulenzEngine: false*/
+/*global Utilities: false*/
+/*global Observer: false*/
 
 //
 // SceneNode
@@ -584,7 +587,7 @@ SceneNode.prototype =
     //
     getDisabled: function sceneNodeGetDisabled()
     {
-        return this.disabled;
+        return this.disabled ? true : false;
     },
 
     //
@@ -1261,7 +1264,20 @@ SceneNode.prototype =
     //
     addCustomLocalExtents: function sceneNodeAddCustomLocalExtentsFn(localExtents)
     {
-        this.customLocalExtents = localExtents.slice();
+        var customWorldExtents = this.customWorldExtents;
+        if (!customWorldExtents)
+        {
+            this.customWorldExtents = localExtents.slice();
+        }
+        else
+        {
+            customWorldExtents[0] = localExtents[0];
+            customWorldExtents[1] = localExtents[1];
+            customWorldExtents[2] = localExtents[2];
+            customWorldExtents[3] = localExtents[3];
+            customWorldExtents[4] = localExtents[4];
+            customWorldExtents[5] = localExtents[5];
+        }
         this.dirtyWorldExtents = true;
         this.dirtyLocalExtents = true;
         this.updateRequired();
@@ -1291,7 +1307,20 @@ SceneNode.prototype =
     //
     addCustomWorldExtents: function sceneNodeAddCustomWorldExtentsFn(worldExtents)
     {
-        this.customWorldExtents = worldExtents.slice();
+        var customWorldExtents = this.customWorldExtents;
+        if (!customWorldExtents)
+        {
+            this.customWorldExtents = worldExtents.slice();
+        }
+        else
+        {
+            customWorldExtents[0] = worldExtents[0];
+            customWorldExtents[1] = worldExtents[1];
+            customWorldExtents[2] = worldExtents[2];
+            customWorldExtents[3] = worldExtents[3];
+            customWorldExtents[4] = worldExtents[4];
+            customWorldExtents[5] = worldExtents[5];
+        }
         this.dirtyWorldExtents = true;
         this.updateRequired();
     },

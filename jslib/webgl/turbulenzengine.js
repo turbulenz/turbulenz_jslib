@@ -7,7 +7,6 @@
 /*global WebGLPhysicsDevice*/
 /*global WebGLNetworkDevice*/
 /*global Float32Array*/
-/*global Utilities*/
 /*global console*/
 /*global window*/
 "use strict";
@@ -18,7 +17,7 @@
 function WebGLTurbulenzEngine() {}
 WebGLTurbulenzEngine.prototype = {
 
-    version : '0.19.0',
+    version : '0.20.0.0',
 
     setInterval: function (f, t)
     {
@@ -38,7 +37,8 @@ WebGLTurbulenzEngine.prototype = {
     {
         if (this.graphicsDevice)
         {
-            throw 'GraphicsDevice already created';
+            this.callOnError('GraphicsDevice already created');
+            return null;
         }
         else
         {
@@ -52,7 +52,8 @@ WebGLTurbulenzEngine.prototype = {
     {
         if (this.physicsDevice)
         {
-            throw 'PhysicsDevice already created';
+            this.callOnError('PhysicsDevice already created');
+            return null;
         }
         else
         {
@@ -75,7 +76,8 @@ WebGLTurbulenzEngine.prototype = {
     {
         if (this.soundDevice)
         {
-            throw 'SoundDevice already created';
+            this.callOnError('SoundDevice already created');
+            return null;
         }
         else
         {
@@ -98,7 +100,8 @@ WebGLTurbulenzEngine.prototype = {
     {
         if (this.inputDevice)
         {
-            throw 'InputDevice already created';
+            this.callOnError('InputDevice already created');
+            return null;
         }
         else
         {
@@ -191,11 +194,7 @@ WebGLTurbulenzEngine.prototype = {
         var graphicsDevice = this.graphicsDevice;
         if (graphicsDevice === null)
         {
-            var onerror = this.onerror;
-            if (onerror)
-            {
-                onerror("GraphicsDevice not created yet.");
-            }
+            this.callOnError("GraphicsDevice not created yet.");
         }
         return graphicsDevice;
     },
@@ -257,12 +256,12 @@ WebGLTurbulenzEngine.prototype = {
 
     onerror: function (msg)
     {
-        Utilities.assert(false, msg);
+        console.error(msg);
     },
 
     onwarning: function (msg)
     {
-        Utilities.log(msg);
+        console.warn(msg);
     },
 
     getSystemInfo: function ()
@@ -285,10 +284,7 @@ WebGLTurbulenzEngine.prototype = {
         }
         else
         {
-            if (that.onerror)
-            {
-                that.onerror("No XMLHTTPRequest object could be created");
-            }
+            that.callOnError("No XMLHTTPRequest object could be created");
             return;
         }
 
@@ -300,25 +296,46 @@ WebGLTurbulenzEngine.prototype = {
                 {
                     var xhrResponseText = xhr.responseText;
                     var xhrStatus = xhr.status;
-                    var xhrStatusText = xhr.statusText;
 
-                    // Sometimes the browser sets status to 200 OK when the connection is closed
-                    // before the message is sent (weird!).
-                    // In order to address this we fail any completely empty responses.
-                    // Hopefully, nobody will get a valid response with no headers and no body!
-                    if (xhr.getAllResponseHeaders() === "" && xhrResponseText === "" && xhrStatus === 200 && xhrStatusText === 'OK')
+                    if ("" === xhrResponseText)
                     {
-                        callback('', 0);
+                        xhrResponseText = null;
+                    }
+
+                    if (null === xhr.getResponseHeader("Content-Type") &&
+                        "" === xhr.getAllResponseHeaders())
+                    {
+                        // Sometimes the browser sets status to 200 OK
+                        // when the connection is closed before the
+                        // message is sent (weird!).  In order to address
+                        // this we fail any completely empty responses.
+                        // Hopefully, nobody will get a valid response
+                        // with no headers and no body!
+                        // Except that for cross domain requests getAllResponseHeaders ALWAYS returns an empty string
+                        // even for valid responses...
+                        callback(null, 0);
                         return;
                     }
 
-                    if (xhr.status !== 0)
+                    // Invoke the callback
+
+                    if (xhrStatus !== 0)
                     {
+                        // Under these conditions, we return a null
+                        // response text.
+
+                        if (404 === xhrStatus)
+                        {
+                            xhrResponseText = null;
+                        }
+
                         callback(xhrResponseText, xhrStatus);
                     }
                     else
                     {
-                        // Checking xhr.statusText when xhr.status is 0 causes a silent error
+                        // Checking xhr.statusText when xhr.status is
+                        // 0 causes a silent error
+
                         callback(xhrResponseText, 0);
                     }
                 }
@@ -347,6 +364,7 @@ WebGLTurbulenzEngine.prototype = {
         }
         if (this.inputDevice)
         {
+            this.inputDevice.destroy();
             delete this.inputDevice;
         }
         if (this.physicsDevice)
@@ -355,10 +373,15 @@ WebGLTurbulenzEngine.prototype = {
         }
         if (this.soundDevice)
         {
+            if (this.soundDevice.destroy)
+            {
+                this.soundDevice.destroy();
+            }
             delete this.soundDevice;
         }
         if (this.graphicsDevice)
         {
+            this.graphicsDevice.destroy();
             delete this.graphicsDevice;
         }
         if (this.canvas)
@@ -369,11 +392,6 @@ WebGLTurbulenzEngine.prototype = {
         {
             window.removeEventListener('resize', this.resizeCanvas, false);
         }
-    },
-
-    getTime : function ()
-    {
-        return ((Date.now() * 0.001) - this.baseTime);
     },
 
     getPluginObject : function ()
@@ -433,6 +451,15 @@ WebGLTurbulenzEngine.prototype = {
         }
 
         return result;
+    },
+
+    callOnError : function (msg)
+    {
+        var onerror = this.onerror;
+        if (onerror)
+        {
+            onerror(msg);
+        }
     }
 };
 
@@ -450,24 +477,25 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
     tz.pluginId = params.pluginId;
     tz.plugin = null;
 
+    // time property
+    var getTime = (window.performance && window.performance.now ? window.performance.now : Date.now);
+    var baseTime = getTime(); // all in milliseconds (our "time" property is in seconds)
+
     if (Object.defineProperty)
     {
         Object.defineProperty(tz, "time", {
                 get : function () {
-                    return tz.getTime();
+                    return ((getTime() - baseTime) * 0.001);
                 },
                 set : function (newValue) {
                     if (typeof newValue === 'number')
                     {
-                        tz.baseTime = ((Date.now() * 0.001) - newValue);
+                        // baseTime is in milliseconds, newValue is in seconds
+                        baseTime = (getTime() - (newValue * 1000));
                     }
                     else
                     {
-                        var onerror = tz.onerror;
-                        if (onerror)
-                        {
-                            onerror("Must set 'time' attribute to a number");
-                        }
+                        tz.callOnError("Must set 'time' attribute to a number");
                     }
                 },
                 enumerable : false,
@@ -482,7 +510,7 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
     {
         tz.updateTime = function ()
         {
-            this.time = this.getTime();
+            this.time = ((getTime() - baseTime) * 0.001);
         };
     }
 
@@ -587,7 +615,12 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
         };
     }
 
-    if (window.mozRequestAnimationFrame)
+    var requestAnimationFrame = (window.requestAnimationFrame       ||
+                                 window.webkitRequestAnimationFrame ||
+                                 window.oRequestAnimationFrame      ||
+                                 window.msRequestAnimationFrame     ||
+                                 window.mozRequestAnimationFrame);
+    if (requestAnimationFrame)
     {
         tz.setInterval = function (f, t)
         {
@@ -597,7 +630,7 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
                 var interval = {
                     enabled: true
                 };
-                var wrap1 = function wrap1Fn()
+                var wrap1 = function wrap1()
                 {
                     if (interval.enabled)
                     {
@@ -606,12 +639,10 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
                         {
                             f();
                         }
-                        window.mozRequestAnimationFrame();
+                        requestAnimationFrame(wrap1, that.canvas);
                     }
                 };
-                interval.callback = wrap1;
-                window.addEventListener("MozBeforePaint", wrap1, false);
-                window.mozRequestAnimationFrame();
+                requestAnimationFrame(wrap1, that.canvas);
                 return interval;
             }
             else
@@ -633,72 +664,12 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
             if (typeof i === 'object')
             {
                 i.enabled = false;
-                window.removeEventListener("MozBeforePaint", i.callback, false);
-                i.callback = null;
             }
             else
             {
                 window.clearInterval(i);
             }
         };
-    }
-    else
-    {
-        var requestAnimationFrame = (window.requestAnimationFrame       ||
-                                     window.webkitRequestAnimationFrame ||
-                                     window.oRequestAnimationFrame      ||
-                                     window.msRequestAnimationFrame);
-        if (requestAnimationFrame)
-        {
-            tz.setInterval = function (f, t)
-            {
-                var that = this;
-                if (Math.abs(t - (1000 / 60)) <= 1)
-                {
-                    var interval = {
-                        enabled: true
-                    };
-                    var wrap1 = function wrap1()
-                    {
-                        if (interval.enabled)
-                        {
-                            that.updateTime();
-                            if (!that.isUnloading())
-                            {
-                                f();
-                            }
-                            requestAnimationFrame(wrap1, that.canvas);
-                        }
-                    };
-                    requestAnimationFrame(wrap1, that.canvas);
-                    return interval;
-                }
-                else
-                {
-                    var wrap2 = function wrap2()
-                    {
-                        that.updateTime();
-                        if (!that.isUnloading())
-                        {
-                            f();
-                        }
-                    };
-                    return window.setInterval(wrap2, t);
-                }
-            };
-
-            tz.clearInterval = function (i)
-            {
-                if (typeof i === 'object')
-                {
-                    i.enabled = false;
-                }
-                else
-                {
-                    window.clearInterval(i);
-                }
-            };
-        }
     }
 
     tz.canvas = canvas;
@@ -733,8 +704,6 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
         }
     };
 
-    tz.baseTime = 0; // need to set it to zero first so the next function call works for the first time
-    tz.baseTime = tz.getTime();
     tz.time = 0;
 
     // System info

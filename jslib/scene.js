@@ -8,8 +8,12 @@
 /*global LightInstance*/
 /*global Utilities*/
 /*global VertexBufferManager*/
+/*global IndexBufferManager*/
 /*global window*/
 /*global alert*/
+/*global Uint16Array*/
+/*global Uint32Array*/
+/*global Float32Array*/
 
 //
 // Scene
@@ -2278,7 +2282,7 @@ Scene.prototype =
                         {
                             setIndexBuffer.call(gd, indexBuffer);
 
-                            drawIndexed.call(gd, surface.primitive, surface.numIndices);
+                            drawIndexed.call(gd, surface.primitive, surface.numIndices, surface.first);
                         }
                         else
                         {
@@ -3148,7 +3152,24 @@ Scene.prototype =
                 {
                     var vertexSourcesCompare = function (vertexSourceA, vertexSourceB)
                     {
-                        return (vertexSourceA.offset - vertexSourceB.offset);
+                        if (vertexSourceA.offset === vertexSourceB.offset)
+                        {
+                            var semanticA = vertexSourceA.semantic;
+                            if (typeof semanticA === 'string')
+                            {
+                                semanticA = gd['SEMANTIC_' + semanticA];
+                            }
+                            var semanticB = vertexSourceB.semantic;
+                            if (typeof semanticB === 'string')
+                            {
+                                semanticB = gd['SEMANTIC_' + semanticB];
+                            }
+                            return (semanticA - semanticB);
+                        }
+                        else
+                        {
+                            return (vertexSourceA.offset - vertexSourceB.offset);
+                        }
                     };
                     vertexSources.sort(vertexSourcesCompare);
                 }
@@ -3156,12 +3177,36 @@ Scene.prototype =
                 var numVertexSources = vertexSources.length;
                 var semanticsNames = [];
                 var attributes = [];
+                var useFloatArray = (this.float32ArrayConstructor ? true : false);
+                var numValuesPerVertex = 0;
                 var vs, vertexSource;
                 for (vs = 0; vs < numVertexSources; vs += 1)
                 {
                     vertexSource = vertexSources[vs];
                     semanticsNames[vs] = vertexSource.semantic;
-                    attributes[vs] = vertexSource.destFormat;
+                    destFormat = vertexSource.destFormat;
+                    if (useFloatArray)
+                    {
+                        if (typeof destFormat === "string")
+                        {
+                            if (destFormat[0] !== "F")
+                            {
+                                useFloatArray = false;
+                            }
+                        }
+                        else
+                        {
+                            if (destFormat !== gd.VERTEXFORMAT_FLOAT1 &&
+                                destFormat !== gd.VERTEXFORMAT_FLOAT2 &&
+                                destFormat !== gd.VERTEXFORMAT_FLOAT3 &&
+                                destFormat !== gd.VERTEXFORMAT_FLOAT4)
+                            {
+                                useFloatArray = false;
+                            }
+                        }
+                    }
+                    attributes[vs] = destFormat;
+                    numValuesPerVertex += vertexSource.stride;
                 }
 
                 // Now parse the surfaces to work out primitive types and the total vertex count
@@ -3314,8 +3359,7 @@ Scene.prototype =
                             var thisSourceStride = vertexSource.stride;
                             var thisSourceData = vertexSource.data;
 
-                            var newData = [];
-                            newData[thisSourceStride * totalNumVertices - 1] = 0;
+                            var newData = new Array(thisSourceStride * totalNumVertices);
 
                             // For each entry in index list
 
@@ -3357,6 +3401,13 @@ Scene.prototype =
                     this.vertexBufferManager = vertexBufferManager;
                 }
 
+                var indexBufferManager = (loadParams.indexBufferManager || this.indexBufferManager);
+                if (!indexBufferManager)
+                {
+                    indexBufferManager = IndexBufferManager.create(gd);
+                    this.indexBufferManager = indexBufferManager;
+                }
+
                 var baseIndex;
                 var vertexBuffer = null;
                 var vertexBufferAllocation = vertexBufferManager.allocate(totalNumVertices, attributes);
@@ -3371,11 +3422,15 @@ Scene.prototype =
                 shape.vertexBufferAllocation = vertexBufferAllocation;
 
                 baseIndex = vertexBufferAllocation.baseIndex;
+
+                var indexBufferAllocation;
                 var t, index, nextIndex;
                 //
                 // We no have the simple case of each index maps to one vertex so create one vertex buffer and fill in.
                 //
-                var vertexData = [];
+                var vertexData = (useFloatArray ?
+                                  new this.float32ArrayConstructor(totalNumVertices * numValuesPerVertex) :
+                                  new Array(totalNumVertices * numValuesPerVertex));
                 var vertexDataCount = 0;
                 for (t = 0; t < totalNumVertices; t += 1)
                 {
@@ -3407,92 +3462,139 @@ Scene.prototype =
                     }
                     while (vs < numVertexSources);
                 }
-                vertexBuffer.setData(vertexData, vertexBufferAllocation.baseIndex, totalNumVertices);
+                vertexBuffer.setData(vertexData, baseIndex, totalNumVertices);
+
+                // Count total num indices
+                var isSequentialIndices = function isSequentialIndicesFn(indices, numIndices)
+                {
+                    var baseIndex = indices[0];
+                    var n;
+                    for (n = 1; n < numIndices; n += 1)
+                    {
+                        if (indices[n] !== (baseIndex + n))
+                        {
+                            return false;
+                        }
+                    }
+                    return true;
+                };
+
+                var totalNumIndices = 0;
+                var numIndices;
 
                 for (s in surfaces)
                 {
                     if (surfaces.hasOwnProperty(s))
                     {
-                        surface = surfaces[s];
                         destSurface = shape.surfaces[s];
+                        faces = destSurface.faces;
+                        if (faces)
+                        {
+                            numIndices = faces.length;
+                            if (!isSequentialIndices(faces, numIndices))
+                            {
+                                totalNumIndices += numIndices;
+                            }
+                        }
+                    }
+                }
 
-                        var firstVertex = baseIndex;
-                        var indexbuffer = null;
-                        var numIndices;
+                var indexBuffer, indexBufferData, indexBufferBaseIndex, indexBufferOffset, maxIndex;
+                if (0 < totalNumIndices)
+                {
+                    maxIndex = (baseIndex + totalNumVertices - 1);
+
+                    indexBufferAllocation = indexBufferManager.allocate(totalNumIndices,
+                                                                        (maxIndex < 65536 ? 'USHORT' : 'UINT'));
+                    indexBuffer = indexBufferAllocation.indexBuffer;
+                    if (!indexBuffer)
+                    {
+                        return undefined;
+                    }
+
+                    shape.indexBufferManager = indexBufferManager;
+                    shape.indexBufferAllocation = indexBufferAllocation;
+
+                    if (maxIndex < 65536 &&
+                        this.uint16ArrayConstructor)
+                    {
+                        indexBufferData = new this.uint16ArrayConstructor(totalNumIndices);
+                    }
+                    else if (this.uint32ArrayConstructor)
+                    {
+                        indexBufferData = new this.uint32ArrayConstructor(totalNumIndices);
+                    }
+                    else
+                    {
+                        indexBufferData = new Array(totalNumIndices);
+                    }
+
+                    indexBufferBaseIndex = indexBufferAllocation.baseIndex;
+                    indexBufferOffset = 0;
+                }
+
+                // Fill index buffers
+                for (s in surfaces)
+                {
+                    if (surfaces.hasOwnProperty(s))
+                    {
+                        destSurface = shape.surfaces[s];
 
                         faces = destSurface.faces;
                         delete destSurface.faces;
 
                         if (faces)
                         {
-
-                            var indexData = [];
                             // Vertices already de-indexed (1 index per vert)
-
                             numIndices = faces.length;
-                            numVertices = destSurface.numVertices;
 
                             //See if they are all sequential, in which case we don't need an index buffer
-                            var sequentialIndices = true;
-                            var lastIndex = faces[0];
-                            nextIndex = 0;
-                            for (t = 1; t < numIndices; t += 1)
+                            if (!isSequentialIndices(faces, numIndices))
                             {
-                                nextIndex = faces[t];
-                                if (nextIndex !== lastIndex + 1)
-                                {
-                                    sequentialIndices = false;
-                                    break;
-                                }
-                                lastIndex = nextIndex;
-                            }
-
-                            if (sequentialIndices === false)
-                            {
-                                var vertexDataIndexData = [];
-                                vertexDataIndexData.length = numIndices;
-                                var maxIndex = 0;
-                                for (t = 0; t < numIndices; t += 1)
-                                {
-                                    vertexDataIndexData[t] = faces[t] + firstVertex;
-                                    maxIndex = Math.max(maxIndex, vertexDataIndexData[t]);
-                                }
-
-                                var indexbufferParameters =
-                                {
-                                    numIndices: numIndices,
-                                    format: (maxIndex < 65536 ? 'USHORT' : 'UINT'),
-                                    data: vertexDataIndexData,
-                                    dynamic: false
-                                };
-
-                                indexbuffer = gd.createIndexBuffer(indexbufferParameters);
-                                if (!indexbuffer)
-                                {
-                                    return undefined;
-                                }
-
-                                indexData = faces;
-                            }
-                            else
-                            {
-                                firstVertex += faces[0];
-                            }
-
-                            if (indexbuffer)
-                            {
-                                destSurface.indexBuffer = indexbuffer;
+                                destSurface.indexBuffer = indexBuffer;
                                 destSurface.numIndices = numIndices;
+                                destSurface.first = (indexBufferBaseIndex + indexBufferOffset);
+
+                                if (baseIndex)
+                                {
+                                    for (t = 0; t < numIndices; t += 1)
+                                    {
+                                        indexBufferData[indexBufferOffset] = (baseIndex + faces[t]);
+                                        indexBufferOffset += 1;
+                                    }
+                                }
+                                else
+                                {
+                                    for (t = 0; t < numIndices; t += 1)
+                                    {
+                                        indexBufferData[indexBufferOffset] = faces[t];
+                                        indexBufferOffset += 1;
+                                    }
+                                }
+
                                 if (keepVertexData)
                                 {
-                                    destSurface.indexData = indexData;
+                                    if (maxIndex < 65536 &&
+                                        this.uint16ArrayConstructor)
+                                    {
+                                        destSurface.indexData = new this.uint16ArrayConstructor(faces);
+                                    }
+                                    else if (this.uint32ArrayConstructor)
+                                    {
+                                        destSurface.indexData = new this.uint32ArrayConstructor(faces);
+                                    }
+                                    else
+                                    {
+                                        destSurface.indexData = faces;
+                                    }
                                 }
                             }
                             else
                             {
-                                destSurface.numVertices = numVertices;
-                                destSurface.first = firstVertex;
+                                destSurface.first = (baseIndex + faces[0]);
                             }
+
+                            faces = null;
 
                             if (keepVertexData)
                             {
@@ -3504,6 +3606,12 @@ Scene.prototype =
                             delete shape.surfaces[s];
                         }
                     }
+                }
+
+                if (indexBuffer)
+                {
+                    indexBuffer.setData(indexBufferData, indexBufferBaseIndex, totalNumIndices);
+                    indexBufferData = null;
                 }
 
                 //Utilities.log("Buffers creation time: " + (TurbulenzEngine.time - startTime));
@@ -3530,6 +3638,8 @@ Scene.prototype =
                             shape.vertexData = surface.vertexData;
                         }
 
+                        shape.first = surface.first;
+
                         if (surface.indexBuffer)
                         {
                             shape.indexBuffer = surface.indexBuffer;
@@ -3542,7 +3652,6 @@ Scene.prototype =
                         else
                         {
                             shape.numVertices = surface.numVertices;
-                            shape.first = surface.first;
                         }
                     }
 
@@ -4704,6 +4813,11 @@ Scene.prototype =
             this.vertexBufferManager.destroy();
             delete this.vertexBufferManager;
         }
+        if (this.indexBufferManager)
+        {
+            this.indexBufferManager.destroy();
+            delete this.indexBufferManager;
+        }
     },
 
     getQueryCounter: function sceneGetQueryCounter()
@@ -4737,3 +4851,35 @@ Scene.create = function sceneCreateFn(mathDevice)
 
     return newScene;
 };
+
+// Detect correct typed arrays
+(function () {
+    var testArray, textDescriptor;
+    if (typeof Uint16Array !== "undefined")
+    {
+        testArray = new Uint16Array(4);
+        textDescriptor = Object.prototype.toString.call(testArray);
+        if (textDescriptor === '[object Uint16Array]')
+        {
+            Scene.prototype.uint16ArrayConstructor = Uint16Array;
+        }
+    }
+    if (typeof Uint32Array !== "undefined")
+    {
+        testArray = new Uint32Array(4);
+        textDescriptor = Object.prototype.toString.call(testArray);
+        if (textDescriptor === '[object Uint32Array]')
+        {
+            Scene.prototype.uint32ArrayConstructor = Uint32Array;
+        }
+    }
+    if (typeof Float32Array !== "undefined")
+    {
+        testArray = new Float32Array(4);
+        textDescriptor = Object.prototype.toString.call(testArray);
+        if (textDescriptor === '[object Float32Array]')
+        {
+            Scene.prototype.float32ArrayConstructor = Float32Array;
+        }
+    }
+}());

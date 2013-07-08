@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2011 Turbulenz Limited
+// Copyright (c) 2010-2012 Turbulenz Limited
 
 //
 // ShadowMapping
@@ -68,14 +68,88 @@ ShadowMapping.prototype =
 
     destroyBuffers: function shadowMappingDestroyBuffersFn()
     {
-        this.depthBufferLow = null;
-        this.depthBufferHigh = null;
-        this.blurTextureLow = null;
-        this.blurTextureHigh = null;
-        this.blurRenderTargetLow = null;
-        this.blurRenderTargetHigh = null;
-        this.shadowMapsLow.length = 0;
-        this.shadowMapsHigh.length = 0;
+        var shadowMaps, numShadowMaps, n, shadowMap, renderTarget, texture;
+
+        shadowMaps = this.shadowMapsLow;
+        if (shadowMaps)
+        {
+            numShadowMaps = shadowMaps.length;
+            for (n = 0; n < numShadowMaps; n += 1)
+            {
+                shadowMap = shadowMaps[n];
+
+                renderTarget = shadowMap.renderTarget;
+                if (renderTarget)
+                {
+                    renderTarget.destroy();
+                    shadowMap.renderTarget = null;
+                }
+
+                texture = shadowMap.texture;
+                if (texture)
+                {
+                    texture.destroy();
+                    shadowMap.texture = null;
+                }
+            }
+            shadowMaps.length = 0;
+        }
+
+        shadowMaps = this.shadowMapsHigh;
+        if (shadowMaps)
+        {
+            numShadowMaps = shadowMaps.length;
+            for (n = 0; n < numShadowMaps; n += 1)
+            {
+                shadowMap = shadowMaps[n];
+
+                renderTarget = shadowMap.renderTarget;
+                if (renderTarget)
+                {
+                    renderTarget.destroy();
+                    shadowMap.renderTarget = null;
+                }
+
+                texture = shadowMap.texture;
+                if (texture)
+                {
+                    texture.destroy();
+                    shadowMap.texture = null;
+                }
+            }
+            shadowMaps.length = 0;
+        }
+
+        if (this.blurRenderTargetLow)
+        {
+            this.blurRenderTargetLow.destroy();
+            this.blurRenderTargetLow = null;
+        }
+        if (this.blurRenderTargetHigh)
+        {
+            this.blurRenderTargetHigh.destroy();
+            this.blurRenderTargetHigh = null;
+        }
+        if (this.blurTextureLow)
+        {
+            this.blurTextureLow.destroy();
+            this.blurTextureLow = null;
+        }
+        if (this.blurTextureHigh)
+        {
+            this.blurTextureHigh.destroy();
+            this.blurTextureHigh = null;
+        }
+        if (this.depthBufferLow)
+        {
+            this.depthBufferLow.destroy();
+            this.depthBufferLow = null;
+        }
+        if (this.depthBufferHigh)
+        {
+            this.depthBufferHigh.destroy();
+            this.depthBufferHigh = null;
+        }
     },
 
     updateBuffers: function shadowMappingUpdateBuffersFn(sizeLow, sizeHigh)
@@ -598,10 +672,11 @@ ShadowMapping.prototype =
                                                               (-offset - minLightDistance) * maxDepthReciprocal,
                                                               shadowMapTechniqueParameters.shadowDepth);
 
-        var drawQueue = [];
+        var drawQueue = this.drawQueue;
         var drawQueueLength = 0;
+        var n;
 
-        for (var n = 0; n < numShadowRenderables; n += 1)
+        for (n = 0; n < numShadowRenderables; n += 1)
         {
             renderable = shadowRenderables[n];
             rendererInfo = renderable.rendererInfo;
@@ -627,6 +702,11 @@ ShadowMapping.prototype =
                     drawQueueLength += 1;
                 }
             }
+        }
+
+        if (drawQueue.length > drawQueueLength)
+        {
+            drawQueue.length = drawQueueLength;
         }
 
         gd.drawArray(drawQueue, [shadowMapTechniqueParameters], 1);
@@ -913,13 +993,27 @@ ShadowMapping.prototype =
         delete this.rigidTechnique;
         delete this.skinnedTechnique;
         delete this.blurTechnique;
-        delete this.shadowMapsLow;
-        delete this.shadowMapsHigh;
-        delete this.techniqueParameters;
-        delete this.md;
-        delete this.gd;
 
         this.destroyBuffers();
+
+        delete this.clearColor;
+
+        delete this.quadPrimitive;
+        delete this.quadSemantics;
+
+        if (this.quadVertexBuffer)
+        {
+            this.quadVertexBuffer.destroy();
+            delete this.quadVertexBuffer;
+        }
+
+        delete this.shadowMapsLow;
+        delete this.shadowMapsHigh;
+        delete this.camera;
+        delete this.techniqueParameters;
+        delete this.drawQueue;
+        delete this.md;
+        delete this.gd;
     }
 };
 
@@ -963,6 +1057,8 @@ ShadowMapping.create = function shadowMappingCreateFn(gd, md, shaderManager, eff
     sizeLow = sizeLow || shadowMapping.defaultSizeLow;
     sizeHigh = sizeHigh || shadowMapping.defaultSizeHigh;
     shadowMapping.updateBuffers(sizeLow, sizeHigh);
+
+    shadowMapping.drawQueue = [];
 
     return shadowMapping;
 };

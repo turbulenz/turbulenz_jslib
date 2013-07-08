@@ -74,12 +74,16 @@ var TurbulenzBridge = {
      * emit a heartbeat for the message server to detect.
      * gameSessionId - A string for identifying the current game session
      */
-    createdGameSession: function stopSavingFn(gameSessionId) {
+    createdGameSession: function createdGameSessionFn(gameSessionId) {
         this.emit('game.session.created', gameSessionId);
     },
 
-    destroyedGameSession: function stopSavingFn(gameSessionId) {
+    destroyedGameSession: function destroyedGameSessionFn(gameSessionId) {
         this.emit('game.session.destroyed', gameSessionId);
+    },
+
+    setGameSessionStatus: function setGameSessionStatusFn(gameSessionId, status) {
+        this.emit('game.session.status', gameSessionId, status);
     },
 
     /**

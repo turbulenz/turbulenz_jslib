@@ -1,4 +1,7 @@
-// Copyright (c) 2010-2011 Turbulenz Limited
+// Copyright (c) 2010-2012 Turbulenz Limited
+
+/*global TurbulenzEngine: false*/
+/*global Reference: false*/
 
 //
 // Geometry
@@ -19,8 +22,19 @@ Geometry.prototype =
             delete this.vertexBufferManager;
             delete this.vertexBufferAllocation;
         }
+        if (this.indexBufferAllocation)
+        {
+            this.indexBufferManager.free(this.indexBufferAllocation);
+            delete this.indexBufferManager;
+            delete this.indexBufferAllocation;
+        }
         delete this.vertexBuffer;
-        delete this.baseIndex;
+        delete this.indexBuffer;
+        delete this.vertexData;
+        delete this.indexData;
+        delete this.semantics;
+        delete this.first;
+        delete this.halfExtents;
         delete this.reference;
         delete this.surfaces;
     }
@@ -200,7 +214,13 @@ GeometryInstance.prototype =
     //
     addCustomWorldExtents: function geometryInstanceAddCustomWorldExtentsFn(customWorldExtents)
     {
-        this.worldExtents = customWorldExtents.slice();
+        var worldExtents = this.worldExtents;
+        worldExtents[0] = customWorldExtents[0];
+        worldExtents[1] = customWorldExtents[1];
+        worldExtents[2] = customWorldExtents[2];
+        worldExtents[3] = customWorldExtents[3];
+        worldExtents[4] = customWorldExtents[4];
+        worldExtents[5] = customWorldExtents[5];
         var alreadyHadCustomExtents = (this.worldExtentsUpdate === this.maxUpdateValue);
         this.worldExtentsUpdate = this.maxUpdateValue;
         this.node.renderableWorldExtentsUpdated(alreadyHadCustomExtents);
@@ -250,8 +270,8 @@ GeometryInstance.prototype =
             this.sharedMaterial.reference.remove();
         }
 
-        delete this.geometry;
         delete this.surface;
+        delete this.geometry;
         delete this.sharedMaterial;
         delete this.techniqueParameters;
         delete this.halfExtents;
@@ -274,6 +294,8 @@ GeometryInstance.prototype =
 
         drawParameters.primitive = surface.primitive;
 
+        drawParameters.firstIndex = surface.first;
+
         if (surface.indexBuffer)
         {
             drawParameters.indexBuffer = surface.indexBuffer;
@@ -281,7 +303,6 @@ GeometryInstance.prototype =
         }
         else
         {
-            drawParameters.firstIndex = surface.first;
             drawParameters.count = surface.numVertices;
         }
     }

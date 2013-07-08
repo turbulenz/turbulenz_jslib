@@ -35,13 +35,9 @@ BadgeManager.prototype =
             }
         }
 
-        var dataSpec = {};
-        dataSpec.gameSessionId = this.gameSessionId;
-
         this.service.request({
             url: '/api/v1/badges/progress/read/' + this.gameSession.gameSlug,
             method: 'GET',
-            data : dataSpec,
             callback: cb,
             requestHandler: this.requestHandler
         });
@@ -62,7 +58,7 @@ BadgeManager.prototype =
         else
         {
             var errorCallback = errorCallbackFn || that.errorCallbackFn;
-            errorCallbackFn("Badges.updateUserBadgeProgress expects a numeric value for current",
+            errorCallback("Badges.updateUserBadgeProgress expects a numeric value for current",
                           400,
                           [badge_key, current, callbackFn]);
         }
@@ -131,13 +127,9 @@ BadgeManager.prototype =
             }
         }
 
-        var dataSpec = {};
-        dataSpec.gameSessionId = that.gameSessionId;
-
         this.service.request({
             url: '/api/v1/badges/read/' + that.gameSession.gameSlug,
             method: 'GET',
-            data: dataSpec,
             callback: cb,
             requestHandler: this.requestHandler
         });

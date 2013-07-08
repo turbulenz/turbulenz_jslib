@@ -160,6 +160,7 @@ TurbulenzServices = {
         gameSession.errorCallbackFn = errorCallbackFn || TurbulenzServices.defaultErrorCallback;
         gameSession.gameSessionId = null;
         gameSession.service = this.getService('gameSessions');
+        gameSession.status = null;
 
         if (!TurbulenzServices.available())
         {
@@ -197,9 +198,17 @@ TurbulenzServices = {
         var createSessionURL = '/api/v1/games/create-session/' + gameSlug;
 
         var Turbulenz = window.top.Turbulenz;
-        if (Turbulenz && Turbulenz.Data && Turbulenz.Data.mode)
+        if (Turbulenz)
         {
-            createSessionURL += '/' + Turbulenz.Data.mode;
+            var data = Turbulenz.Data;
+            if (data)
+            {
+                var mode = data.mode;
+                if (mode)
+                {
+                    createSessionURL += '/' + mode;
+                }
+            }
         }
 
         gameSession.service.request({
@@ -312,13 +321,9 @@ TurbulenzServices = {
             return leaderboardManager;
         }
 
-        var dataSpec = {};
-        dataSpec.gameSessionId = gameSession.gameSessionId;
-
         leaderboardManager.service.request({
             url: '/api/v1/leaderboards/read/' + gameSession.gameSlug,
             method: 'GET',
-            data: dataSpec,
             callback: function createLeaderboardManagerAjaxErrorCheck(jsonResponse, status) {
                 if (status === 200)
                 {

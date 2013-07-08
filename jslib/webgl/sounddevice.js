@@ -1,9 +1,11 @@
 // Copyright (c) 2011-2012 Turbulenz Limited
 /*global TurbulenzEngine: false*/
+/*global SoundTARLoader: false*/
 /*global Audio: false*/
 /*global VMath: false*/
 /*global navigator: false*/
 /*global window: false*/
+/*global console*/
 "use strict";
 
 
@@ -13,7 +15,21 @@
 function WebGLSound() {}
 WebGLSound.prototype =
 {
-    version : 1
+    version : 1,
+
+    destroy : function soundDestroyFn()
+    {
+        var audioContext = this.audioContext;
+        if (audioContext)
+        {
+            delete this.audioContext;
+            delete this.buffer;
+        }
+        else
+        {
+            delete this.audio;
+        }
+    }
 };
 
 WebGLSound.create = function webGLSoundCreateFn(sd, params)
@@ -36,10 +52,12 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
     var audioContext = sd.audioContext;
     if (audioContext)
     {
+        sound.audioContext = audioContext;
+
         var buffer;
         if (soundPath)
         {
-            if (!sd.isFormatSupported(soundPath))
+            if (!sd.isResourceSupported(soundPath))
             {
                 if (onload)
                 {
@@ -48,59 +66,102 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
                 return null;
             }
 
-            var xhr;
-            if (window.XMLHttpRequest)
+            var bufferCreated = function bufferCreatedFn(buffer)
             {
-                xhr = new window.XMLHttpRequest();
-            }
-            else if (window.ActiveXObject)
+                if (buffer)
+                {
+                    sound.buffer = buffer;
+                    sound.frequency = buffer.sampleRate;
+                    sound.channels = buffer.numberOfChannels;
+                    sound.bitrate = (sound.frequency * sound.channels * 2 * 8);
+                    sound.length = buffer.duration;
+
+                    if (onload)
+                    {
+                        onload(sound, 200);
+                    }
+                }
+                else
+                {
+                    if (onload)
+                    {
+                        onload(null);
+                    }
+                }
+            };
+
+            var bufferFailed = function bufferFailedFn()
             {
-                xhr = new window.ActiveXObject("Microsoft.XMLHTTP");
+                if (onload)
+                {
+                    onload(null);
+                }
+            };
+
+            data = params.data;
+            if (data)
+            {
+                if (audioContext.decodeAudioData)
+                {
+                    audioContext.decodeAudioData(data, bufferCreated, bufferFailed);
+                }
+                else
+                {
+                    buffer = audioContext.createBuffer(data, false);
+                    bufferCreated(buffer);
+                }
             }
             else
             {
-                if (onload)
+                var xhr;
+                if (window.XMLHttpRequest)
                 {
-                    onload(null);
+                    xhr = new window.XMLHttpRequest();
                 }
-                return null;
-            }
-
-            xhr.onreadystatechange = function ()
-            {
-                if (xhr.readyState === 4)
+                else if (window.ActiveXObject)
                 {
-                    if (!TurbulenzEngine || !TurbulenzEngine.isUnloading())
+                    xhr = new window.ActiveXObject("Microsoft.XMLHTTP");
+                }
+                else
+                {
+                    if (onload)
                     {
-                        var xhrStatus = xhr.status;
-                        var xhrStatusText = (xhrStatus !== 0 && xhr.statusText || 'No connection');
-                        var response = xhr.response;
+                        onload(null);
+                    }
+                    return null;
+                }
 
-                        // Sometimes the browser sets status to 200 OK when the connection is closed
-                        // before the message is sent (weird!).
-                        // In order to address this we fail any completely empty responses.
-                        // Hopefully, nobody will get a valid response with no headers and no body!
-                        if (xhr.getAllResponseHeaders() === "" && !response && xhrStatus === 200 && xhrStatusText === 'OK')
+                xhr.onreadystatechange = function ()
+                {
+                    if (xhr.readyState === 4)
+                    {
+                        if (!TurbulenzEngine || !TurbulenzEngine.isUnloading())
                         {
-                            if (onload)
-                            {
-                                onload(null);
-                            }
-                        }
-                        else if (xhrStatus === 200 || xhrStatus === 0)
-                        {
-                            var buffer = audioContext.createBuffer(response, false);
-                            if (buffer)
-                            {
-                                sound.buffer = buffer;
-                                sound.frequency = buffer.sampleRate;
-                                sound.channels = buffer.numberOfChannels;
-                                sound.bitrate = (sound.frequency * sound.channels * 2 * 8);
-                                sound.length = buffer.duration;
+                            var xhrStatus = xhr.status;
+                            var xhrStatusText = (xhrStatus !== 0 && xhr.statusText || 'No connection');
+                            var response = xhr.response;
 
+                            // Sometimes the browser sets status to 200 OK when the connection is closed
+                            // before the message is sent (weird!).
+                            // In order to address this we fail any completely empty responses.
+                            // Hopefully, nobody will get a valid response with no headers and no body!
+                            if (xhr.getAllResponseHeaders() === "" && !response && xhrStatus === 200 && xhrStatusText === 'OK')
+                            {
                                 if (onload)
                                 {
-                                    onload(sound, 200);
+                                    onload(null);
+                                }
+                            }
+                            else if (xhrStatus === 200 || xhrStatus === 0)
+                            {
+                                if (audioContext.decodeAudioData)
+                                {
+                                    audioContext.decodeAudioData(response, bufferCreated, bufferFailed);
+                                }
+                                else
+                                {
+                                    var buffer = audioContext.createBuffer(response, false);
+                                    bufferCreated(buffer);
                                 }
                             }
                             else
@@ -111,23 +172,16 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
                                 }
                             }
                         }
-                        else
-                        {
-                            if (onload)
-                            {
-                                onload(null);
-                            }
-                        }
+                        // break circular reference
+                        xhr.onreadystatechange = null;
+                        xhr = null;
                     }
-                    // break circular reference
-                    xhr.onreadystatechange = null;
-                    xhr = null;
-                }
-            };
-            xhr.open("GET", soundPath, true);
-            xhr.responseType = "arraybuffer";
-            xhr.setRequestHeader("Content-Type", "text/plain");
-            xhr.send(null);
+                };
+                xhr.open("GET", soundPath, true);
+                xhr.responseType = "arraybuffer";
+                xhr.setRequestHeader("Content-Type", "text/plain");
+                xhr.send(null);
+            }
 
             return sound;
         }
@@ -171,7 +225,9 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
                         for (j = 0; j < bufferLength; j += 1)
                         {
                             /*jslint bitwise: false*/
+                            /*jshint bitwise: false*/
                             channel[j] = data[c + (((j * ratio) | 0) * numChannels)];
+                            /*jshint bitwise: true*/
                             /*jslint bitwise: true*/
                         }
                     }
@@ -201,7 +257,7 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
 
         if (soundPath)
         {
-            if (!sd.isFormatSupported(soundPath))
+            if (!sd.isResourceSupported(soundPath))
             {
                 if (onload)
                 {
@@ -211,6 +267,9 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
             }
 
             audio = new Audio();
+
+            audio.preload = 'auto';
+            audio.autobuffer = true;
 
             audio.src = soundPath;
 
@@ -231,21 +290,40 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
                     sound.bitrate = (sound.frequency * sound.channels * 2 * 8);
                     sound.length = audio.duration;
 
-                    // Make sure the data is actually loaded
-                    var forceLoading = function forceLoadingFn()
+                    if (audio.buffered &&
+                        audio.buffered.length &&
+                        0 < audio.buffered.end(0))
                     {
-                        audio.pause();
-                        audio.removeEventListener('play', forceLoading, false);
+                        if (isNaN(sound.length) ||
+                            sound.length === Number.POSITIVE_INFINITY)
+                        {
+                            sound.length = audio.buffered.end(0);
+                        }
 
                         if (onload)
                         {
                             onload(sound, 200);
                             onload = null;
                         }
-                    };
-                    audio.addEventListener('play', forceLoading, false);
-                    audio.volume = 0;
-                    audio.play();
+                    }
+                    else
+                    {
+                        // Make sure the data is actually loaded
+                        var forceLoading = function forceLoadingFn()
+                        {
+                            audio.pause();
+                            audio.removeEventListener('play', forceLoading, false);
+
+                            if (onload)
+                            {
+                                onload(sound, 200);
+                                onload = null;
+                            }
+                        };
+                        audio.addEventListener('play', forceLoading, false);
+                        audio.volume = 0;
+                        audio.play();
+                    }
 
                     return true;
                 }
@@ -319,8 +397,6 @@ WebGLSoundSource.prototype =
         var audioContext = this.audioContext;
         if (audioContext)
         {
-            var buffer = sound.buffer;
-
             var bufferNode = this.bufferNode;
 
             if (this.sound !== sound)
@@ -341,9 +417,8 @@ WebGLSoundSource.prototype =
                 }
             }
 
-            bufferNode = this.createBufferNode(buffer);
+            bufferNode = this.createBufferNode(sound);
 
-            this.bufferNode = bufferNode;
             this.sound = sound;
 
             if (!this.playing)
@@ -361,6 +436,7 @@ WebGLSoundSource.prototype =
 
             if (0 < seek)
             {
+                var buffer = sound.buffer;
                 bufferNode.noteGrainOn(0, seek, (buffer.duration - seek));
                 this.playStart = (audioContext.currentTime - seek);
             }
@@ -417,7 +493,14 @@ WebGLSoundSource.prototype =
 
             if (0.05 < Math.abs(audio.currentTime - seek))
             {
-                audio.currentTime = seek;
+                try
+                {
+                    audio.currentTime = seek;
+                }
+                catch (e)
+                {
+                    // There does not seem to be any reliable way of seeking
+                }
             }
 
             if (this.data)
@@ -517,14 +600,11 @@ WebGLSoundSource.prototype =
                     seek = (this.playPaused - this.playStart);
                 }
 
-                var buffer = this.sound.buffer;
-
-                var bufferNode = this.createBufferNode(buffer);
-
-                this.bufferNode = bufferNode;
+                var bufferNode = this.createBufferNode(this.sound);
 
                 if (0 < seek)
                 {
+                    var buffer = this.sound.buffer;
                     bufferNode.noteGrainOn(0, seek, (buffer.duration - seek));
                     this.playStart = (audioContext.currentTime - seek);
                 }
@@ -542,7 +622,15 @@ WebGLSoundSource.prototype =
                 {
                     if (0.05 < Math.abs(audio.currentTime - seek))
                     {
-                        audio.currentTime = seek;
+                        try
+                        {
+                            audio.currentTime = seek;
+                        }
+                        catch (e)
+                        {
+                            // There does not seem to be any reliable way of seeking
+                        }
+
                     }
                 }
 
@@ -570,9 +658,7 @@ WebGLSoundSource.prototype =
                     bufferNode.noteOff(0);
                 }
 
-                bufferNode = this.createBufferNode(this.sound.buffer);
-
-                this.bufferNode = bufferNode;
+                bufferNode = this.createBufferNode(this.sound);
 
                 bufferNode.noteOn(0);
 
@@ -606,6 +692,24 @@ WebGLSoundSource.prototype =
 
     setDirectFilter : function setDirectFilterFn()
     {
+    },
+
+    destroy : function sourceDestroyFn()
+    {
+        this.stop();
+
+        var audioContext = this.audioContext;
+        if (audioContext)
+        {
+            var pannerNode = this.pannerNode;
+            if (pannerNode)
+            {
+                pannerNode.disconnect();
+                delete this.pannerNode;
+            }
+
+            delete this.audioContext;
+        }
     }
 };
 
@@ -636,12 +740,16 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params)
         source.pannerNode = pannerNode;
         pannerNode.connect(audioContext.destination);
 
-/*
         if (sd.linearDistance)
         {
-            pannerNode.distanceModel = 0; // Linear model, BROKEN!!!
+            if (typeof pannerNode.LINEAR_DISTANCE === "number")
+            {
+                pannerNode.distanceModel = pannerNode.LINEAR_DISTANCE;
+            }
         }
-*/
+
+        pannerNode.panningModel = pannerNode.EQUALPOWER;
+
         var position, direction, velocity;
 
         Object.defineProperty(source, "position", {
@@ -683,14 +791,28 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params)
                 configurable : false
             });
 
-        source.createBufferNode = function createBufferNodeFn(buffer)
+        source.createBufferNode = function createBufferNodeFn(sound)
         {
+            var buffer = sound.buffer;
+
             var bufferNode = audioContext.createBufferSource();
             bufferNode.buffer = buffer;
-            bufferNode.gain = gain;
+            bufferNode.gain.value = gain;
             bufferNode.loop = looping;
             bufferNode.playbackRate.value = pitch;
-            bufferNode.connect(pannerNode);
+
+            if (1 < sound.channels)
+            {
+                // We do not support panning of stereo sources
+                bufferNode.connect(audioContext.destination);
+            }
+            else
+            {
+                bufferNode.connect(pannerNode);
+            }
+
+            this.bufferNode = bufferNode;
+
             return bufferNode;
         };
 
@@ -703,7 +825,7 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params)
                     var bufferNode = this.bufferNode;
                     if (bufferNode)
                     {
-                        bufferNode.gain = newGain;
+                        bufferNode.gain.value = newGain;
                     }
                 },
                 enumerable : true,
@@ -927,7 +1049,40 @@ WebGLSoundDevice.prototype =
 
     loadSoundsArchive : function loadSoundsArchiveFn(params)
     {
-        return false;
+        var src = params.src;
+        if (typeof SoundTARLoader !== 'undefined')
+        {
+            SoundTARLoader.create({
+                sd: this,
+                src : src,
+                uncompress : params.uncompress,
+                onsoundload : function tarSoundLoadedFn(texture)
+                {
+                    params.onsoundload(texture);
+                },
+                onload : function soundTarLoadedFn(success, status)
+                {
+                    if (params.onload)
+                    {
+                        params.onload(true);
+                    }
+                },
+                onerror : function soundTarFailedFn()
+                {
+                    if (params.onload)
+                    {
+                        params.onload(false);
+                    }
+                }
+            });
+            return true;
+        }
+        else
+        {
+            TurbulenzEngine.callOnError(
+                'Missing archive loader required for ' + src);
+            return false;
+        }
     },
 
     createEffect : function createEffectFn(params)
@@ -957,7 +1112,8 @@ WebGLSoundDevice.prototype =
         var linearDistance = this.linearDistance;
 
         var playingSources = this.playingSources;
-        for (var id in playingSources)
+        var id;
+        for (id in playingSources)
         {
             if (playingSources.hasOwnProperty(id))
             {
@@ -1015,6 +1171,23 @@ WebGLSoundDevice.prototype =
         }
     },
 
+    isSupported : function isSupportedFn(name)
+    {
+        if ("FILEFORMAT_OGG" === name)
+        {
+            return ("ogg" in this.supportedExtensions);
+        }
+        else if ("FILEFORMAT_MP3" === name)
+        {
+            return ("mp3" in this.supportedExtensions);
+        }
+        else if ("FILEFORMAT_WAV" === name)
+        {
+            return ("wav" in this.supportedExtensions);
+        }
+        return false;
+    },
+
     // Private API
     addLoadingSound : function addLoadingSoundFn(soundCheck)
     {
@@ -1064,10 +1237,45 @@ WebGLSoundDevice.prototype =
         delete this.playingSources[source.id];
     },
 
-    isFormatSupported : function isFormatSupportedFn(soundPath)
+    isResourceSupported : function isResourceSupportedFn(soundPath)
     {
-        var extension = soundPath.slice(-3);
+        var extension = soundPath.slice(-3).toLowerCase();
         return (extension in this.supportedExtensions);
+    },
+
+    destroy : function soundDeviceDestroyFn()
+    {
+        var loadingInterval = this.loadingInterval;
+        if (loadingInterval !== null)
+        {
+            window.clearInterval(loadingInterval);
+            this.loadingInterval = null;
+        }
+
+        var loadingSounds = this.loadingSounds;
+        if (loadingSounds)
+        {
+            loadingSounds.length = 0;
+            this.loadingSounds = null;
+        }
+
+        var playingSources = this.playingSources;
+        var id;
+        if (playingSources)
+        {
+            for (id in playingSources)
+            {
+                if (playingSources.hasOwnProperty(id))
+                {
+                    var source = playingSources[id];
+                    if (source)
+                    {
+                        source.stop();
+                    }
+                }
+            }
+            this.playingSources = null;
+        }
     }
 };
 
@@ -1088,7 +1296,7 @@ WebGLSoundDevice.create = function webGLSoundDeviceFn(params)
     sd.dopplerFactor = (params.dopplerFactor || 1);
     sd.dopplerVelocity = (params.dopplerVelocity || 1);
     sd.speedOfSound = (params.speedOfSound || 343.29998779296875);
-    sd.linearDistance = params.linearDistance;
+    sd.linearDistance = (params.linearDistance !== undefined ? params.linearDistance : true);
 
     sd.loadingSounds = [];
     sd.loadingInterval = null;
@@ -1124,7 +1332,7 @@ WebGLSoundDevice.create = function webGLSoundDeviceFn(params)
 
                     listener.setPosition(position0, position1, position2);
 
-                    listener.setOrientation(transform[6], transform[7], transform[8],
+                    listener.setOrientation(-transform[6], -transform[7], -transform[8],
                                             transform[3], transform[4], transform[5]);
                 },
                 enumerable : true,
@@ -1162,8 +1370,9 @@ WebGLSoundDevice.create = function webGLSoundDeviceFn(params)
 
             var playingSources = this.playingSources;
             var stopped = [];
+            var id;
 
-            for (var id in playingSources)
+            for (id in playingSources)
             {
                 if (playingSources.hasOwnProperty(id))
                 {
@@ -1194,7 +1403,8 @@ WebGLSoundDevice.create = function webGLSoundDeviceFn(params)
             }
 
             var numStopped = stopped.length;
-            for (var n = 0; n < numStopped; n += 1)
+            var n;
+            for (n = 0; n < numStopped; n += 1)
             {
                 delete playingSources[stopped[n]];
             }

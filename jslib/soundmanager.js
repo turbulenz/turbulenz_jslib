@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 
 /*global Observer: false*/
 /*global TurbulenzEngine: false*/
@@ -413,6 +413,35 @@ SoundManager.create = function soundManagerCreateFn(sd, rh, ds, errorCallback, l
     {
         pathRemapping = prm;
         pathPrefix = assetUrl;
+    };
+
+    sm.destroy = function shaderManagerDestroyFn()
+    {
+        if (sounds)
+        {
+            var p;
+            for (p in sounds)
+            {
+                if (sounds.hasOwnProperty(p))
+                {
+                    var sound = sounds[p];
+                    if (sound)
+                    {
+                        sound.destroy();
+                    }
+                }
+            }
+            sounds = null;
+        }
+
+        defaultSound = null;
+        loadingSound = null;
+        loadedObservers = null;
+        numLoadingSounds = 0;
+        pathRemapping = null;
+        pathPrefix = null;
+        rh = null;
+        sd = null;
     };
 
     return sm;

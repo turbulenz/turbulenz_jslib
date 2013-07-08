@@ -12,12 +12,23 @@ GameSession.prototype =
 {
     version : 1,
 
+    setStatus: function gameSessionSetStatusFn(status)
+    {
+        if (this.status !== status)
+        {
+            this.status = status;
+            TurbulenzBridge.setGameSessionStatus(this.gameSessionId, status);
+        }
+    },
+
     // callbackFn is for testing only!
     // It will not be called if destroy is called in TurbulenzEngine.onUnload
     destroy: function gameSessionDestroyFn(callbackFn)
     {
         if (this.gameSessionId)
         {
+            TurbulenzBridge.destroyedGameSession(this.gameSessionId);
+
             Utilities.ajax({
                 url: '/api/v1/games/destroy-session',
                 method: 'POST',
@@ -25,8 +36,6 @@ GameSession.prototype =
                 callback: callbackFn,
                 requestHandler: this.requestHandler
             });
-
-            TurbulenzBridge.destroyedGameSession(this.gameSessionId);
         }
         else
         {

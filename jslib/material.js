@@ -48,7 +48,7 @@ Material.prototype =
     {
         if (!this.textureInstances)
         {
-            this.textureInstances = [];
+            this.textureInstances = {};
         }
         var oldInstance = this.textureInstances[propertryName];
         if (oldInstance !== textureInstance)

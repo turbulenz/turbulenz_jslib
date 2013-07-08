@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 
 /*global Observer: false*/
 /*global TurbulenzEngine: false*/
@@ -420,6 +420,35 @@ ShaderManager.create = function shaderManagerCreateFn(gd, rh, ds, errorCallback,
     {
         pathRemapping = prm;
         pathPrefix = assetUrl;
+    };
+
+    sm.destroy = function shaderManagerDestroyFn()
+    {
+        if (shaders)
+        {
+            var p;
+            for (p in shaders)
+            {
+                if (shaders.hasOwnProperty(p))
+                {
+                    var shader = shaders[p];
+                    if (shader)
+                    {
+                        shader.destroy();
+                    }
+                }
+            }
+            shaders = null;
+        }
+
+        defaultShader = null;
+        loadingShader = null;
+        loadedObservers = null;
+        numLoadingShaders = 0;
+        pathRemapping = null;
+        pathPrefix = null;
+        rh = null;
+        gd = null;
     };
 
     return sm;

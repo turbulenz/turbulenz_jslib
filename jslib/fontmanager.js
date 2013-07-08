@@ -1,7 +1,8 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 
 /*global TurbulenzEngine: false*/
 /*global Observer: false*/
+/*global Float32Array: false*/
 
 "use strict";
 
@@ -72,8 +73,29 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
         return gd.createVertexBuffer({numVertices: (4 * maxGlyphs),
             attributes: [gd.VERTEXFORMAT_FLOAT2, gd.VERTEXFORMAT_FLOAT2],
             dynamic: true,
-            transient: true});
+            'transient': true});
     }
+
+    var Float32ArrayConstructor = Array;
+    if (typeof Float32Array !== "undefined")
+    {
+        var testArray = new Float32Array(4);
+        var textDescriptor = Object.prototype.toString.call(testArray);
+        if (textDescriptor === '[object Float32Array]')
+        {
+            Float32ArrayConstructor = Float32Array;
+        }
+    }
+
+
+    var primitive = gd.PRIMITIVE_TRIANGLES;
+    var semantics = gd.createSemantics(['POSITION', 'TEXCOORD0']);
+    var techniqueParameters = gd.createTechniqueParameters({
+        texture: null
+    });
+    var sharedIndexBuffer;
+    var sharedVertexBuffer;
+
 
     /**
       @class  Font
@@ -84,31 +106,12 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
     function Font() {}
     Font.prototype =
     {
-        /**
-          Version number
-          @memberOf Font
-          @constant
-          @type number
-        */
         version : 1,
-
-        primitive: gd.PRIMITIVE_TRIANGLES,
-
-        semantics: gd.createSemantics(['POSITION', 'TEXCOORD0']),
-
-        indexBuffer : createIndexBuffer(256),
-
-        vertexBuffer : createVertexBuffer(256),
-
-        techniqueParameters: gd.createTechniqueParameters({
-            texture: null
-        }),
-
 
         calculateTextDimensions: function fontCalculateTextDimensionsFn(text, scale, spacing)
         {
             var glyphs = this.glyphs;
-            var lineHeight = this.lineHeight;
+            var lineHeight = (this.lineHeight * scale);
             var width = 0;
             var height = 0;
             var numGlyphs = 0;
@@ -170,159 +173,176 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
             };
         },
 
-        /**
-          Draw text in rectangle
 
-          @memberOf Font.prototype
-          @public
-          @function
-          @name drawTextRect
-
-          @param {string} text Text to calculate dimensions for
-          @param {object} params Text drawing parameters:
-                    rect: Rectangle to draw the text into
-                    alignment: A value of 0 left-aligns the text.
-                               A value of 1 center-aligns the text.
-                               A value of 2 right-aligns the text.
-                               When this flag is not set, the text defaults to left-aligned.
-                    spacing: Extra pixels between glyphs.
-                    scale: Scale factor applied to glyphs
-
-        */
-        drawTextRect: function fontDrawTextRectFn(text, params)
+        generateTextVertices: function fontGenerateTextVerticesFn(text, params)
         {
             var rect = params.rect;
             var alignment = params.alignment;
             var scale = (params.scale || 1.0);
-            var extraSpacing = (0.5 + ((params.spacing * scale) || 0));
+            var extraSpacing = (params.spacing ? (params.spacing * scale) : 0);
+
             var dimensions = this.calculateTextDimensions(text, scale, extraSpacing);
             var numGlyphs = dimensions.numGlyphs;
-            if (0 < numGlyphs)
+            if (0 >= numGlyphs)
             {
-                var linesWidth = dimensions.linesWidth;
-                var lineHeight = (this.lineHeight * scale);
-                var kernings = this.kernings;
-                var glyphs = this.glyphs;
-                var writer, i;
+                return null;
+            }
 
-                var numVertices = (numGlyphs * 4);
-                var numIndicies = (numGlyphs * 6);
+            var linesWidth = dimensions.linesWidth;
+            var lineHeight = (this.lineHeight * scale);
+            var kernings = this.kernings;
+            var glyphs = this.glyphs;
 
-                var indexBuffer = Font.prototype.indexBuffer;
-                if (!indexBuffer || numIndicies > indexBuffer.numIndices)
+            var numVertices = (numGlyphs * 4);
+            var vertices = new Float32ArrayConstructor(numVertices * 4);
+            var vertexIndex = 0;
+
+            var c, glyph, gx0, gy0, gx1, gy1, gaw, u0, v0, u1, v1;
+            var lineWidth = linesWidth[0];
+            var rectLeft = rect[0];
+            var rectWidth = rect[2];
+            var y = rect[1];
+            var x = rectLeft;
+            if (1 === alignment)
+            {
+                x += ((rectWidth - lineWidth) * 0.5);
+            }
+            else if (2 === alignment)
+            {
+                x += ((rectWidth - lineWidth));
+            }
+            var textLength = text.length;
+            var line = 0;
+            var i;
+            for (i = 0; i < textLength; i += 1)
+            {
+                c = text.charCodeAt(i);
+                if (c === 10)
                 {
-                    Font.prototype.indexBuffer = indexBuffer = createIndexBuffer(numGlyphs);
-                }
-
-                var vertexBuffer = Font.prototype.vertexBuffer;
-                if (!vertexBuffer || numVertices > vertexBuffer.numVertices)
-                {
-                    Font.prototype.vertexBuffer = vertexBuffer = createVertexBuffer(numGlyphs);
-                }
-
-                if (vertexBuffer)
-                {
-                    writer = vertexBuffer.map(0, numVertices);
-                    if (writer)
+                    y += lineHeight;
+                    line += 1;
+                    lineWidth = linesWidth[line];
+                    x = rectLeft;
+                    if (1 === alignment)
                     {
-                        var c, glyph, gx0, gy0, gx1, gy1, gaw, u0, v0, u1, v1;
-                        var lineWidth = linesWidth[0];
-                        var rectLeft = rect[0];
-                        var rectWidth = rect[2];
-                        var y = (rect[1] + (this.baseline * scale));
-                        var x = rectLeft;
-                        if (1 === alignment)
+                        x += ((rectWidth - lineWidth) * 0.5);
+                    }
+                    else if (2 === alignment)
+                    {
+                        x += ((rectWidth - lineWidth));
+                    }
+                }
+                else
+                {
+                    glyph = glyphs[c];
+                    if (glyph)
+                    {
+                        gaw = (glyph.awidth * scale);
+                        if (gaw)
                         {
-                            x += ((rectWidth - lineWidth) * 0.5);
-                        }
-                        else if (2 === alignment)
-                        {
-                            x += ((rectWidth - lineWidth));
-                        }
-                        var textLength = text.length;
-                        var line = 0;
-                        for (i = 0; i < textLength; i += 1)
-                        {
-                            c = text.charCodeAt(i);
-                            if (c === 10)
+                            gx0 = (x + (glyph.xoffset * scale));
+                            gy0 = (y + (glyph.yoffset * scale));
+                            gx1 = (gx0 + (glyph.width  * scale));
+                            gy1 = (gy0 + (glyph.height * scale));
+                            u0 = glyph.left;
+                            v0 = glyph.top;
+                            u1 = glyph.right;
+                            v1 = glyph.bottom;
+
+                            vertices[vertexIndex + 0] = gx0;
+                            vertices[vertexIndex + 1] = gy0;
+                            vertices[vertexIndex + 2] = u0;
+                            vertices[vertexIndex + 3] = v0;
+
+                            vertices[vertexIndex + 4] = gx1;
+                            vertices[vertexIndex + 5] = gy0;
+                            vertices[vertexIndex + 6] = u1;
+                            vertices[vertexIndex + 7] = v0;
+
+                            vertices[vertexIndex + 8] = gx1;
+                            vertices[vertexIndex + 9] = gy1;
+                            vertices[vertexIndex + 10] = u1;
+                            vertices[vertexIndex + 11] = v1;
+
+                            vertices[vertexIndex + 12] = gx0;
+                            vertices[vertexIndex + 13] = gy1;
+                            vertices[vertexIndex + 14] = u0;
+                            vertices[vertexIndex + 15] = v1;
+
+                            vertexIndex += 16;
+
+                            numGlyphs -= 1;
+                            if (0 === numGlyphs)
                             {
-                                y += lineHeight;
-                                line += 1;
-                                lineWidth = linesWidth[line];
-                                x = rectLeft;
-                                if (1 === alignment)
-                                {
-                                    x += ((rectWidth - lineWidth) * 0.5);
-                                }
-                                else if (2 === alignment)
-                                {
-                                    x += ((rectWidth - lineWidth));
-                                }
+                                break;
                             }
-                            else
+                            x += (gaw + extraSpacing);
+
+                            if (kernings)
                             {
-                                glyph = glyphs[c];
-                                if (glyph)
+                                var kerning = kernings[c];
+                                if (kerning && i < (textLength - 1))
                                 {
-                                    gaw = (glyph.awidth * scale);
-                                    if (gaw)
+                                    var amount = kerning[text.charCodeAt(i + 1)];
+                                    if (amount)
                                     {
-                                        gx0 = (x + (glyph.xoffset * scale));
-                                        gy0 = (y - (glyph.yoffset * scale));
-                                        gx1 = (gx0 + (glyph.width  * scale));
-                                        gy1 = (gy0 + (glyph.height * scale));
-                                        u0 = glyph.left;
-                                        v0 = glyph.top;
-                                        u1 = glyph.right;
-                                        v1 = glyph.bottom;
-
-                                        writer(gx0, gy0, u0, v0);
-                                        writer(gx1, gy0, u1, v0);
-                                        writer(gx1, gy1, u1, v1);
-                                        writer(gx0, gy1, u0, v1);
-
-                                        numGlyphs -= 1;
-                                        if (0 === numGlyphs)
-                                        {
-                                            break;
-                                        }
-                                        x += (gaw + extraSpacing);
-
-                                        if (kernings)
-                                        {
-                                            var kerning = kernings[c];
-                                            if (kerning && i < (textLength - 1))
-                                            {
-                                                var amount = kerning[text.charCodeAt(i + 1)];
-                                                if (amount)
-                                                {
-                                                    x += (amount * scale);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        x += extraSpacing;
+                                        x += (amount * scale);
                                     }
                                 }
                             }
                         }
-
-                        vertexBuffer.unmap(writer);
-
-                        gd.setStream(vertexBuffer, this.semantics);
-                        gd.setIndexBuffer(indexBuffer);
-
-                        // TODO: support for multiple pages
-                        var techniqueParameters = this.techniqueParameters;
-                        techniqueParameters.texture = this.texture;
-                        gd.setTechniqueParameters(techniqueParameters);
-
-                        gd.drawIndexed(this.primitive, numIndicies);
+                        else
+                        {
+                            x += extraSpacing;
+                        }
                     }
                 }
             }
+
+            return vertices;
+        },
+
+
+        drawTextRect: function fontDrawTextRectFn(text, params)
+        {
+            var vertices = this.generateTextVertices(text, params);
+            if (!vertices)
+            {
+                return;
+            }
+
+            var numGlyphs = (vertices.length / 16);
+            var numVertices = (numGlyphs * 4);
+            var numIndicies = (numGlyphs * 6);
+
+            if (!sharedIndexBuffer || numIndicies > sharedIndexBuffer.numIndices)
+            {
+                if (sharedIndexBuffer)
+                {
+                    sharedIndexBuffer.destroy();
+                }
+                sharedIndexBuffer = createIndexBuffer(numGlyphs);
+            }
+
+            if (!sharedVertexBuffer || numVertices > sharedVertexBuffer.numVertices)
+            {
+                if (sharedVertexBuffer)
+                {
+                    sharedVertexBuffer.destroy();
+                }
+                sharedVertexBuffer = createVertexBuffer(numGlyphs);
+            }
+
+            sharedVertexBuffer.setData(vertices, 0, numVertices);
+
+            gd.setStream(sharedVertexBuffer, semantics);
+            gd.setIndexBuffer(sharedIndexBuffer);
+
+            // TODO: support for multiple pages
+            techniqueParameters.texture = this.texture;
+            gd.setTechniqueParameters(techniqueParameters);
+
+            gd.drawIndexed(primitive, numIndicies);
         }
     };
 
@@ -360,7 +380,7 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
                         height: h,
                         awidth: w,
                         xoffset: 0,
-                        yoffset: h,
+                        yoffset: 0,
                         left: u,
                         top: v,
                         right: (u + d),
@@ -373,29 +393,6 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
             font.glyphs = glyphs;
             font.numGlyphs = 256;
             font.minGlyphIndex = 0;
-        }
-        else if (!font.lineHeight)
-        {
-            var minGlyphIndex = font.minGlyphIndex;
-            var maxGlyphIndex = (minGlyphIndex + font.numGlyphs);
-            var height = 0;
-            var offset = 0;
-            for (g = minGlyphIndex; g < maxGlyphIndex; g += 1)
-            {
-                var glyph = glyphs[g];
-                glyph.page = 0;
-                var goffset = (glyph.height - glyph.yoffset);
-                if (height < glyph.height)
-                {
-                    height = glyph.height;
-                }
-                if (offset < goffset)
-                {
-                    offset = goffset;
-                }
-            }
-            font.lineHeight = Math.round(height + offset);
-            font.baseline = height;
         }
     }
 
@@ -427,7 +424,7 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
             }
             return false;
         }
-        
+
         function requestFn(url, onload, callContext)
         {
             var font = fonts[path];
@@ -436,7 +433,7 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
                 pageComplete();
                 return;
             }
-            
+
             if (!gd.createTexture({
                 src     : url,
                 mipmaps : true,
@@ -519,7 +516,7 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
                                     {
                                         font.texture = t;
                                     }
-                                    
+
                                     if (pageComplete())
                                     {
                                         observer.notify(font);
@@ -822,14 +819,49 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
     */
     fm.destroy = function fontManagerDestroyFn(prm)
     {
-        fonts = {};
-        loadingFont = {};
-        loadingPages = {};
+        if (fonts)
+        {
+            var p;
+            for (p in fonts)
+            {
+                if (fonts.hasOwnProperty(p))
+                {
+                    var font = fonts[p];
+                    if (font)
+                    {
+                        var texture = font.texture;
+                        if (texture)
+                        {
+                            texture.destroy();
+                            font.texture = null;
+                        }
+                    }
+                }
+            }
+            fonts = null;
+        }
+        if (sharedVertexBuffer)
+        {
+            sharedVertexBuffer.destroy();
+            sharedVertexBuffer = null;
+        }
+        if (sharedIndexBuffer)
+        {
+            sharedIndexBuffer.destroy();
+            sharedIndexBuffer = null;
+        }
+        techniqueParameters = null;
+        semantics = null;
+        loadingFont = null;
+        loadingPages = null;
+        loadedObservers = null;
+        loadingPages = null;
         numLoadingFonts = 0;
-        internalFont = {};
+        internalFont = null;
         pathRemapping = null;
-        pathPrefix = "";
-        Font.prototype = null;
+        pathPrefix = null;
+        rh = null;
+        gd = null;
     };
 
     return fm;

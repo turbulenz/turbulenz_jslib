@@ -1,9 +1,9 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 
 //
 // DeferredRendering
 //
-/*global TurbulenzEngine: false, ShadowMapping: false, VMath: false, Effect: false,
+/*global ShadowMapping: false, VMath: false, Effect: false,
          renderingCommonCreateRendererInfoFn: false,  renderingCommonGetTechniqueIndexFn: false,
          renderingCommonSortKeyFn: false*/
 
@@ -521,18 +521,61 @@ DeferredRendering.prototype =
 
     destroyBuffers: function deferredRenderingDestroyBuffersFn()
     {
-        this.albedoTexture = null;
-        this.specularTexture = null;
-        this.normalTexture = null;
-        this.depthTexture = null;
-        this.depthBuffer = null;
-        this.diffuseLightingTexture = null;
-        this.specularLightingTexture = null;
-        this.finalTexture = null;
-        this.baseRenderTarget = null;
-        this.lightingRenderTarget = null;
-        this.mixRenderTarget = null;
-        TurbulenzEngine.flush();
+        if (this.mixRenderTarget)
+        {
+            this.mixRenderTarget.destroy();
+            this.mixRenderTarget = null;
+        }
+        if (this.lightingRenderTarget)
+        {
+            this.lightingRenderTarget.destroy();
+            this.lightingRenderTarget = null;
+        }
+        if (this.baseRenderTarget)
+        {
+            this.baseRenderTarget.destroy();
+            this.baseRenderTarget = null;
+        }
+        if (this.depthBuffer)
+        {
+            this.depthBuffer.destroy();
+            this.depthBuffer = null;
+        }
+        if (this.depthTexture)
+        {
+            this.depthTexture.destroy();
+            this.depthTexture = null;
+        }
+        if (this.finalTexture)
+        {
+            this.finalTexture.destroy();
+            this.finalTexture = null;
+        }
+        if (this.specularLightingTexture)
+        {
+            this.specularLightingTexture.destroy();
+            this.specularLightingTexture = null;
+        }
+        if (this.diffuseLightingTexture)
+        {
+            this.diffuseLightingTexture.destroy();
+            this.diffuseLightingTexture = null;
+        }
+        if (this.normalTexture)
+        {
+            this.normalTexture.destroy();
+            this.normalTexture = null;
+        }
+        if (this.specularTexture)
+        {
+            this.specularTexture.destroy();
+            this.specularTexture = null;
+        }
+        if (this.albedoTexture)
+        {
+            this.albedoTexture.destroy();
+            this.albedoTexture = null;
+        }
     },
 
     updateBuffers: function deferredRenderingUpdateBuffersFn(gd, deviceWidth, deviceHeight)
@@ -1210,37 +1253,63 @@ DeferredRendering.prototype =
         delete this.pointLightSpecularOpaqueTechnique;
         delete this.fogLightTechnique;
         delete this.mixTechnique;
+        delete this.spotLightShadowTechnique;
+        delete this.pointLightSpecularShadowTechnique;
+        delete this.pointLightSpecularShadowOpaqueTechnique;
         delete this.sharedTechniqueParameters;
         delete this.lightPrimitive;
         delete this.lightSemantics;
-        delete this.spotLightVolumeVertexBuffer;
-        delete this.pointLightVolumeVertexBuffer;
+
+        if (this.spotLightVolumeVertexBuffer)
+        {
+            this.spotLightVolumeVertexBuffer.destroy();
+            delete this.spotLightVolumeVertexBuffer;
+        }
+
+        if (this.pointLightVolumeVertexBuffer)
+        {
+            this.pointLightVolumeVertexBuffer.destroy();
+            delete this.pointLightVolumeVertexBuffer;
+        }
+
         delete this.quadPrimitive;
         delete this.quadSemantics;
-        delete this.quadVertexBuffer;
+
+        if (this.quadVertexBuffer)
+        {
+            this.quadVertexBuffer.destroy();
+            delete this.quadVertexBuffer;
+        }
+
         delete this.mixTechniqueParameters;
         delete this.globalCameraMatrix;
         delete this.globalTechniqueParameters;
-        delete this.albedoTexture;
-        delete this.specularTexture;
-        delete this.normalTexture;
-        delete this.depthTexture;
-        delete this.depthBuffer;
-        delete this.diffuseLightingTexture;
-        delete this.specularLightingTexture;
-        delete this.finalTexture;
-        delete this.baseRenderTarget;
-        delete this.lightingRenderTarget;
-        delete this.mixRenderTarget;
+
+        delete this.passes;
+        delete this.passIndex;
+        delete this.opaqueRenderables;
+        delete this.decalRenderables;
+        delete this.transparentRenderables;
+        delete this.spotLights;
+        delete this.pointLights;
+        delete this.fogLights;
+        delete this.sceneExtents;
+        delete this.sceneGlobalLights;
 
         var shadowMaps = this.shadowMaps;
         if (shadowMaps)
         {
             shadowMaps.destroy();
+            delete this.shadowMaps;
         }
+
         delete this.bufferWidth;
         delete this.bufferHeight;
-        delete this.passes;
+
+        this.destroyBuffers();
+
+        delete this.black;
+        delete this.md;
     }
 };
 
@@ -1257,7 +1326,6 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
 
     dr.md = md;
 
-    dr.shadowMapClearColor = md.v4Build(1, 0, 0, 0);
     dr.black = md.v4BuildZero();
 
     dr.numPasses = 3;
@@ -1459,7 +1527,7 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
                 rendererInfo.shadowMappingUpdate = this.shadowMappingUpdate;
                 drawParameters.technique = this.shadowTechnique;
 
-                drawParameters.sortKey = renderingCommonSortKeyFn(this.shadowTechniqueIndex, meta.materialIndex);
+                drawParameters.sortKey = renderingCommonSortKeyFn(this.shadowTechniqueIndex, 0);
                 drawParameters.setTechniqueParameters(0, geometryInstance.techniqueParameters);   //TODO: This is excessive
             }
             else
@@ -1574,6 +1642,7 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
                     semantics: flareSemantics,
                     vertexBuffer: vertexBuffer,
                     numIndices: 8,
+                    first: 0,
                     indexBuffer: flareIndexBuffer,
                     lastTimeVisible: true
                 };
