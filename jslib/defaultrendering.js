@@ -19,7 +19,7 @@ DefaultRendering.prototype =
 {
     version : 1,
 
-    updateShader: function defaultRenderingUpdateShaderFn(sm)
+    updateShader: function defaultRenderingUpdateShaderFn(/* sm */)
     {
     },
 
@@ -101,7 +101,7 @@ DefaultRendering.prototype =
         this.scene = scene;
     },
 
-    updateBuffers: function defaultRenderingUpdateBuffersFn(gd, deviceWidth, deviceHeight)
+    updateBuffers: function defaultRenderingUpdateBuffersFn(/* gd, deviceWidth, deviceHeight */)
     {
         return true;
     },

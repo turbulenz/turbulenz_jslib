@@ -75,7 +75,7 @@ RequestHandler.prototype =
         TurbulenzEngine.setTimeout(requestFn, callContext.expTime);
     },
 
-    retryAfter: function requestHandlerRetryAfterFn(callContext, retryAfter, requestFn, status)
+    retryAfter: function requestHandlerRetryAfterFn(callContext, retryAfter, requestFn /*, status */)
     {
         if (callContext.retries)
         {
@@ -287,7 +287,7 @@ RequestHandler.create = function requestHandlerCreateFn(params)
     rh.reconnectTest = null;
 
     rh.onReconnected = params.onReconnected || function onReconnectedFn() {};
-    rh.onRequestTimeout = params.onRequestTimeout || function onRequestTimeoutFn(callContext) {};
+    rh.onRequestTimeout = params.onRequestTimeout || function onRequestTimeoutFn(/* callContext */) {};
     var handlers = {};
     rh.handlers = handlers;
 

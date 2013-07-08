@@ -1,10 +1,8 @@
 // Copyright (c) 2012 Turbulenz Limited
 
 /*global
-Global: false
 Draw2D: false
 Float32Array: false
-TurbulenzEngine: false
 */
 
 //
@@ -1740,11 +1738,13 @@ Draw2D.prototype = {
     },
 
     // always overallocate.
+    /*jshint bitwise: false*/
     makePow2 : function makePow2Fn(dim)
     {
         var index = Math.log(dim) / Math.log(2);
         return (1 << Math.ceil(index));
     },
+    /*jshint bitwise: true*/
 
     createRenderTarget : function createRenderTargetFn(params)
     {

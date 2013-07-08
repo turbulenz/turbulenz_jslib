@@ -55,7 +55,7 @@ OSD.prototype =
 };
 
 // Constructor function
-OSD.create = function OSDCreateFn(args)
+OSD.create = function OSDCreateFn(/* args */)
 {
     var osdObject = new OSD();
 

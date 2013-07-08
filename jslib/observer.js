@@ -36,7 +36,7 @@ Observer.prototype = {
         }
     },
 
-    unsubscribeAll: function observerUnsubscribeAllFn(subscriber)
+    unsubscribeAll: function observerUnsubscribeAllFn(/* subscriber */)
     {
         this.subscribers.length = 0;
     },

@@ -37,7 +37,7 @@ ShaderManager.create = function shaderManagerCreateFn(gd, rh, ds, errorCallback,
 {
     if (!errorCallback)
     {
-        errorCallback = function (e) {};
+        errorCallback = function (/* e */) {};
     }
 
     var defaultShaderName = "default";
@@ -152,7 +152,7 @@ ShaderManager.create = function shaderManagerCreateFn(gd, rh, ds, errorCallback,
                     observer.subscribe(onShaderLoaded);
                 }
 
-                var shaderLoaded = function shaderLoadedFn(shaderText, status, callContext)
+                var shaderLoaded = function shaderLoadedFn(shaderText /*, status, callContext */)
                 {
                     if (shaderText)
                     {

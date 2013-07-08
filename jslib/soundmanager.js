@@ -85,7 +85,7 @@ SoundManager.create = function soundManagerCreateFn(sd, rh, ds, errorCallback, l
 {
     if (!errorCallback)
     {
-        errorCallback = function (e) {};
+        errorCallback = function (/* e */) {};
     }
 
     var defaultSoundName = "default";
@@ -155,7 +155,7 @@ SoundManager.create = function soundManagerCreateFn(sd, rh, ds, errorCallback, l
                     observer.subscribe(onSoundLoaded);
                 }
 
-                var soundLoaded = function soundLoadedFn(sound, status)
+                var soundLoaded = function soundLoadedFn(sound /*, status */)
                 {
                     if (sound)
                     {
@@ -171,7 +171,7 @@ SoundManager.create = function soundManagerCreateFn(sd, rh, ds, errorCallback, l
                     numLoadingSounds -= 1;
                 };
 
-                var requestSound = function requestSoundFn(url, onload, callContext)
+                var requestSound = function requestSoundFn(url, onload /*, callContext */)
                 {
                     var sound = sd.createSound({
                             src : url,

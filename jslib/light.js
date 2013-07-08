@@ -262,7 +262,7 @@ LightInstance.prototype =
     //
     // getNode
     //
-    getNode : function lightInstanceGetNodeFn(node)
+    getNode : function lightInstanceGetNodeFn(/* node */)
     {
         return this.node;
     },

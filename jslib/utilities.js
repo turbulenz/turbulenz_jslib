@@ -3,6 +3,7 @@
 /*global window: false*/
 /*global Observer: false*/
 /*global TurbulenzEngine: false*/
+/*exported MathDeviceConvert*/
 
 var Utilities = {};
 
@@ -10,7 +11,7 @@ var Utilities = {};
 // assert
 //
 Utilities.skipAsserts = false;
-Utilities.assert = function assertFn(test, message)
+Utilities.assert = function assertFn(test /*, message */)
 {
     if (!test)
     {
@@ -527,7 +528,7 @@ Reference.create = function referenceCreate(object)
 //
 var Profile =
 {
-    profiles: [],
+    profiles: {},
 
     sortMode: {alphabetical: 0, duration: 1, max: 2, min: 3, calls: 4},
 
@@ -557,8 +558,7 @@ var Profile =
             var duration = end - data.start;
             data.duration += duration;
             data.calls += 1;
-            var delta = duration - data.duration / data.calls; // This is an approximation, it should use the mean of all samples (or N random ones) but thats requries samples to be stored
-            data.sumOfSquares += delta * delta;
+            data.sumOfSquares += duration * duration;
 
             if (duration > data.max)
             {
@@ -577,7 +577,7 @@ var Profile =
     //
     reset: function profileResetFn()
     {
-        this.profiles = [];
+        this.profiles = {};
     },
 
     //
@@ -648,6 +648,8 @@ var Profile =
         var percentagePrecision = format ? format.percentagePrecision : 1;
         var seperator = format ? format.seperator : " ";
         var length = dataArray.length;
+        var standardDeviation;
+        var mean;
         var index;
         for (index = 0; index < length; index += 1)
         {
@@ -657,8 +659,10 @@ var Profile =
             line += seperator + data.duration.toFixed(precision);
             line += seperator + data.max.toFixed(precision);
             line += seperator + data.min.toFixed(precision);
-            line += seperator + (data.duration / data.calls).toFixed(precision); // average
-            line += seperator + Math.sqrt(data.sumOfSquares / data.calls).toFixed(precision); // approximate standard deviation
+            mean = data.duration / data.calls;
+            line += seperator + mean.toFixed(precision);
+            standardDeviation = Math.sqrt(data.sumOfSquares / data.calls - mean * mean);
+            line += seperator + standardDeviation.toFixed(precision);
             line += seperator + (100 * data.duration / maxDuration).toFixed(percentagePrecision) + "%\n";
             text += line;
         }

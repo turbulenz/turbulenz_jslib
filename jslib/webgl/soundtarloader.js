@@ -142,7 +142,7 @@ SoundTARLoader.prototype = {
         return result;
     },
 
-    isValidHeader : function isValidHeaderFn(header)
+    isValidHeader : function isValidHeaderFn(/* header */)
     {
         return true;
     }

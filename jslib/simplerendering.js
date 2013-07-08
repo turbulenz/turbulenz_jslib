@@ -17,7 +17,7 @@ SimpleRendering.prototype =
 {
     version : 1,
 
-    updateShader: function simpleRenderingUpdateShaderFn(sm)
+    updateShader: function simpleRenderingUpdateShaderFn(/* sm */)
     {
     },
 
@@ -97,7 +97,7 @@ SimpleRendering.prototype =
         this.scene = scene;
     },
 
-    updateBuffers: function simpleRenderingUpdateBuffersFn(gd, deviceWidth, deviceHeight)
+    updateBuffers: function simpleRenderingUpdateBuffersFn(/* gd, deviceWidth, deviceHeight */)
     {
         return true;
     },

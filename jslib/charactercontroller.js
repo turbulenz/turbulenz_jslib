@@ -299,7 +299,7 @@ CharacterController.create = function characterControllerCreateFn(gd, id, pd, dy
     c.padforward = 0.0;
     c.padbackward = 0.0;
     c.step = 0.0;
-    c.extents = [];
+    c.extents = md.aabbBuildEmpty();
 
     //
     // Character creation
@@ -528,7 +528,7 @@ CharacterController.create = function characterControllerCreateFn(gd, id, pd, dy
     };
 
     // Pad handling
-    c.onpadmove = function onpadmoveFn(lX, lY, lZ, rX, rY, rZ, dpadState)
+    c.onpadmove = function onpadmoveFn(lX, lY, lZ, rX, rY /*, rZ, dpadState */)
     {
         if (!c.dead)
         {

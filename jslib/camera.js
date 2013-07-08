@@ -700,7 +700,7 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
     }
 
     // Mouse handling
-    c.onmouseup = function onmouseupFn(button, x, y)
+    c.onmouseup = function onmouseupFn(/* button, x, y */)
     {
         if (!id.isLocked())
         {
@@ -720,7 +720,7 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
     };
 
     // Pad handling
-    c.onpadmove = function onpadmoveFn(lX, lY, lZ, rX, rY, rZ, dpadState)
+    c.onpadmove = function onpadmoveFn(lX, lY, lZ, rX, rY /*, rZ, dpadState */)
     {
         c.turn  += lX * 10.0;
         c.pitch += lY * 10.0;

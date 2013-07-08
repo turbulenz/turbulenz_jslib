@@ -225,7 +225,7 @@ TextureManager.prototype =
                         that.numLoadingTextures -= 1;
                     };
 
-                    var textureRequest = function textureRequestFn(url, onload, callContext)
+                    var textureRequest = function textureRequestFn(url, onload /*, callContext */)
                     {
                         var texture = that.graphicsDevice.createTexture({
                             src     : url,
@@ -680,7 +680,7 @@ TextureManager.create = function textureManagerCreateFn(graphicsDevice, requestH
 
     if (!errorCallback)
     {
-        errorCallback = function (e) {};
+        errorCallback = function (/* e */) {};
     }
 
     var defaultTextureName = "default";

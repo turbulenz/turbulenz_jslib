@@ -147,7 +147,7 @@ var TurbulenzBridge = {
     },
 
     triggerMultiplayerSessionMakePublic: function triggerMultiplayerSessionMakePublicFn(sessionId) {
-        this.emit('multiplayer.session.makepublic');
+        this.emit('multiplayer.session.makepublic', sessionId);
     },
 
     /**

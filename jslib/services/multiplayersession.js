@@ -11,7 +11,7 @@
 function MultiPlayerSession() {}
 MultiPlayerSession.prototype =
 {
-    version : 1,
+    version: 1,
 
     // Public API
     sendTo: function multiPlayerSendToFn(destinationID, messageType, messageData)
@@ -73,13 +73,18 @@ MultiPlayerSession.prototype =
 
     makePublic: function multiPlayerMakePublicFn(callbackFn)
     {
+        var sessionId = this.sessionId;
         this.service.request({
             url: '/api/v1/multiplayer/session/make-public',
             method: 'POST',
-            data: {'session': this.sessionId},
-            callback: function () {
-                TurbulenzBridge.triggerMultiplayerSessionMakePublic();
-                callbackFn();
+            data: {'session': sessionId},
+            callback: function ()
+            {
+                TurbulenzBridge.triggerMultiplayerSessionMakePublic(sessionId);
+                if (callbackFn)
+                {
+                    callbackFn.call(arguments);
+                }
             },
             requestHandler: this.requestHandler
         });
@@ -142,7 +147,7 @@ MultiPlayerSession.prototype =
         }
     },
 
-    connected : function multiPlayerConnectedFn()
+    connected: function multiPlayerConnectedFn()
     {
         return (!!this.socket);
     },

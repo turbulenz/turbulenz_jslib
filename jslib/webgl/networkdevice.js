@@ -50,7 +50,7 @@ WebGLNetworkDevice.prototype = {
     }
 };
 
-WebGLNetworkDevice.create = function networkDeviceCreateFn(params)
+WebGLNetworkDevice.create = function networkDeviceCreateFn(/* params */)
 {
     var nd = new WebGLNetworkDevice();
     return nd;

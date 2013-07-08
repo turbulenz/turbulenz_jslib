@@ -150,65 +150,93 @@ Scene.prototype.writeBox = function sceneWriteBoxFn(writer, extents, r, g, b)
 //
 Scene.prototype.writeRotatedBox = function sceneWriteRotatedBoxFn(writer, transform, halfExtents, r, g, b)
 {
-    var md = this.md;
+    var m0 = transform[0];
+    var m1 = transform[1];
+    var m2 = transform[2];
+    var m3 = transform[3];
+    var m4 = transform[4];
+    var m5 = transform[5];
+    var m6 = transform[6];
+    var m7 = transform[7];
+    var m8 = transform[8];
+    var m9 = transform[9];
+    var m10 = transform[10];
+    var m11 = transform[11];
 
     var hx = halfExtents[0];
     var hy = halfExtents[1];
     var hz = halfExtents[2];
 
-    var p0 = md.v3Build(- hx, - hy, - hz);
-    var p1 = md.v3Build(+ hx, - hy, - hz);
-    var p2 = md.v3Build(+ hx, - hy, + hz);
-    var p3 = md.v3Build(- hx, - hy, + hz);
-    var p4 = md.v3Build(- hx, + hy, - hz);
-    var p5 = md.v3Build(+ hx, + hy, - hz);
-    var p6 = md.v3Build(+ hx, + hy, + hz);
-    var p7 = md.v3Build(- hx, + hy, + hz);
+    var hx0 = (m0 * hx);
+    var hx1 = (m1 * hx);
+    var hx2 = (m2 * hx);
+    var hy3 = (m3 * hy);
+    var hy4 = (m4 * hy);
+    var hy5 = (m5 * hy);
+    var hz6 = (m6 * hz);
+    var hz7 = (m7 * hz);
+    var hz8 = (m8 * hz);
 
-    md.m43TransformPoint(transform, p0, p0);
-    md.m43TransformPoint(transform, p1, p1);
-    md.m43TransformPoint(transform, p2, p2);
-    md.m43TransformPoint(transform, p3, p3);
-    md.m43TransformPoint(transform, p4, p4);
-    md.m43TransformPoint(transform, p5, p5);
-    md.m43TransformPoint(transform, p6, p6);
-    md.m43TransformPoint(transform, p7, p7);
+    var p0x = (m9  - hx0 - hy3 - hz6);
+    var p0y = (m10 - hx1 - hy4 - hz7);
+    var p0z = (m11 - hx2 - hy5 - hz8);
+    var p1x = (m9  + hx0 - hy3 - hz6);
+    var p1y = (m10 + hx1 - hy4 - hz7);
+    var p1z = (m11 + hx2 - hy5 - hz8);
+    var p2x = (m9  + hx0 - hy3 + hz6);
+    var p2y = (m10 + hx1 - hy4 + hz7);
+    var p2z = (m11 + hx2 - hy5 + hz8);
+    var p3x = (m9  - hx0 - hy3 + hz6);
+    var p3y = (m10 - hx1 - hy4 + hz7);
+    var p3z = (m11 - hx2 - hy5 + hz8);
+    var p4x = (m9  - hx0 + hy3 - hz6);
+    var p4y = (m10 - hx1 + hy4 - hz7);
+    var p4z = (m11 - hx2 + hy5 - hz8);
+    var p5x = (m9  + hx0 + hy3 - hz6);
+    var p5y = (m10 + hx1 + hy4 - hz7);
+    var p5z = (m11 + hx2 + hy5 - hz8);
+    var p6x = (m9  + hx0 + hy3 + hz6);
+    var p6y = (m10 + hx1 + hy4 + hz7);
+    var p6z = (m11 + hx2 + hy5 + hz8);
+    var p7x = (m9  - hx0 + hy3 + hz6);
+    var p7y = (m10 - hx1 + hy4 + hz7);
+    var p7z = (m11 - hx2 + hy5 + hz8);
 
-    writer(p0, r, g, b);
-    writer(p1, r, g, b);
+    writer(p0x, p0y, p0z, r, g, b);
+    writer(p1x, p1y, p1z, r, g, b);
 
-    writer(p1, r, g, b);
-    writer(p2, r, g, b);
+    writer(p1x, p1y, p1z, r, g, b);
+    writer(p2x, p2y, p2z, r, g, b);
 
-    writer(p2, r, g, b);
-    writer(p3, r, g, b);
+    writer(p2x, p2y, p2z, r, g, b);
+    writer(p3x, p3y, p3z, r, g, b);
 
-    writer(p3, r, g, b);
-    writer(p0, r, g, b);
+    writer(p3x, p3y, p3z, r, g, b);
+    writer(p0x, p0y, p0z, r, g, b);
 
-    writer(p0, r, g, b);
-    writer(p4, r, g, b);
+    writer(p0x, p0y, p0z, r, g, b);
+    writer(p4x, p4y, p4z, r, g, b);
 
-    writer(p1, r, g, b);
-    writer(p5, r, g, b);
+    writer(p1x, p1y, p1z, r, g, b);
+    writer(p5x, p5y, p5z, r, g, b);
 
-    writer(p2, r, g, b);
-    writer(p6, r, g, b);
+    writer(p2x, p2y, p2z, r, g, b);
+    writer(p6x, p6y, p6z, r, g, b);
 
-    writer(p3, r, g, b);
-    writer(p7, r, g, b);
+    writer(p3x, p3y, p3z, r, g, b);
+    writer(p7x, p7y, p7z, r, g, b);
 
-    writer(p4, r, g, b);
-    writer(p5, r, g, b);
+    writer(p4x, p4y, p4z, r, g, b);
+    writer(p5x, p5y, p5z, r, g, b);
 
-    writer(p5, r, g, b);
-    writer(p6, r, g, b);
+    writer(p5x, p5y, p5z, r, g, b);
+    writer(p6x, p6y, p6z, r, g, b);
 
-    writer(p6, r, g, b);
-    writer(p7, r, g, b);
+    writer(p6x, p6y, p6z, r, g, b);
+    writer(p7x, p7y, p7z, r, g, b);
 
-    writer(p7, r, g, b);
-    writer(p4, r, g, b);
+    writer(p7x, p7y, p7z, r, g, b);
+    writer(p4x, p4y, p4z, r, g, b);
 };
 
 //
@@ -495,7 +523,7 @@ Scene.prototype.drawLightsExtents = function sceneDrawLightsExtentsFn(gd, sm, ca
 //
 // drawLightsScreenExtents
 //
-Scene.prototype.drawLightsScreenExtents = function sceneDrawLightsScreenExtentsFn(gd, sm, camera)
+Scene.prototype.drawLightsScreenExtents = function sceneDrawLightsScreenExtentsFn(gd, sm /*, camera */)
 {
     var visibleLights = this.visibleLights;
     var numVisibleLights = visibleLights.length;
@@ -1283,7 +1311,9 @@ Scene.prototype.createGeoSphere = function scenecreateGeoSphereFn(radius, recurs
 
     return {
         indices : indices,
-        vertices : positions
+        vertices : positions,
+        minExtent : [-radius, -radius, -radius],
+        maxExtent : [radius, radius, radius]
     };
 };
 
@@ -1420,9 +1450,13 @@ Scene.prototype.createCylinder = function sceneCreateCylinderFn(radius1, radius2
         }
     }
 
+    var radius = Math.max(radius1, radius2);
+
     return {
         indices : indices,
-        vertices : positions
+        vertices : positions,
+        minExtent : [-radius, -height, -radius],
+        maxExtent : [radius, height, radius]
     };
 };
 
@@ -1678,30 +1712,34 @@ Scene.prototype.createRoundedPrimitive = function sceneCreateRoundedPrimitiveFn(
         }
     }
 
+    var hX = (0.5 * mSizeX + radius);
+    var hY = (0.5 * mSizeY + radius);
+    var hZ = (0.5 * mSizeZ + radius);
+
     var planeNorm = md.v3Neg(md.v3BuildZAxis(), planeNorm);
-    var planePos = v3ScalarMul.call(md, planeNorm, 0.5 * mSizeZ + radius);
+    var planePos = v3ScalarMul.call(md, planeNorm, hZ);
 
     // Generate the pseudo-box shape
     generatePlane(mNumSegY, mNumSegX, mSizeY, mSizeX, planeNorm, planePos);
 
     planeNorm = md.v3BuildZAxis(planeNorm);
-    v3ScalarMul.call(md, planeNorm, 0.5 * mSizeZ + radius, planePos);
+    v3ScalarMul.call(md, planeNorm, hZ, planePos);
     generatePlane(mNumSegY, mNumSegX, mSizeY, mSizeX, planeNorm, planePos);
 
     md.v3Neg(md.v3BuildYAxis(planeNorm), planeNorm);
-    v3ScalarMul.call(md, planeNorm, 0.5 * mSizeY + radius, planePos);
+    v3ScalarMul.call(md, planeNorm, hY, planePos);
     generatePlane(mNumSegZ, mNumSegX, mSizeZ, mSizeX, planeNorm, planePos);
 
     md.v3BuildYAxis(planeNorm);
-    v3ScalarMul.call(md, planeNorm, 0.5 * mSizeY + radius, planePos);
+    v3ScalarMul.call(md, planeNorm, hY, planePos);
     generatePlane(mNumSegZ, mNumSegX, mSizeZ, mSizeX, planeNorm, planePos);
 
     md.v3Neg(md.v3BuildXAxis(planeNorm), planeNorm);
-    v3ScalarMul.call(md, planeNorm, 0.5 * mSizeX + radius, planePos);
+    v3ScalarMul.call(md, planeNorm, hX, planePos);
     generatePlane(mNumSegZ, mNumSegY, mSizeZ, mSizeY, planeNorm, planePos);
 
     md.v3BuildXAxis(planeNorm);
-    v3ScalarMul.call(md, planeNorm, 0.5 * mSizeX + radius, planePos);
+    v3ScalarMul.call(md, planeNorm, hX, planePos);
     generatePlane(mNumSegZ, mNumSegY, mSizeZ, mSizeY, planeNorm, planePos);
 
     // Generate the corners
@@ -1732,7 +1770,9 @@ Scene.prototype.createRoundedPrimitive = function sceneCreateRoundedPrimitiveFn(
 
     return {
         indices : indices,
-        vertices : positions
+        vertices : positions,
+        minExtent : [-hX, -hY, -hZ],
+        maxExtent : [hX, hY, hZ]
     };
 };
 
@@ -1787,7 +1827,9 @@ Scene.prototype.createBox = function sceneCreateBoxFn(halfExtents)
 
     return {
         indices : indices,
-        vertices : positions
+        vertices : positions,
+        minExtent : [-xHalfExtent, -yHalfExtent, -zHalfExtent],
+        maxExtent : [xHalfExtent, yHalfExtent, zHalfExtent]
     };
 };
 
@@ -1807,9 +1849,9 @@ Scene.prototype.createConvexHull = function sceneCreateConvexHull(dw, body, numR
     var md = this.md;
     var offset = 0;
 
-    var pos = md.m43Pos(body.transform);
-    var halfextents = body.shape.halfExtents;
     var transform = body.transform;
+    var pos = md.m43Pos(transform);
+    var halfextents = body.shape.halfExtents;
     var sqrtNumRays = Math.ceil(Math.sqrt(numRays));
 
     var biggestHalfExtent = halfextents[0];
@@ -1964,7 +2006,10 @@ Scene.prototype.drawPhysicsNodes = function sceneDrawPhysicsNodesFn(gd, sm, came
     var previousFrameIndex = (this.frameIndex - 1);
     var isInsidePlanesAABB = this.isInsidePlanesAABB;
     var frustumPlanes = this.frustumPlanes;
-    var n, physicsNode, target, extents = [];
+    var n, physicsNode, target;
+    var extents = (this.float32ArrayConstructor ?
+                   new this.float32ArrayConstructor(6) :
+                   new Array(6));
     var numNodes = physicsNodes.length;
     var visiblePhysicsNodes = [];
     for (n = 0; n < numNodes; n += 1)
@@ -2016,6 +2061,7 @@ Scene.prototype.drawPhysicsNodes = function sceneDrawPhysicsNodesFn(gd, sm, came
                               sem);
     if (writer)
     {
+        var transform = physicsManager.mathsDevice.m43BuildIdentity();
         for (n = 0; n < numNodes; n += 1)
         {
             physicsNode = visiblePhysicsNodes[n];
@@ -2041,7 +2087,8 @@ Scene.prototype.drawPhysicsNodes = function sceneDrawPhysicsNodesFn(gd, sm, came
                 b = 0;
             }
             var body = physicsNode.body;
-            this.writeRotatedBox(writer, body.transform, body.shape.halfExtents, r, g, b);
+            body.calculateTransform(transform);
+            this.writeRotatedBox(writer, transform, body.shape.halfExtents, r, g, b);
         }
 
         gd.endDraw(writer);
@@ -2061,12 +2108,21 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
     }
 
     var md = this.md;
+
+    // Cache vertex formats
+    var vformatFloat3 = gd.VERTEXFORMAT_FLOAT3;
+    var vformatFloat4 = gd.VERTEXFORMAT_FLOAT4;
+    var attributes = [ vformatFloat4, vformatFloat3, vformatFloat3 ];
+    var numAttributeComponents = 10;
+
     var physicsNodes = physicsManager.physicsNodes;
     var previousFrameIndex = (this.frameIndex - 1);
     var isInsidePlanesAABB = this.isInsidePlanesAABB;
     var frustumPlanes = this.frustumPlanes;
-    var n, physicsNode, target, triangleArray, visible, positions, triangles, i, numIndices;
-    var extents = [];
+    var n, physicsNode, target, triangleArray, visible, positions, i, indices, numIndices;
+    var extents = (this.float32ArrayConstructor ?
+                   new this.float32ArrayConstructor(6) :
+                   new Array(6));
     var numNodes = physicsNodes.length;
     var visiblePhysicsNodes = [];
     var triangleArrayParams;
@@ -2076,7 +2132,6 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
     for (n = 0; n < numNodes; n += 1)
     {
         physicsNode = physicsNodes[n];
-        triangleArray = physicsNode.triangleArray;
 
         visible = false;
         target = physicsNode.target;
@@ -2092,9 +2147,12 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
                 visible = true;
             }
         }
+
         if (visible)
         {
             visiblePhysicsNodes[visiblePhysicsNodes.length] = physicsNode;
+
+            triangleArray = physicsNode.triangleArray;
             if (!triangleArray)
             {
                 shape = physicsNode.body.shape;
@@ -2137,31 +2195,40 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
                                                                 physicsNode.body,
                                                                 50);
                 }
+                else if (type === "TRIANGLE_MESH")
+                {
+                    triangleArrayParams = shape.triangleArray;
+                }
 
                 if (triangleArrayParams && triangleArrayParams.vertices.length > 0)
                 {
-                    triangleArray = pd.createTriangleArray(triangleArrayParams);
+                    if (triangleArrayParams.triangles)
+                    {
+                        triangleArray = triangleArrayParams;
+                    }
+                    else
+                    {
+                        triangleArray = pd.createTriangleArray(triangleArrayParams);
+                    }
                     physicsNode.triangleArray = triangleArray;
                 }
                 else
                 {
-                    visiblePhysicsNodes.pop(physicsNode);
+                    visiblePhysicsNodes.pop();
+                    continue;
                 }
-
             }
+
             positions = physicsNode.positions;
             if (!positions && triangleArray)
             {
                 var vertices = triangleArray.vertices;
-                var indices = triangleArray.indices;
-                numIndices = indices.length;
 
                 // convert native arrays to javascript ones
                 if (!TurbulenzEngine.canvas)
                 {
                     var numVertexComponents = vertices.length;
                     positions = [];
-                    physicsNode.positions = positions;
                     positions.length = numVertexComponents;
                     for (i = 0; i < numVertexComponents; i += 1)
                     {
@@ -2170,16 +2237,92 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
                 }
                 else
                 {
-                    physicsNode.positions = vertices;
+                    positions = vertices;
                 }
 
-                triangles = [];
-                physicsNode.triangles = triangles;
-                triangles.length = numIndices;
-                for (i = 0; i < numIndices; i += 1)
+                physicsNode.positions = positions;
+                physicsNode.indices = triangleArray.indices;
+            }
+
+            if (!physicsNode.wireframeBuffer && positions)
+            {
+                indices = physicsNode.indices;
+                numIndices = indices.length;
+
+                var vData = (this.float32ArrayConstructor ?
+                             new this.float32ArrayConstructor(numIndices * numAttributeComponents) :
+                             new Array(numIndices * numAttributeComponents));
+                var j;
+                var dstIndex = 0;
+                var vdIndex0, vdValue0x, vdValue0y, vdValue0z,
+                    vdIndex1, vdValue1x, vdValue1y, vdValue1z,
+                    vdIndex2, vdValue2x, vdValue2y, vdValue2z;
+
+                var vertexBuffer = gd.createVertexBuffer({
+                        numVertices: numIndices,
+                        attributes: attributes
+                    });
+
+                for (j = 0; j < numIndices; j += 3)
                 {
-                    triangles[i] = (indices[i] * 3);
+                    vdIndex0 = 3 * indices[j];
+                    vdIndex1 = 3 * indices[j + 1];
+                    vdIndex2 = 3 * indices[j + 2];
+                    //Vertex 0
+                    vdValue0x = positions[vdIndex0];
+                    vdValue0y = positions[vdIndex0 + 1];
+                    vdValue0z = positions[vdIndex0 + 2];
+                    vData[dstIndex] = vdValue0x;
+                    vData[dstIndex + 1] = vdValue0y;
+                    vData[dstIndex + 2] = vdValue0z;
+                    vData[dstIndex + 3] = 0;
+                    //Vertex 1 passed as attribute of Vertex 0
+                    vdValue1x = positions[vdIndex1];
+                    vdValue1y = positions[vdIndex1 + 1];
+                    vdValue1z = positions[vdIndex1 + 2];
+                    vData[dstIndex + 4] = vdValue1x;
+                    vData[dstIndex + 5] = vdValue1y;
+                    vData[dstIndex + 6] = vdValue1z;
+                    //Vertex 2 passed as attribute of Vertex 0
+                    vdValue2x = positions[vdIndex2];
+                    vdValue2y = positions[vdIndex2 + 1];
+                    vdValue2z = positions[vdIndex2 + 2];
+                    vData[dstIndex + 7] = vdValue2x;
+                    vData[dstIndex + 8] = vdValue2y;
+                    vData[dstIndex + 9] = vdValue2z;
+                    //Depending on whether skinned or not, increments accordingly
+                    dstIndex += numAttributeComponents;
+
+                    //Repeat for Vertex 1
+                    vData[dstIndex] = vdValue1x;
+                    vData[dstIndex + 1] = vdValue1y;
+                    vData[dstIndex + 2] = vdValue1z;
+                    vData[dstIndex + 3] = 1;
+                    vData[dstIndex + 4] = vdValue0x;
+                    vData[dstIndex + 5] = vdValue0y;
+                    vData[dstIndex + 6] = vdValue0z;
+                    vData[dstIndex + 7] = vdValue2x;
+                    vData[dstIndex + 8] = vdValue2y;
+                    vData[dstIndex + 9] = vdValue2z;
+                    dstIndex += numAttributeComponents;
+
+                    //Repeat for Vertex 2
+                    vData[dstIndex] = vdValue2x;
+                    vData[dstIndex + 1] = vdValue2y;
+                    vData[dstIndex + 2] = vdValue2z;
+                    vData[dstIndex + 3] = 2;
+                    vData[dstIndex + 4] = vdValue0x;
+                    vData[dstIndex + 5] = vdValue0y;
+                    vData[dstIndex + 6] = vdValue0z;
+                    vData[dstIndex + 7] = vdValue1x;
+                    vData[dstIndex + 8] = vdValue1y;
+                    vData[dstIndex + 9] = vdValue1z;
+                    dstIndex += numAttributeComponents;
                 }
+
+                vertexBuffer.setData(vData);
+
+                physicsNode.wireframeBuffer = vertexBuffer;
             }
         }
     }
@@ -2193,10 +2336,6 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
     // Cache math functions and vertex formats
     var v4Build = md.v4Build;
     var m43MulM44 = md.m43MulM44;
-    var vformatFloat3 = gd.VERTEXFORMAT_FLOAT3;
-    var vformatFloat4 = gd.VERTEXFORMAT_FLOAT4;
-    var attributes = [ vformatFloat4, vformatFloat3, vformatFloat3 ];
-    var numAttributeComponents = 10;
 
     // Set technique and shared parameters
     gd.setTechnique(technique);
@@ -2207,6 +2346,13 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
     technique.alpha = 0.5;
 
     var fillColor, worldViewProjection;
+    var transform = md.m43BuildIdentity();
+
+    var wireframeSemantics = this.physicsWireframeSemantics;
+    if (!wireframeSemantics)
+    {
+        this.physicsWireframeSemantics = wireframeSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0', 'TEXCOORD1']);
+    }
 
     for (n = 0; n < numNodes; n += 1)
     {
@@ -2269,104 +2415,16 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
         b = 0.5 * (b + tintB);
 
         fillColor = v4Build.call(md, r, g, b, 0, fillColor);
-        worldViewProjection = m43MulM44.call(md, body.transform, camera.viewProjectionMatrix, worldViewProjection);
+        body.calculateTransform(transform);
+        worldViewProjection = m43MulM44.call(md, transform, camera.viewProjectionMatrix, worldViewProjection);
 
         technique.fillColor = fillColor;
         technique.worldViewProjection = worldViewProjection;
 
-        positions = physicsNode.positions;
-        triangles = physicsNode.triangles;
-        numIndices = triangles.length;
-
         var wireframeBuffer = physicsNode.wireframeBuffer;
 
-        var wireframeSemantics = physicsNode.wireframeSemantics;
-        if (!wireframeSemantics)
-        {
-            physicsNode.wireframeSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0', 'TEXCOORD1']);
-            wireframeSemantics = physicsNode.wireframeSemantics;
-        }
-
-
-        if (!wireframeBuffer)
-        {
-            var vData = (this.float32ArrayConstructor ?
-                         new this.float32ArrayConstructor(numIndices * numAttributeComponents) :
-                         new Array(numIndices * numAttributeComponents));
-            var j;
-            var dstIndex = 0;
-            var vdIndex0, vdValue0x, vdValue0y, vdValue0z,
-                vdIndex1, vdValue1x, vdValue1y, vdValue1z,
-                vdIndex2, vdValue2x, vdValue2y, vdValue2z;
-
-            var vertexBuffer = gd.createVertexBuffer({
-                    numVertices: numIndices,
-                    attributes: attributes
-                });
-
-            for (j = 0; j < numIndices; j += 3)
-            {
-                vdIndex0 = triangles[j];
-                vdIndex1 = triangles[j + 1];
-                vdIndex2 = triangles[j + 2];
-                //Vertex 0
-                vdValue0x = positions[vdIndex0];
-                vdValue0y = positions[vdIndex0 + 1];
-                vdValue0z = positions[vdIndex0 + 2];
-                vData[dstIndex] = vdValue0x;
-                vData[dstIndex + 1] = vdValue0y;
-                vData[dstIndex + 2] = vdValue0z;
-                vData[dstIndex + 3] = 0;
-                //Vertex 1 passed as attribute of Vertex 0
-                vdValue1x = positions[vdIndex1];
-                vdValue1y = positions[vdIndex1 + 1];
-                vdValue1z = positions[vdIndex1 + 2];
-                vData[dstIndex + 4] = vdValue1x;
-                vData[dstIndex + 5] = vdValue1y;
-                vData[dstIndex + 6] = vdValue1z;
-                //Vertex 2 passed as attribute of Vertex 0
-                vdValue2x = positions[vdIndex2];
-                vdValue2y = positions[vdIndex2 + 1];
-                vdValue2z = positions[vdIndex2 + 2];
-                vData[dstIndex + 7] = vdValue2x;
-                vData[dstIndex + 8] = vdValue2y;
-                vData[dstIndex + 9] = vdValue2z;
-                //Depending on whether skinned or not, increments accordingly
-                dstIndex += numAttributeComponents;
-
-                //Repeat for Vertex 1
-                vData[dstIndex] = vdValue1x;
-                vData[dstIndex + 1] = vdValue1y;
-                vData[dstIndex + 2] = vdValue1z;
-                vData[dstIndex + 3] = 1;
-                vData[dstIndex + 4] = vdValue0x;
-                vData[dstIndex + 5] = vdValue0y;
-                vData[dstIndex + 6] = vdValue0z;
-                vData[dstIndex + 7] = vdValue2x;
-                vData[dstIndex + 8] = vdValue2y;
-                vData[dstIndex + 9] = vdValue2z;
-                dstIndex += numAttributeComponents;
-
-                //Repeat for Vertex 2
-                vData[dstIndex] = vdValue2x;
-                vData[dstIndex + 1] = vdValue2y;
-                vData[dstIndex + 2] = vdValue2z;
-                vData[dstIndex + 3] = 2;
-                vData[dstIndex + 4] = vdValue0x;
-                vData[dstIndex + 5] = vdValue0y;
-                vData[dstIndex + 6] = vdValue0z;
-                vData[dstIndex + 7] = vdValue1x;
-                vData[dstIndex + 8] = vdValue1y;
-                vData[dstIndex + 9] = vdValue1z;
-                dstIndex += numAttributeComponents;
-            }
-
-            vertexBuffer.setData(vData);
-            wireframeBuffer = vertexBuffer;
-            physicsNode.wireframeBuffer = wireframeBuffer;
-        }
-
         gd.setStream(wireframeBuffer, wireframeSemantics);
+
         gd.draw(gd.PRIMITIVE_TRIANGLES, wireframeBuffer.numVertices, 0);
     }
 };
@@ -3033,6 +3091,29 @@ Scene.prototype.drawWireframe = function drawWireframeFn(gd, sm, camera, wirefra
         var vformatFloat3 = gd.VERTEXFORMAT_FLOAT3;
         var vformatByte4 = gd.VERTEXFORMAT_BYTE4;
 
+        var skinnedAttributes = [ vformatFloat4, vformatFloat3,
+                                  vformatFloat3, vformatByte4,
+                                  vformatFloat4, vformatByte4,
+                                  vformatFloat4, vformatByte4,
+                                  vformatFloat4 ];
+        var solidAttributes = [vformatFloat4,
+                               vformatFloat3,
+                               vformatFloat3];
+
+        var skinnedWireframeSemantics = this.skinnedWireframeSemantics;
+        if (!skinnedWireframeSemantics)
+        {
+            skinnedWireframeSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0', 'TEXCOORD1', 'BLENDINDICES', 'BLENDWEIGHT', 'TEXCOORD2', 'TEXCOORD3', 'TEXCOORD4', 'TEXCOORD5']);
+            this.skinnedWireframeSemantics = skinnedWireframeSemantics;
+        }
+
+        var solidWireframeSemantics = this.solidWireframeSemantics;
+        if (!solidWireframeSemantics)
+        {
+            solidWireframeSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0', 'TEXCOORD1']);
+            this.solidWireframeSemantics = solidWireframeSemantics;
+        }
+
         for (var n = 0; n < numNodes; n += 1)
         {
             var node = nodes[n];
@@ -3064,12 +3145,8 @@ Scene.prototype.drawWireframe = function drawWireframeFn(gd, sm, camera, wirefra
 
                             currentTechnique.skinBones = skinController.output;
 
-                            attributes = [ vformatFloat4, vformatFloat3,
-                                           vformatFloat3, vformatByte4,
-                                           vformatFloat4, vformatByte4,
-                                           vformatFloat4, vformatByte4,
-                                           vformatFloat4 ];
-                            wireframeSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0', 'TEXCOORD1', 'BLENDINDICES', 'BLENDWEIGHT', 'TEXCOORD2', 'TEXCOORD3', 'TEXCOORD4', 'TEXCOORD5']);
+                            attributes = skinnedAttributes;
+                            wireframeSemantics = skinnedWireframeSemantics;
                             numAttributeComponents = 34;
                             numBlendComponents = 24;
                         }
@@ -3081,10 +3158,8 @@ Scene.prototype.drawWireframe = function drawWireframeFn(gd, sm, camera, wirefra
                                 setTechnique.call(gd, technique);
                             }
 
-                            attributes = [vformatFloat4,
-                                          vformatFloat3,
-                                          vformatFloat3];
-                            wireframeSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0', 'TEXCOORD1']);
+                            attributes = solidAttributes;
+                            wireframeSemantics = solidWireframeSemantics;
                             numAttributeComponents = 10;
                             numBlendComponents = 0;
                         }
@@ -3107,7 +3182,6 @@ Scene.prototype.drawWireframe = function drawWireframeFn(gd, sm, camera, wirefra
                         }
 
                         var wireframeBuffer = oldSurface.wireframeBuffer;
-
                         if (!wireframeBuffer)
                         {
                             var oldGeometry = renderable.geometry;

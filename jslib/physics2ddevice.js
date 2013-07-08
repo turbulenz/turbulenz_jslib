@@ -4953,7 +4953,7 @@ Physics2DShape.prototype = {
         }
     },
 
-    getMaterial : function getMaterialFn(material)
+    getMaterial : function getMaterialFn(/* material */)
     {
         return this._material;
     },
@@ -10288,9 +10288,24 @@ Physics2DWorld.prototype = {
             }
             else
             {
-                toi.shapeA = s1;
-                toi.shapeB = s2;
-                this._collisions._dynamicSweep(toi, this._deltaTime, Physics2DConfig.SWEEP_SLOP);
+                if (s1.body._sweepFrozen)
+                {
+                    toi.shapeB = s1;
+                    toi.shapeA = s2;
+                    this._collisions._staticSweep(toi, this._deltaTime, Physics2DConfig.SWEEP_SLOP);
+                }
+                else if (s2.body._sweepFrozen)
+                {
+                    toi.shapeA = s1;
+                    toi.shapeB = s2;
+                    this._collisions._staticSweep(toi, this._deltaTime, Physics2DConfig.SWEEP_SLOP);
+                }
+                else
+                {
+                    toi.shapeA = s1;
+                    toi.shapeB = s2;
+                    this._collisions._dynamicSweep(toi, this._deltaTime, Physics2DConfig.SWEEP_SLOP);
+                }
             }
 
             // Permit dynamic-dynamic events that represent missed collisions
@@ -11844,7 +11859,7 @@ Physics2DWorld.create = function phys2DWorldFn(params)
     w._bodyPointCallback  = bodySampler(pointSampler);
 
 
-    function rectangleSampler(shape, unusedSampleBox)
+    function rectangleSampler(shape /*, unusedSampleBox */)
     {
         return this.collisions._test(shape, this.rectangleShape);
     }
@@ -11862,7 +11877,7 @@ Physics2DWorld.create = function phys2DWorldFn(params)
     w._bodyRectangleCallback.rectangleShape  = w._rectangleQueryShape;
 
 
-    function circleSampler(shape, unusedSampleBox)
+    function circleSampler(shape /*, unusedSampleBox */)
     {
         return this.collisions._test(shape, this.circleShape);
     }
@@ -11892,7 +11907,7 @@ Physics2DWorld.create = function phys2DWorldFn(params)
         ray : null,
         noInner : false,
         normal : new Physics2DDevice.prototype.floatArray(2),
-        sample : function sampleFn(handle, _)
+        sample : function sampleFn(handle /*, _ */)
         {
             var shape = handle.data;
 
@@ -11948,7 +11963,7 @@ Physics2DWorld.create = function phys2DWorldFn(params)
         userThis : null,
 
         deltaTime : 0,
-        sample : function sampleFn(handle, _)
+        sample : function sampleFn(handle /*, _ */)
         {
             var toi = this.toi;
             var shape = handle.data;

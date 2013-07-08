@@ -155,7 +155,7 @@ MouseForces.create = function mouseForcesCreateFn(gd, id, md, pd, dragExtentsMin
         return false;
     };
 
-    c.onmousedown = function onmousedownFn(button, x, y)
+    c.onmousedown = function onmousedownFn(/* button, x, y */)
     {
         c.mouseX = 0.5;
         c.mouseY = 0.5;
@@ -164,7 +164,7 @@ MouseForces.create = function mouseForcesCreateFn(gd, id, md, pd, dragExtentsMin
         return false;
     };
 
-    c.onmouseup = function onmouseupFn(button, x, y)
+    c.onmouseup = function onmouseupFn(/* button, x, y */)
     {
         c.mouseX = 0.5;
         c.mouseY = 0.5;

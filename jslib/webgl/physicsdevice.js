@@ -2,7 +2,6 @@
 /*global Float32Array: false*/
 /*global Uint16Array: false*/
 /*global Uint32Array: false*/
-/*global window: false*/
 /*global VMath: false*/
 /*global AABBTree: false*/
 /*global TurbulenzEngine: false*/
@@ -603,7 +602,7 @@ WebGLPhysicsSphereShape.create = function WebGlPhysicsSphereShapeFn(params)
         },
         enumerable : true
     });
-    initShapeProperties(rets, "CAPSULE", true);
+    initShapeProperties(rets, "SPHERE", true);
     return rets;
 };
 
@@ -2028,6 +2027,15 @@ WebGLPhysicsTriangleMeshShape.create = function WebGLPhysicsTriangleMeshShapeFn(
     t.collisionRadius = margin;
 
     initShapeProperties(rett, "TRIANGLE_MESH");
+
+    Object.defineProperty(rett, "triangleArray", {
+        get : function shapeGetTriangleArray()
+        {
+            return this._private.triangleArray;
+        },
+        enumerable : true
+    });
+
     return rett;
 };
 
@@ -2336,6 +2344,30 @@ WebGLPhysicsCollisionObject.prototype = {
     calculateExtents : function collisionObjectCalculateExtentsFn(extents)
     {
         this._private.calculateExtents(extents);
+    },
+
+    calculateTransform : function collisionObjectCalculateTransformFn(transform, origin)
+    {
+        var privateTransform = this._private.transform;
+        if (origin)
+        {
+            VMath.m43NegOffset(privateTransform, origin, transform);
+        }
+        else
+        {
+            transform[0] = privateTransform[0];
+            transform[1] = privateTransform[1];
+            transform[2] = privateTransform[2];
+            transform[3] = privateTransform[3];
+            transform[4] = privateTransform[4];
+            transform[5] = privateTransform[5];
+            transform[6] = privateTransform[6];
+            transform[7] = privateTransform[7];
+            transform[8] = privateTransform[8];
+            transform[9] = privateTransform[9];
+            transform[10] = privateTransform[10];
+            transform[11] = privateTransform[11];
+        }
     },
 
     clone : function collisionObjectCloneFn()
@@ -2755,7 +2787,7 @@ WebGLPhysicsPrivateBody.prototype = {
 
     // Return false if body is (taking into account sleep delay) able to sleep.
     // used for dynamics.
-    isActive : function isActiveFn(timeStep)
+    isActive : function isActiveFn(/* timeStep */)
     {
         if (!this.permitSleep) {
             return true;
@@ -2834,6 +2866,25 @@ function initPrivateBody(r, params)
 
     return r;
 }
+
+function WebGLPhysicsContactCallbacks(params, mask)
+{
+    this.mask = (params.contactCallbacksMask !== undefined ?
+                 params.contactCallbacksMask :
+                 mask);
+    this.added = false;
+    this.deferred = (params.onAddedContacts ||
+                     params.onProcessedContacts ||
+                     params.onRemovedContacts);
+    this.onPreSolveContact = params.onPreSolveContact || null;
+    this.onAddedContacts = params.onAddedContacts || null;
+    this.onProcessedContacts = params.onProcessedContacts || null;
+    this.onRemovedContacts = params.onRemovedContacts || null;
+    this.trigger = params.trigger || false;
+}
+
+WebGLPhysicsCollisionObject.sharedInverseInertiaLocal = VMath.v3BuildZero();
+WebGLPhysicsCollisionObject.sharedInverseInertia = new Float32Array([0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
 WebGLPhysicsCollisionObject.create = function webGLPhysicsPrivateBodyFn(params)
 {
@@ -2957,8 +3008,8 @@ WebGLPhysicsCollisionObject.create = function webGLPhysicsPrivateBodyFn(params)
     s.mass = 0;
     s.inverseMass = 0;
 
-    s.inverseInertiaLocal = VMath.v3BuildZero();
-    s.inverseInertia = new Float32Array([0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    s.inverseInertiaLocal = WebGLPhysicsCollisionObject.sharedInverseInertiaLocal;
+    s.inverseInertia = WebGLPhysicsCollisionObject.sharedInverseInertia;
 
     s.collisionObject = true;
 
@@ -2972,6 +3023,19 @@ WebGLPhysicsCollisionObject.create = function webGLPhysicsPrivateBodyFn(params)
     // static object is always 'inactive'
     s.active = kinematic;
 
+    // prepare for contact callbacks
+    if (params.onPreSolveContact ||
+        params.onAddedContacts ||
+        params.onProcessedContacts ||
+        params.onRemovedContacts)
+    {
+        s.contactCallbacks = new WebGLPhysicsContactCallbacks(params, mask);
+    }
+    else
+    {
+        s.contactCallbacks = null;
+    }
+
     return rets;
 };
 
@@ -2984,10 +3048,9 @@ WebGLPhysicsRigidBody.prototype = {
 
     version : 1,
 
-    calculateExtents : function rigidBodyCalculateExtentsFn(extents)
-    {
-        this._private.calculateExtents(extents);
-    },
+    calculateExtents : WebGLPhysicsCollisionObject.prototype.calculateExtents,
+
+    calculateTransform : WebGLPhysicsCollisionObject.prototype.calculateTransform,
 
     clone : function rigidBodyCloneFn()
     {
@@ -3270,6 +3333,19 @@ WebGLPhysicsRigidBody.create = function webGLPhysicsRigidBodyFn(params)
     // Kinematic object is not subject to manipulation by continous collisions.
     r.sweepFrozen = kinematic;
 
+    // prepare for contact callbacks
+    if (params.onPreSolveContact ||
+        params.onAddedContacts ||
+        params.onProcessedContacts ||
+        params.onRemovedContacts)
+    {
+        r.contactCallbacks = new WebGLPhysicsContactCallbacks(params, mask);
+    }
+    else
+    {
+        r.contactCallbacks = null;
+    }
+
     return retr;
 };
 
@@ -3281,7 +3357,7 @@ WebGLPhysicsConstraint.prototype = {
 
     version : 1,
 
-    preStep : function constraintPreStepFn(timeStep)
+    preStep : function constraintPreStepFn(/* timeStep */)
     {
     },
 
@@ -3805,6 +3881,11 @@ WebGLPhysicsCharacter.prototype = {
     calculateExtents : function characterCalculateExtentsFn(extents)
     {
         this._private.rigidBody.calculateExtents(extents);
+    },
+
+    calculateTransform : function characterCalculateTransformFn(transform, origin)
+    {
+        this._private.rigidBody.calculateTransform(transform, origin);
     }
 };
 
@@ -5468,6 +5549,7 @@ WebGLContactEPA.create = function WebGLContactEPAFn()
 //           [ kfA   kfBC ]
 //           [ kfBC   kfD ]
 // [50,51) : bounce
+// [51,52) : new
 //
 
 //
@@ -5486,13 +5568,15 @@ WebGLPhysicsContact.allocate = function allocateFn()
     var contact;
     if (this.contactPoolSize === 0)
     {
-        contact = new Float32Array(51);
+        contact = new Float32Array(52);
     }
     else
     {
-        contact = this.contactPool[this.contactPoolSize - 1];
         this.contactPoolSize -= 1;
+        contact = this.contactPool[this.contactPoolSize];
     }
+
+    contact[51] = 1.0; // new contact
 
     return contact;
 };
@@ -5506,6 +5590,91 @@ WebGLPhysicsContact.deallocate = function deallocateFn(contact)
     contact[40] = 0;
 };
 
+//
+// WebGLPhysicsPublicContact
+//
+function WebGLPhysicsPublicContact()
+{
+    this._private = null;
+}
+
+WebGLPhysicsPublicContact.create = function webGLPhysicsPublicContactCreate()
+{
+    var p = new WebGLPhysicsPublicContact();
+
+    Object.defineProperty(p, "localPointOnA", {
+        get : function getLocalPointOnA()
+        {
+            var pr = this._private;
+            return VMath.v3Build(pr[0], pr[1], pr[2]);
+        },
+        set : function setLocalPointOnA(point)
+        {
+            var pr = this._private;
+            pr[0] = point[0];
+            pr[1] = point[1];
+            pr[2] = point[2];
+        },
+        enumerable : true
+    });
+
+    Object.defineProperty(p, "localPointOnB", {
+        get : function getLocalPointOnB()
+        {
+            var pr = this._private;
+            return VMath.v3Build(pr[3], pr[4], pr[5]);
+        },
+        set : function setLocalPointOnB(point)
+        {
+            var pr = this._private;
+            pr[3] = point[0];
+            pr[4] = point[1];
+            pr[5] = point[2];
+        },
+        enumerable : true
+    });
+
+    Object.defineProperty(p, "worldNormalOnB", {
+        get : function getWorldNormalOnB()
+        {
+            var pr = this._private;
+            return VMath.v3Build(pr[12], pr[13], pr[14]);
+        },
+        set : function setWorldNormalOnB(normal)
+        {
+            var pr = this._private;
+            pr[12] = normal[0];
+            pr[13] = normal[1];
+            pr[14] = normal[2];
+        },
+        enumerable : true
+    });
+
+    Object.defineProperty(p, "added", {
+        get : function getAdded()
+        {
+            var pr = this._private;
+            return (0.0 < pr[51]);
+        },
+        enumerable : true
+    });
+
+    Object.defineProperty(p, "distance", {
+        get : function getDistance()
+        {
+            var pr = this._private;
+            return pr[21];
+        },
+        enumerable : true
+    });
+
+    return p;
+};
+
+WebGLPhysicsContact.publicContacts = [WebGLPhysicsPublicContact.create(),
+                                      WebGLPhysicsPublicContact.create(),
+                                      WebGLPhysicsPublicContact.create()];
+WebGLPhysicsContact.callbackContacts = [];
 
 //
 // WebGLPhysicsArbiter
@@ -5540,6 +5709,12 @@ function WebGLPhysicsArbiter()
 
     // Flag used to ignore unneccesary discrete collision checks in post-continuous collisions.
     this.skipDiscreteCollisions = false;
+
+    // Flags to signal processing of contact callbacks
+    this.contactFlags = 0; // 1 - added, 2 - processed, 4 - removed
+
+    // Flag to disable contact response
+    this.trigger = false;
 }
 
 WebGLPhysicsArbiter.prototype = {
@@ -5558,63 +5733,32 @@ WebGLPhysicsArbiter.prototype = {
             return;
         }
 
-        var data = WebGLPhysicsContact.allocate();
+        var scale = 1 / Math.sqrt(clsq);
+        cn0 *= scale;
+        cn1 *= scale;
+        cn2 *= scale;
+
         //WebGLPrivatePhysicsWorld.prototype.m43InverseOrthonormalTransformPoint(this.objectA.transform, worldA, c.localA);
         //WebGLPrivatePhysicsWorld.prototype.m43InverseOrthonormalTransformPoint(this.objectB.transform, worldB, c.localB);
         //var localA = c.localA;
         //var localB = c.localB;
         //var relA = c.relA;
         //var relB = c.relB;
-        var xformA = this.objectA.transform;
-        var xformB = this.objectB.transform;
-
-        var r0 = data[6] = worldA[0] - xformA[9];
-        var r1 = data[7] = worldA[1] - xformA[10];
-        var r2 = data[8] = worldA[2] - xformA[11];
-        var ca0 = data[0] = (xformA[0] * r0) + (xformA[1] * r1) + (xformA[2] * r2);
-        var ca1 = data[1] = (xformA[3] * r0) + (xformA[4] * r1) + (xformA[5] * r2);
-        var ca2 = data[2] = (xformA[6] * r0) + (xformA[7] * r1) + (xformA[8] * r2);
-
-        r0 = data[9] = worldB[0] - xformB[9];
-        r1 = data[10] = worldB[1] - xformB[10];
-        r2 = data[11] = worldB[2] - xformB[11];
-        data[3] = (xformB[0] * r0) + (xformB[1] * r1) + (xformB[2] * r2);
-        data[4] = (xformB[3] * r0) + (xformB[4] * r1) + (xformB[5] * r2);
-        data[5] = (xformB[6] * r0) + (xformB[7] * r1) + (xformB[8] * r2);
-
-        //c.distance = distance;
-        data[21] = distance;
-
-        // contact normal, normalised.
-        //var basis = c.basis;
-        var scale = 1 / Math.sqrt(clsq);
-        data[12] = cn0 = (cn0 * scale);
-        data[13] = cn1 = (cn1 * scale);
-        data[14] = cn2 = (cn2 * scale);
-
-        // contact tangent.
-        var ct0, ct1, ct2;
-        if ((cn0 * cn0) + (cn2 * cn2) === 0)
-        {
-            ct0 = data[15] = 1.0;
-            ct1 = data[16] = 0.0;
-            ct2 = data[17] = 0.0;
-        }
-        else
-        {
-            scale = 1 / Math.sqrt(cn0 * cn0 + cn2 * cn2);
-            ct0 = data[15] = (-cn2 * scale);
-            ct1 = data[16] = 0.0;
-            ct2 = data[17] = (cn0 * scale);
-        }
-
-        // contact bitangent
-        data[18] = ((cn1 * ct2) - (cn2 * ct1));
-        data[19] = ((cn2 * ct0) - (cn0 * ct2));
-        data[20] = ((cn0 * ct1) - (cn1 * ct0));
+        var objectA = this.objectA;
+        var objectB = this.objectB;
+        var xformA = objectA.transform;
+        var xformB = objectB.transform;
+        var r0 = worldA[0] - xformA[9];
+        var r1 = worldA[1] - xformA[10];
+        var r2 = worldA[2] - xformA[11];
+        var ca0 = (xformA[0] * r0) + (xformA[1] * r1) + (xformA[2] * r2);
+        var ca1 = (xformA[3] * r0) + (xformA[4] * r1) + (xformA[5] * r2);
+        var ca2 = (xformA[6] * r0) + (xformA[7] * r1) + (xformA[8] * r2);
+        var jAccN = 0;
 
         // Cull any contacts with different normal
         // Inherit accumulated impulse of nearby contact
+        /*jshint bitwise: false*/
         var i = 0;
         var min = Number.MAX_VALUE;
         var contacts = this.contacts;
@@ -5628,6 +5772,7 @@ WebGLPhysicsArbiter.prototype = {
                 contacts[i] = contacts[contacts.length - 1];
                 contacts.pop();
                 WebGLPhysicsContact.deallocate(datad);
+                this.contactFlags |= 4; // removed
                 continue;
             }
 
@@ -5639,10 +5784,11 @@ WebGLPhysicsArbiter.prototype = {
             if (sep < WebGLPhysicsConfig.CONTACT_EQUAL_SQ_SEPERATION)
             {
                 //c.jAccN = d.jAccN;
-                data[40] = datad[40];
+                jAccN = datad[40];
                 contacts[i] = contacts[contacts.length - 1];
                 contacts.pop();
                 WebGLPhysicsContact.deallocate(datad);
+                this.contactFlags |= 4; // removed
                 min = sep;
                 continue;
             }
@@ -5650,12 +5796,107 @@ WebGLPhysicsArbiter.prototype = {
             if (sep < WebGLPhysicsConfig.CONTACT_INHERIT_SQ_SEPERATION && sep < min)
             {
                 //c.jAccN = d.jAccN;
-                data[40] = datad[40];
+                jAccN = datad[40];
                 min = sep;
             }
 
-            i++;
+            i += 1;
         }
+
+        var data = WebGLPhysicsContact.allocate();
+
+        data[0] = ca0;
+        data[1] = ca1;
+        data[2] = ca2;
+        data[6] = r0;
+        data[7] = r1;
+        data[8] = r2;
+
+        data[9] = r0 = worldB[0] - xformB[9];
+        data[10] = r1 = worldB[1] - xformB[10];
+        data[11] = r2 = worldB[2] - xformB[11];
+        data[3] = (xformB[0] * r0) + (xformB[1] * r1) + (xformB[2] * r2);
+        data[4] = (xformB[3] * r0) + (xformB[4] * r1) + (xformB[5] * r2);
+        data[5] = (xformB[6] * r0) + (xformB[7] * r1) + (xformB[8] * r2);
+
+        //c.distance = distance;
+        data[21] = distance;
+
+        // contact normal, normalised.
+        //var basis = c.basis;
+        data[12] = cn0;
+        data[13] = cn1;
+        data[14] = cn2;
+
+        // contact tangent.
+        var ct0, /*ct1,*/ ct2;
+        clsq = ((cn0 * cn0) + (cn2 * cn2));
+        if (clsq < WebGLPhysicsConfig.DONT_NORMALIZE_THRESHOLD)
+        {
+            data[15] = ct0 = 1.0;
+            data[16] = /*ct1 =*/ 0.0;
+            data[17] = ct2 = 0.0;
+        }
+        else
+        {
+            scale = 1 / Math.sqrt(clsq);
+            data[15] = ct0 = (-cn2 * scale);
+            data[16] = /*ct1 =*/ 0.0;
+            data[17] = ct2 = (cn0 * scale);
+        }
+
+        // contact bitangent
+        data[18] = ((cn1 * ct2) /*- (cn2 * ct1)*/);
+        data[19] = ((cn2 * ct0) - (cn0 * ct2));
+        data[20] = (/*(cn0 * ct1)*/ - (cn1 * ct0));
+
+        data[40] = jAccN;
+
+        var contactCallbacks, publicContact;
+        contactCallbacks = objectA.contactCallbacks;
+        if (null !== contactCallbacks && 0 !== (contactCallbacks.mask & objectB.group))
+        {
+            if (contactCallbacks.onPreSolveContact)
+            {
+                publicContact = WebGLPhysicsContact.publicContacts[0];
+                publicContact._private = data;
+                contactCallbacks.onPreSolveContact(objectA._public, objectB._public, publicContact);
+            }
+            if (!contactCallbacks.added && contactCallbacks.deferred)
+            {
+                contactCallbacks.added = true;
+                objectA.world.contactCallbackObjects.push(objectA);
+            }
+            if (contactCallbacks.trigger)
+            {
+                this.trigger = true;
+                objectA.sweepFrozen = false;
+                objectB.sweepFrozen = false;
+            }
+        }
+        contactCallbacks = objectB.contactCallbacks;
+        if (null !== contactCallbacks && 0 !== (contactCallbacks.mask & objectA.group))
+        {
+            if (contactCallbacks.onPreSolveContact)
+            {
+                publicContact = WebGLPhysicsContact.publicContacts[0];
+                publicContact._private = data;
+                contactCallbacks.onPreSolveContact(objectA._public, objectB._public, publicContact);
+            }
+            if (!contactCallbacks.added && contactCallbacks.deferred)
+            {
+                contactCallbacks.added = true;
+                objectB.world.contactCallbackObjects.push(objectB);
+            }
+            if (contactCallbacks.trigger)
+            {
+                this.trigger = true;
+                objectA.sweepFrozen = false;
+                objectB.sweepFrozen = false;
+            }
+        }
+
+        this.contactFlags |= 1; // added
 
         contacts.push(data);
 
@@ -5663,9 +5904,9 @@ WebGLPhysicsArbiter.prototype = {
         {
             // Discard one contact, so that remaining 3 have maximum area, and contain deepest contact
             // Find deepest.
-            var minDistance = Number.MAX_VALUE;
-            var minimum;
-            for (i = 0; i < 4; i += 1)
+            var minDistance = contacts[0][21];
+            var minimum = 0;
+            for (i = 1; i < 4; i += 1)
             {
                 data = contacts[i];
                 if (data[21] < minDistance)
@@ -5783,7 +6024,9 @@ WebGLPhysicsArbiter.prototype = {
             contacts[discard] = contacts[3];
             contacts.pop();
             WebGLPhysicsContact.deallocate(data);
+            this.contactFlags |= 4; // removed
         }
+        /*jshint bitwise: true*/
     },
 
     refreshContacts : function refreshContactsFn()
@@ -5822,6 +6065,7 @@ WebGLPhysicsArbiter.prototype = {
         var B10 = xformB[10];
         var B11 = xformB[11];
 
+        /*jshint bitwise: false*/
         var data;
         var i = 0;
         while (i < contacts.length)
@@ -5861,6 +6105,7 @@ WebGLPhysicsArbiter.prototype = {
                 contacts[i] = contacts[contacts.length - 1];
                 contacts.pop();
                 WebGLPhysicsContact.deallocate(data);
+                this.contactFlags |= 4; // removed
                 continue;
             }
 
@@ -5874,17 +6119,27 @@ WebGLPhysicsArbiter.prototype = {
                 contacts[i] = contacts[contacts.length - 1];
                 contacts.pop();
                 WebGLPhysicsContact.deallocate(data);
+                this.contactFlags |= 4; // removed
                 continue;
             }
 
-            i++;
+            i += 1;
         }
+
+        this.contactFlags |= 2; // processed
+        /*jshint bitwise: true*/
 
         return (contacts.length === 0);
     },
 
     preStep : function arbiterPreStepFn(timeStepRatio, timeStep)
     {
+        if (this.trigger)
+        {
+            this.activeContacts.length = 0;
+            return;
+        }
+
         var objectA = this.objectA;
         var objectB = this.objectB;
         var mass_sum = objectA.inverseMass + objectB.inverseMass;
@@ -5917,6 +6172,10 @@ WebGLPhysicsArbiter.prototype = {
 
         var activeContacts = this.activeContacts;
         activeContacts.length = 0;
+
+        var baum = (objectA.collisionObject || objectB.collisionObject) ?
+                      WebGLPhysicsConfig.CONTACT_STATIC_BAUMGRAUTE :
+                      WebGLPhysicsConfig.CONTACT_BAUMGRAUTE;
 
         var contacts = this.contacts;
         var i;
@@ -5979,9 +6238,6 @@ WebGLPhysicsArbiter.prototype = {
             data[45] = 1 / kN;
 
             // Compute positional bias for baumgraute stabalisation#
-            var baum = (objectA.collisionObject || objectB.collisionObject) ?
-                          WebGLPhysicsConfig.CONTACT_STATIC_BAUMGRAUTE :
-                          WebGLPhysicsConfig.CONTACT_BAUMGRAUTE;
             data[43] = baum * Math.min(0, data[21] + WebGLPhysicsConfig.CONTACT_SLOP) / timeStep;
             data[44] = 0;
 
@@ -6030,7 +6286,7 @@ WebGLPhysicsArbiter.prototype = {
             cb1 = ((rb2 * n0) - (rb0 * n2));
             cb2 = ((rb0 * n1) - (rb1 * n0));
             //c.uCrossB = VMbth.m33Trbnsform(objecnB.inverseInertib, crossB);
-            data[31]  = k0 = -((B0 * cb0) + (B3 * cb1) + (B6 * cb2));
+            data[31] = k0 = -((B0 * cb0) + (B3 * cb1) + (B6 * cb2));
             data[32] = k1 = -((B1 * cb0) + (B4 * cb1) + (B7 * cb2));
             data[33] = k2 = -((B2 * cb0) + (B5 * cb1) + (B8 * cb2));
             kU -= ((cb0 * k0) + (cb1 * k1) + (cb2 * k2));
@@ -6076,6 +6332,11 @@ WebGLPhysicsArbiter.prototype = {
 
     applyCachedImpulses : function arbiterApplyCachedImpulsesFn()
     {
+        if (this.trigger)
+        {
+            return;
+        }
+
         var objectA = this.objectA;
         var objectB = this.objectB;
 
@@ -6086,7 +6347,7 @@ WebGLPhysicsArbiter.prototype = {
         var imB = objectB.inverseMass;
 
         var contacts = this.activeContacts;
-        var i = 0;
+        var i;
         for (i = 0; i < contacts.length; i += 1)
         {
             var data = contacts[i];
@@ -6116,6 +6377,11 @@ WebGLPhysicsArbiter.prototype = {
 
     computeAndApplyBiasImpulses : function arbiterBiasImpulsesFn()
     {
+        if (this.trigger)
+        {
+            return;
+        }
+
         var objectA = this.objectA;
         var objectB = this.objectB;
 
@@ -6142,8 +6408,8 @@ WebGLPhysicsArbiter.prototype = {
         var contacts = this.activeContacts;
         var limit = contacts.length;
         var data;
-        var i = 0;
-        for (; i < limit; i += 1)
+        var i;
+        for (i = 0; i < limit; i += 1)
         {
             data = contacts[i];
 
@@ -6218,6 +6484,11 @@ WebGLPhysicsArbiter.prototype = {
 
     computeAndApplyImpulses : function arbiterImpulsesFn()
     {
+        if (this.trigger)
+        {
+            return;
+        }
+
         var objectA = this.objectA;
         var objectB = this.objectB;
 
@@ -6241,11 +6512,13 @@ WebGLPhysicsArbiter.prototype = {
         var imA = objectA.inverseMass;
         var imB = objectB.inverseMass;
 
+        var friction = this.friction;
+
         var contacts = this.activeContacts;
         var limit = contacts.length;
         var data;
-        var i = 0;
-        for (; i < limit; i += 1)
+        var i;
+        for (i = 0; i < limit; i += 1)
         {
             data = contacts[i];
 
@@ -6280,8 +6553,9 @@ WebGLPhysicsArbiter.prototype = {
             if (cjAcc1 < 0)
             {
                 cjAcc1 = 0.0;
+                //j1 = cjAcc1 - jOld1;
+                j1 = -jOld1;
             }
-            j1 = cjAcc1 - jOld1;
             data[40] = cjAcc1;
 
             // Apply normal impulse.
@@ -6324,16 +6598,16 @@ WebGLPhysicsArbiter.prototype = {
             cjAcc1 = jOld1 + j1;
             var cjAcc2 = jOld2 + j2;
 
-            var jMax = this.friction * data[40];
+            var jMax = friction * data[40];
             var fsq = (cjAcc1 * cjAcc1) + (cjAcc2 * cjAcc2);
             if (fsq > (jMax * jMax))
             {
                 fsq = jMax / Math.sqrt(fsq);
                 cjAcc1 *= fsq;
                 cjAcc2 *= fsq;
+                j1 = cjAcc1 - jOld1;
+                j2 = cjAcc2 - jOld2;
             }
-            j1 = cjAcc1 - jOld1;
-            j2 = cjAcc2 - jOld2;
             data[41] = cjAcc1;
             data[42] = cjAcc2;
 
@@ -6430,6 +6704,11 @@ WebGLPhysicsArbiter.deallocate = function deallocateFn(arbiter)
 
     // Ensure flag is reset.
     arbiter.skipDiscreteCollisions = false;
+
+    // clear contact information
+    arbiter.activeContacts.length = 0;
+    arbiter.contactFlags = 0;
+    arbiter.trigger = false;
 
     this.arbiterPool[this.arbiterPoolSize] = arbiter;
     this.arbiterPoolSize += 1;
@@ -6913,11 +7192,13 @@ WebGLPrivatePhysicsWorld.prototype = {
             return true;
         }
 
+        /*jshint bitwise: false*/
         if ((objectA.mask & objectB.group) === 0 ||
             (objectB.mask & objectA.group) === 0)
         {
             return true;
         }
+        /*jshint bitwise: true*/
 
         return false;
     },
@@ -7107,11 +7388,12 @@ WebGLPrivatePhysicsWorld.prototype = {
         //
         // Default case, both objects are convex.
         //
-        else {
+        else
+        {
             contact = this.contactPairTest(cache, objectA.transform, objectB.transform);
             if (contact < 0)
             {
-                arb.insertContact(cache.closestA, cache.closestB, cache.axis, contact);
+                arb.insertContact(cache.closestA, cache.closestB, cache.axis, contact, false);
                 collided = true;
             }
         }
@@ -8206,20 +8488,33 @@ WebGLPrivatePhysicsWorld.prototype = {
                     arbiters[i] = arbiters[arbiters.length - 1];
                     arbiters.pop();
 
-                    var bodyArbiters = arb.objectA.arbiters;
+                    objectA = arb.objectA;
+                    objectB = arb.objectB;
+
+                    var bodyArbiters = objectA.arbiters;
                     bodyArbiters[bodyArbiters.indexOf(arb)] = bodyArbiters[bodyArbiters.length - 1];
                     bodyArbiters.pop();
 
-                    bodyArbiters = arb.objectB.arbiters;
+                    bodyArbiters = objectB.arbiters;
                     bodyArbiters[bodyArbiters.indexOf(arb)] = bodyArbiters[bodyArbiters.length - 1];
                     bodyArbiters.pop();
 
-                    WebGLPhysicsArbiter.deallocate(arb);
+                    if ((objectA.contactCallbacks && objectA.contactCallbacks.onRemovedContacts) ||
+                        (objectB.contactCallbacks && objectB.contactCallbacks.onRemovedContacts))
+                    {
+                        this.contactCallbackRemovedArbiters.push(arb);
+                    }
+                    else
+                    {
+                        WebGLPhysicsArbiter.deallocate(arb);
+                    }
+
                     continue;
                 }
 
                 arb.preStep(timeStepRatio, timeStep);
-                i++;
+
+                i += 1;
             }
             performance.prestepContacts += (TurbulenzEngine.time - preTime);
 
@@ -8692,6 +8987,8 @@ WebGLPrivatePhysicsWorld.prototype = {
             VMath.m43Copy(body.newTransform, body.transform);
             VMath.m43Copy(body.newTransform, body.prevTransform);
         }
+
+        this.updateContactCallbacks();
 
         this.midStep = false;
     },
@@ -9405,6 +9702,21 @@ WebGLPrivatePhysicsWorld.prototype = {
 
         this.removeArbitersFromObject(body);
 
+        this.removeFromContactCallbacks(body);
+
+        var island = body.island;
+        if (island)
+        {
+            var bodies = island.bodies;
+            var bodyIndex = bodies.indexOf(body);
+            if (bodyIndex !== -1)
+            {
+                bodies[bodyIndex] = bodies[bodies.length - 1];
+                bodies.pop();
+            }
+            body.island = null;
+        }
+
         return true;
     },
 
@@ -9476,6 +9788,19 @@ WebGLPrivatePhysicsWorld.prototype = {
             list.pop();
         }
 
+        var island = constraint.island;
+        if (island)
+        {
+            var constraints = island.constraints;
+            var constraintIndex = constraints.indexOf(constraint);
+            if (constraintIndex !== -1)
+            {
+                constraints[constraintIndex] = constraints[constraints.length - 1];
+                constraints.pop();
+            }
+            constraint.island = null;
+        }
+
         return true;
     },
 
@@ -9536,6 +9861,159 @@ WebGLPrivatePhysicsWorld.prototype = {
 
             WebGLPhysicsArbiter.deallocate(arb);
         }
+    },
+
+    removeFromContactCallbacks : function removeFromContactCallbacksFn(object)
+    {
+        var contactCallbackObjects = this.contactCallbackObjects;
+        var numObjects = contactCallbackObjects.length;
+        var n;
+        for (n = 0; n < numObjects; n += 1)
+        {
+            if (contactCallbackObjects[n] === object)
+            {
+                numObjects -= 1;
+                if (n < numObjects)
+                {
+                    contactCallbackObjects[n] = contactCallbackObjects[numObjects];
+                }
+                contactCallbackObjects.length = numObjects;
+                break;
+            }
+        }
+        object.addedToContactCallbacks = false;
+    },
+
+    updateContactCallbacks : function updateContactCallbacksFn()
+    {
+        var contactCallbackObjects = this.contactCallbackObjects;
+        var numObjects = contactCallbackObjects.length;
+        var publicContacts = WebGLPhysicsContact.publicContacts;
+        var callbackContacts = WebGLPhysicsContact.callbackContacts;
+        var arbiter, objectA, objectB, contactCallbacksA, contactCallbacksB;
+        var n = 0;
+        while (n < numObjects)
+        {
+            var object = contactCallbackObjects[n];
+            var arbiters = object.arbiters;
+            var numArbiters = arbiters.length;
+            if (0 === numArbiters)
+            {
+                object.contactCallbacks.added = false;
+                numObjects -= 1;
+                if (n < numObjects)
+                {
+                    contactCallbackObjects[n] = contactCallbackObjects[numObjects];
+                }
+                contactCallbackObjects.length = numObjects;
+            }
+            else
+            {
+                var i, j;
+                for (i = 0; i < numArbiters; i += 1)
+                {
+                    arbiter = arbiters[i];
+                    if (0 !== arbiter.contactFlags)
+                    {
+                        var contacts = arbiter.contacts;
+                        var numContacts = contacts.length;
+
+                        while (publicContacts.length < numContacts)
+                        {
+                            publicContacts[publicContacts.length] = WebGLPhysicsPublicContact.create();
+                        }
+
+                        callbackContacts.length = numContacts;
+                        for (j = 0; j < numContacts; j += 1)
+                        {
+                            var publicContact = publicContacts[j];
+                            publicContact._private = contacts[j];
+                            callbackContacts[j] = publicContact;
+                        }
+
+                        objectA = arbiter.objectA;
+                        objectB = arbiter.objectB;
+
+                        contactCallbacksA = objectA.contactCallbacks;
+                        contactCallbacksB = objectB.contactCallbacks;
+
+                        /*jshint bitwise: false*/
+                        if (arbiter.contactFlags & 1)
+                        {
+                            if (null !== contactCallbacksA && contactCallbacksA.onAddedContacts)
+                            {
+                                contactCallbacksA.onAddedContacts(objectA._public, objectB._public, callbackContacts);
+                            }
+                            if (null !== contactCallbacksB && contactCallbacksB.onAddedContacts)
+                            {
+                                contactCallbacksB.onAddedContacts(objectA._public, objectB._public, callbackContacts);
+                            }
+                        }
+
+                        if (arbiter.contactFlags & 2)
+                        {
+                            if (null !== contactCallbacksA && contactCallbacksA.onProcessedContacts)
+                            {
+                                contactCallbacksA.onProcessedContacts(objectA._public, objectB._public, callbackContacts);
+                            }
+                            if (null !== contactCallbacksB && contactCallbacksB.onProcessedContacts)
+                            {
+                                contactCallbacksB.onProcessedContacts(objectA._public, objectB._public, callbackContacts);
+                            }
+                        }
+
+                        if (arbiter.contactFlags & 4)
+                        {
+                            if (null !== contactCallbacksA && contactCallbacksA.onRemovedContacts)
+                            {
+                                contactCallbacksA.onRemovedContacts(objectA._public, objectB._public, callbackContacts);
+                            }
+                            if (null !== contactCallbacksB && contactCallbacksB.onRemovedContacts)
+                            {
+                                contactCallbacksB.onRemovedContacts(objectA._public, objectB._public, callbackContacts);
+                            }
+                        }
+                        /*jshint bitwise: true*/
+
+                        arbiter.contactFlags = 0;
+
+                        // Flag contacts as old
+                        for (j = 0; j < numContacts; j += 1)
+                        {
+                            contacts[j][51] = 0;
+                        }
+                    }
+                }
+                n += 1;
+            }
+        }
+
+        // Callbacks for pairs no longer touching
+        var contactCallbackRemovedArbiters = this.contactCallbackRemovedArbiters;
+        numObjects = contactCallbackRemovedArbiters.length;
+        callbackContacts.length = 0;
+        for (n = 0; n < numObjects; n += 1)
+        {
+            arbiter = contactCallbackRemovedArbiters[n];
+
+            objectA = arbiter.objectA;
+            objectB = arbiter.objectB;
+
+            contactCallbacksA = objectA.contactCallbacks;
+            contactCallbacksB = objectB.contactCallbacks;
+
+            if (null !== contactCallbacksA && contactCallbacksA.onRemovedContacts)
+            {
+                contactCallbacksA.onRemovedContacts(objectA._public, objectB._public, callbackContacts);
+            }
+            if (null !== contactCallbacksB && contactCallbacksB.onRemovedContacts)
+            {
+                contactCallbacksB.onRemovedContacts(objectA._public, objectB._public, callbackContacts);
+            }
+
+            WebGLPhysicsArbiter.deallocate(arbiter);
+        }
+        contactCallbackRemovedArbiters.length = 0;
     }
 };
 
@@ -9644,6 +10122,12 @@ WebGLPhysicsWorld.create = function webGLPrivatePhysicsWorldFn(params)
 
     // Extents used throughout all calls to syncBody
     s.syncExtents = new Float32Array(6);
+
+    // Array for all the objects we need to call for contact callbacks
+    s.contactCallbackObjects = [];
+
+    // Array for all the removed arbiters
+    s.contactCallbackRemovedArbiters = [];
 
     return rets;
 };
@@ -9761,10 +10245,9 @@ WebGLPhysicsDevice.prototype = {
     }
 };
 
-WebGLPhysicsDevice.create = function webGLPhysicsDeviceFn(params)
+WebGLPhysicsDevice.create = function webGLPhysicsDeviceFn(/* params */)
 {
     var pd = new WebGLPhysicsDevice();
     pd.genObjectId = 0;
     return pd;
 };
-

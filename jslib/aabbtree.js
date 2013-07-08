@@ -4,7 +4,13 @@
 //
 // AABBTreeNode
 //
-function AABBTreeNode() {}
+function AABBTreeNode(extents, escapeNodeOffset, externalNode)
+{
+    this.escapeNodeOffset = escapeNodeOffset;
+    this.externalNode = externalNode;
+    this.extents = extents;
+}
+
 AABBTreeNode.prototype =
 {
     version : 1,
@@ -47,18 +53,28 @@ AABBTreeNode.prototype =
 // Constructor function
 AABBTreeNode.create = function aabbtreeNodeCreateFn(extents, escapeNodeOffset, externalNode)
 {
-    var n = new AABBTreeNode();
-    n.escapeNodeOffset = escapeNodeOffset;
-    n.externalNode = externalNode;
-    n.extents = extents;
-    return n;
+    return new AABBTreeNode(extents, escapeNodeOffset, externalNode);
 };
 
 
 //
 // AABBTree
 //
-function AABBTree() {}
+function AABBTree(highQuality)
+{
+    this.nodes = [];
+    this.endNode = 0;
+    this.needsRebuild = false;
+    this.needsRebound = false;
+    this.numAdds = 0;
+    this.numUpdates = 0;
+    this.numExternalNodes = 0;
+    this.startUpdate = 0x7FFFFFFF;
+    this.endUpdate = -0x7FFFFFFF;
+    this.highQuality = highQuality;
+    this.ignoreY = false;
+}
+
 AABBTree.prototype =
 {
     version : 1,
@@ -335,8 +351,8 @@ AABBTree.prototype =
         this.needsRebound = false;
         this.numAdds = 0;
         //this.numUpdates = 0;
-        this.startUpdate = Number.MAX_VALUE;
-        this.endUpdate = -Number.MAX_VALUE;
+        this.startUpdate = 0x7FFFFFFF;
+        this.endUpdate = -0x7FFFFFFF;
     },
 
     rebuild : function rebuildFn()
@@ -428,8 +444,8 @@ AABBTree.prototype =
         this.needsRebound = false;
         this.numAdds = 0;
         this.numUpdates = 0;
-        this.startUpdate = Number.MAX_VALUE;
-        this.endUpdate = -Number.MAX_VALUE;
+        this.startUpdate = 0x7FFFFFFF;
+        this.endUpdate = -0x7FFFFFFF;
     },
 
     sortNodes : function sortNodesFn(nodes)
@@ -1438,8 +1454,8 @@ AABBTree.prototype =
         this.numAdds = 0;
         this.numUpdates = 0;
         this.numExternalNodes = 0;
-        this.startUpdate = Number.MAX_VALUE;
-        this.endUpdate = -Number.MAX_VALUE;
+        this.startUpdate = 0x7FFFFFFF;
+        this.endUpdate = -0x7FFFFFFF;
     }
 };
 
@@ -1664,13 +1680,7 @@ AABBTree.rayTest = function aabbtreeRayTestFn(trees, ray, callback)
 // Constructor function
 AABBTree.create = function aabbtreeCreateFn(highQuality)
 {
-    var t = new AABBTree();
-    t.clear();
-    if (highQuality)
-    {
-        t.highQuality = true;
-    }
-    return t;
+    return new AABBTree(highQuality);
 };
 
 // Detect correct typed arrays

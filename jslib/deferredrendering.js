@@ -1553,7 +1553,7 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
         }
     }
 
-    function deferredBlendUpdateFn(camera)
+    function deferredBlendUpdateFn(/* camera */)
     {
         this.frameUpdated = this.frameVisible;
         var node = this.node;
@@ -1565,7 +1565,7 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
         }
     }
 
-    function deferredBlendSkinnedUpdateFn(camera)
+    function deferredBlendSkinnedUpdateFn(/* camera */)
     {
         this.frameUpdated = this.frameVisible;
         var techniqueParameters = this.techniqueParameters;
@@ -1585,7 +1585,7 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
     }
 
 
-    function deferredEnvUpdateFn(camera)
+    function deferredEnvUpdateFn(/* camera */)
     {
         this.frameUpdated = this.frameVisible;
         var node = this.node;
@@ -1600,7 +1600,7 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
         }
     }
 
-    function deferredEnvSkinnedUpdateFn(camera)
+    function deferredEnvSkinnedUpdateFn(/* camera */)
     {
         this.frameUpdated = this.frameVisible;
         var techniqueParameters = this.techniqueParameters;
@@ -1917,7 +1917,7 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
         }
     }
 
-    function deferredSkyboxUpdateFn(camera)
+    function deferredSkyboxUpdateFn(/* camera */)
     {
         var node = this.node;
         var worldUpdate = node.worldUpdate;

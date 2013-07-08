@@ -14,7 +14,6 @@
 /*global ArrayBuffer*/
 /*global DataView*/
 /*global window*/
-/*global console*/
 "use strict";
 
 //
@@ -3345,7 +3344,7 @@ function techniqueParameterBufferCreate(params)
             return techniqueParameterBufferWriter;
         };
 
-        Float32Array.prototype.unmap = function techniqueParameterBufferUnmap(writer) {
+        Float32Array.prototype.unmap = function techniqueParameterBufferUnmap(/* writer */) {
         };
     }
 
@@ -3534,7 +3533,7 @@ WebGLDrawParameters.prototype =
 };
 
 // Constructor function
-WebGLDrawParameters.create = function webGLDrawParametersFn(params)
+WebGLDrawParameters.create = function webGLDrawParametersFn(/* params */)
 {
     return new WebGLDrawParameters();
 };
@@ -4610,7 +4609,7 @@ WebGLGraphicsDevice.prototype =
         return WebGLRenderTarget.create(this, params);
     },
 
-    createOcclusionQuery : function createOcclusionQueryFn(params)
+    createOcclusionQuery : function createOcclusionQueryFn(/* params */)
     {
         return null;
     },

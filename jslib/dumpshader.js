@@ -1,5 +1,7 @@
 // Copyright (c) 2009-2011 Turbulenz Limited
 
+/*exported dumpShader*/
+
 var dumpShader = function dumpShaderFn(shader, log)
 {
     log("<h2>Shader: " + shader.name + "</h2>");

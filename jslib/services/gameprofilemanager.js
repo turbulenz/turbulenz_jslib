@@ -1,8 +1,6 @@
 // Copyright (c) 2012 Turbulenz Limited
 
 /*global TurbulenzServices: false*/
-/*global ServiceRequester: false*/
-/*global Utilities: false*/
 
 //
 // API
@@ -12,7 +10,7 @@ GameProfileManager.prototype =
 {
     version : 1,
     maxValueSize : 1024,
-    maxGetListUsernames : 32,
+    maxGetListUsernames : 64,
 
     set: function gameProfileManagerSetFn(value, callbackFn, errorCallbackFn)
     {
@@ -31,7 +29,10 @@ GameProfileManager.prototype =
         {
             if (status === 200)
             {
-                callbackFn();
+                if (callbackFn)
+                {
+                    callbackFn();
+                }
             }
             else
             {
@@ -77,13 +78,12 @@ GameProfileManager.prototype =
         var that = this;
         function removeCallbackFn(jsonResponse, status)
         {
-            if (status === 200)
+            if (status === 200 || status === 404)
             {
-                callbackFn();
-            }
-            else if (status === 404)
-            {
-                callbackFn();
+                if (callbackFn)
+                {
+                    callbackFn();
+                }
             }
             else
             {

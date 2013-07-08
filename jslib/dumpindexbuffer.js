@@ -1,5 +1,7 @@
 // Copyright (c) 2009-2011 Turbulenz Limited
 
+/*exported dumpIndexBuffer*/
+
 var dumpIndexBuffer = function dumpIndexBufferFn(indexbuffer, log)
 {
     log("<h2>IndexBuffer</h2>");

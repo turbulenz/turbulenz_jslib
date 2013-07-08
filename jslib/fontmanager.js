@@ -36,7 +36,7 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
 {
     if (!errorCallback)
     {
-        errorCallback = function (e) {};
+        errorCallback = function (/* e */) {};
     }
 
     function createIndexBuffer(maxGlyphs)
@@ -322,7 +322,9 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
                 return;
             }
 
+            /*jshint bitwise: false*/
             var numGlyphs = (vertices.length >> 4);
+            /*jshint bitwise: true*/
 
             reusableArrays[numGlyphs] = vertices;
 
@@ -439,7 +441,7 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
             return false;
         }
 
-        function requestFn(url, onload, callContext)
+        function requestFn(url, onload /*, callContext */)
         {
             var font = fonts[path];
             if (!font)
@@ -825,7 +827,9 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
 
     fm.reuseVertices = function reuseVerticesFn(vertices)
     {
+        /*jshint bitwise: false*/
         reusableArrays[vertices.length >> 4] = vertices;
+        /*jshint bitwise: true*/
     };
 
     /**
@@ -836,7 +840,7 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
       @function
       @name destroy
     */
-    fm.destroy = function fontManagerDestroyFn(prm)
+    fm.destroy = function fontManagerDestroyFn(/* prm */)
     {
         if (fonts)
         {

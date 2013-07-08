@@ -3,10 +3,8 @@
 /*global SoundTARLoader: false*/
 /*global Audio: false*/
 /*global VMath: false*/
-/*global navigator: false*/
 /*global window: false*/
 /*global Uint8Array: false*/
-/*global console*/
 "use strict";
 
 
@@ -317,7 +315,7 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
 
             audio.src = soundPath;
 
-            audio.onerror = function loadingSoundFailedFn(e)
+            audio.onerror = function loadingSoundFailedFn(/* e */)
             {
                 if (onload)
                 {
@@ -1156,7 +1154,7 @@ WebGLSoundDevice.prototype =
                 {
                     params.onsoundload(texture);
                 },
-                onload : function soundTarLoadedFn(success, status)
+                onload : function soundTarLoadedFn(success /*, status */)
                 {
                     if (params.onload)
                     {
@@ -1181,17 +1179,17 @@ WebGLSoundDevice.prototype =
         }
     },
 
-    createEffect : function createEffectFn(params)
+    createEffect : function createEffectFn(/* params */)
     {
         return null;
     },
 
-    createEffectSlot : function createEffectSlotFn(params)
+    createEffectSlot : function createEffectSlotFn(/* params */)
     {
         return null;
     },
 
-    createFilter : function createFilterFn(params)
+    createFilter : function createFilterFn(/* params */)
     {
         return null;
     },
@@ -1404,7 +1402,17 @@ WebGLSoundDevice.create = function webGLSoundDeviceFn(params)
     var AudioContextConstructor = (window.AudioContext || window.webkitAudioContext);
     if (AudioContextConstructor)
     {
-        var audioContext = new AudioContextConstructor();
+        var audioContext;
+        try
+        {
+            audioContext = new AudioContextConstructor();
+        }
+        catch (error)
+        {
+            TurbulenzEngine.callOnError(
+                'Failed to create AudioContext:' + error);
+            return null;
+        }
 
         sd.renderer = 'WebAudio';
         sd.audioContext = audioContext;

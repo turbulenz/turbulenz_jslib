@@ -3,19 +3,15 @@
 /*global BadgeManager: false*/
 /*global window: false*/
 /*global GameSession: false*/
-/*global Turbulenz*/
 /*global TurbulenzBridge: false*/
 /*global TurbulenzEngine: false*/
 /*global Utilities: false*/
 /*global MappingTable: false*/
 /*global LeaderboardManager: false*/
 /*global ServiceRequester: false*/
-/*global Badges*/
-/*global MultiPlayerSession: false*/
 /*global MultiPlayerSessionManager: false*/
 /*global Observer*/
 /*global StoreManager: false*/
-/*global JsLocalStore: false*/
 
 var TurbulenzServices;
 
@@ -278,10 +274,10 @@ TurbulenzServices = {
         }
     },
 
-    defaultErrorCallback: function turbulenzServicesDefaultErrorCallbackFn(errorMsg, httpStatus) {},
+    defaultErrorCallback: function turbulenzServicesDefaultErrorCallbackFn(/* errorMsg, httpStatus */) {},
 
-    onServiceUnavailable: function turbulenzServicesOnServiceUnavailableFn(serviceName, callContext) {},
-    onServiceAvailable: function turbulenzServicesOnServiceAvailableFn(serviceName, callContext) {},
+    onServiceUnavailable: function turbulenzServicesOnServiceUnavailableFn(/* serviceName, callContext */) {},
+    onServiceAvailable: function turbulenzServicesOnServiceAvailableFn(/* serviceName, callContext */) {},
 
     createGameSession: function turbulenzServicesCreateGameSession(requestHandler, sessionCreatedFn, errorCallbackFn)
     {
@@ -441,7 +437,10 @@ TurbulenzServices = {
                     {
                         errorCallbackFn("TurbulenzServices.createUserProfile error with HTTP status " + status + ": " + jsonResponse.msg, status);
                     }
-                    profileRecievedFn(userProfile);
+                    if (profileRecievedFn)
+                    {
+                        profileRecievedFn(userProfile);
+                    }
                 },
                 requestHandler: requestHandler
             });

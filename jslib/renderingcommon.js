@@ -1,5 +1,9 @@
 // Copyright (c) 2010-2011 Turbulenz Limited
 
+/*exported renderingCommonSortKeyFn*/
+/*exported renderingCommonCreateRendererInfoFn*/
+/*exported renderingCommonAddDrawParameterFastestFn*/
+
 //
 // renderingCommonGetTechniqueIndexFn
 //

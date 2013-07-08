@@ -1,8 +1,6 @@
 // Copyright (c) 2011 Turbulenz Limited
 
 /*global TurbulenzServices: false*/
-/*global ServiceRequester: false*/
-/*global Utilities: false*/
 
 //
 // API

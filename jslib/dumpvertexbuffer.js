@@ -1,5 +1,7 @@
 // Copyright (c) 2009-2011 Turbulenz Limited
 
+/*exported dumpVertexBuffer*/
+
 var dumpVertexBuffer = function dumpVertexBufferFn(vertexbuffer, log)
 {
     log("<h2>VertexBuffer</h2>");

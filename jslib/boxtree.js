@@ -4,7 +4,13 @@
 //
 // BoxTreeNode
 //
-function BoxTreeNode() {}
+function BoxTreeNode(extents, escapeNodeOffset, externalNode)
+{
+    this.escapeNodeOffset = escapeNodeOffset;
+    this.externalNode = externalNode;
+    this.extents = extents;
+}
+
 BoxTreeNode.prototype =
 {
     version : 1,
@@ -43,18 +49,27 @@ BoxTreeNode.prototype =
 // Constructor function
 BoxTreeNode.create = function boxtreeNodeCreateFn(extents, escapeNodeOffset, externalNode)
 {
-    var n = new BoxTreeNode();
-    n.escapeNodeOffset = escapeNodeOffset;
-    n.externalNode = externalNode;
-    n.extents = extents;
-    return n;
+    return new BoxTreeNode(extents, escapeNodeOffset, externalNode);
 };
 
 
 //
 // BoxTree
 //
-function BoxTree() {}
+function BoxTree(highQuality)
+{
+    this.nodes = [];
+    this.endNode = 0;
+    this.needsRebuild = false;
+    this.needsRebound = false;
+    this.numAdds = 0;
+    this.numUpdates = 0;
+    this.numExternalNodes = 0;
+    this.startUpdate = 0x7FFFFFFF;
+    this.endUpdate = -0x7FFFFFFF;
+    this.highQuality = highQuality;
+}
+
 BoxTree.prototype =
 {
     version : 1,
@@ -315,8 +330,8 @@ BoxTree.prototype =
         this.needsRebound = false;
         this.numAdds = 0;
         //this.numUpdates = 0;
-        this.startUpdate = Number.MAX_VALUE;
-        this.endUpdate = -Number.MAX_VALUE;
+        this.startUpdate = 0x7FFFFFFF;
+        this.endUpdate = -0x7FFFFFFF;
     },
 
     rebuild : function rebuildFn()
@@ -395,8 +410,8 @@ BoxTree.prototype =
         this.needsRebound = false;
         this.numAdds = 0;
         this.numUpdates = 0;
-        this.startUpdate = Number.MAX_VALUE;
-        this.endUpdate = -Number.MAX_VALUE;
+        this.startUpdate = 0x7FFFFFFF;
+        this.endUpdate = -0x7FFFFFFF;
     },
 
     sortNodes : function sortNodesFn(nodes)
@@ -1223,8 +1238,8 @@ BoxTree.prototype =
         this.numAdds = 0;
         this.numUpdates = 0;
         this.numExternalNodes = 0;
-        this.startUpdate = Number.MAX_VALUE;
-        this.endUpdate = -Number.MAX_VALUE;
+        this.startUpdate = 0x7FFFFFFF;
+        this.endUpdate = -0x7FFFFFFF;
     }
 };
 
@@ -1413,13 +1428,7 @@ BoxTree.rayTest = function boxtreeRayTestFn(trees, ray, callback)
 // Constructor function
 BoxTree.create = function boxtreeCreateFn(highQuality)
 {
-    var t = new BoxTree();
-    t.clear();
-    if (highQuality)
-    {
-        t.highQuality = true;
-    }
-    return t;
+    return new BoxTree(highQuality);
 };
 
 // Detect correct typed arrays

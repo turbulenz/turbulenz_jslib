@@ -526,14 +526,17 @@ WebGLInputDevice.prototype = {
     // Called when blurring
     resetKeyStates : function resetKeyStatesFn()
     {
-        var keyName;
+        var k;
         var pressedKeys = this.pressedKeys;
+        var keyUpHandlers = this.handlers.keyup;
 
-        for (keyName in pressedKeys)
+        for (k in pressedKeys)
         {
-            if (pressedKeys.hasOwnProperty(keyName))
+            if (pressedKeys.hasOwnProperty(k) && pressedKeys[k])
             {
-                pressedKeys[keyName] = false;
+                k = parseInt(k, 10);
+                pressedKeys[k] = false;
+                this.sendEventToHandlers(keyUpHandlers, k);
             }
         }
     },
@@ -816,6 +819,14 @@ WebGLInputDevice.prototype = {
             {
                 pressedKeys[keyCode] = false;
                 this.sendEventToHandlers(keyUpHandlers, keyCode);
+
+                // Nasty hack for mac to deal with the missing KeyUp
+                // signals when CMD is released.  #1016.
+
+                if ((627 === keyCode || 628 === keyCode) && (this.macosx))
+                {
+                    this.resetKeyStates();
+                }
             }
         }
     },
@@ -1027,7 +1038,7 @@ WebGLInputDevice.prototype = {
         }
     },
 
-    canvasOnMouseOut : function canvasOnMouseOutFn(event)
+    canvasOnMouseOut : function canvasOnMouseOutFn(/* event */)
     {
         var mouseLeaveHandlers = this.handlers.mouseleave;
 
@@ -1077,7 +1088,7 @@ WebGLInputDevice.prototype = {
 
     // Window event handlers
 
-    onFullscreenChanged : function onFullscreenChangedFn(event)
+    onFullscreenChanged : function onFullscreenChangedFn(/* event */)
     {
         if (this.isMouseLocked)
         {
@@ -1257,11 +1268,49 @@ WebGLInputDevice.prototype = {
         canvas.onmouseover = null;
         canvas.onmouseout = null;
         canvas.onmousedown = null;
+    },
+
+    isSupported : function inputDevice_isSupportedFn(name)
+    {
+        var canvas = this.canvas;
+
+        if ((canvas) && (name === "POINTER_LOCK"))
+        {
+            // Currently Firefox requires full screen mode for pointer
+            // lock to work.
+
+            var fullscreenEnabled = (document.fullscreenEnabled ||
+                                     document.mozFullScreen ||
+                                     document.webkitIsFullScreen);
+
+            // This check prevents allowing pointer lock in Firefox
+            // until this requirement is removed.  Allows chrome to
+            // lock whenever.
+
+            var navStr = window.navigator.userAgent;
+            var allowPointerLock =
+                (navStr.indexOf('Chrome') >= 0) || fullscreenEnabled;
+
+            var havePointerLock = ('pointerLockElement' in document) ||
+                ('mozPointerLockElement' in document) ||
+                ('webkitPointerLockElement' in document);
+
+            var requestPointerLock = (canvas.requestPointerLock ||
+                                      canvas.mozRequestPointerLock ||
+                                      canvas.webkitRequestPointerLock);
+
+            if (allowPointerLock && havePointerLock && requestPointerLock)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 };
 
 // Constructor function
-WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
+WebGLInputDevice.create = function webGLInputDeviceFn(canvas /*, params */)
 {
     var id = new WebGLInputDevice();
 
@@ -1420,9 +1469,9 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
 
     // Punctuation keys
     keyMap[223] = 500; // GRAVE
-    keyMap[109] = 501; // MINUS (mozilla - gecko)
+    keyMap[173] = 501; // MINUS (mozilla - gecko)
     keyMap[189] = 501; // MINUS (ie + webkit)
-    keyMap[107] = 502; // EQUALS (mozilla - gecko)
+    keyMap[61] = 502; // EQUALS (mozilla - gecko)
     keyMap[187] = 502; // EQUALS (ie + webkit)
     keyMap[219] = 503; // LEFT_BRACKET
     keyMap[221] = 504; // RIGHT_BRACKET
@@ -1465,7 +1514,7 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
     keyMap[100] = 616; // NUMPAD_4 (numlock on/off)
     keyMap[12] = 617; // NUMPAD_5 (numlock on/off)
     keyMap[101] = 617; // NUMPAD_5 (numlock on/off)
-    keyMap[144] = 617; // NUMPAD_5 (numlock on/off)
+    keyMap[144] = 617; // NUMPAD_5 (numlock on/off) and NUMPAD_NUM
     //keyMap[39] = 618; // NUMPAD_6 (numlock on/off)
     keyMap[102] = 618; // NUMPAD_6 (numlock on/off)
     //keyMap[36] = 619; // NUMPAD_7 (numlock on/off)
@@ -1478,8 +1527,8 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
     keyMap[111] = 623; // NUMPAD_DIVIDE (numlock on/off)
     keyMap[191] = 623; // NUMPAD_DIVIDE (numlock on/off), mac chrome
     keyMap[106] = 624; // NUMPAD_MULTIPLY (numlock on/off)
-    //keyMap[107] = 625; // NUMPAD_ADD (numlock on/off)
-    //keyMap[109] = 626; // NUMPAD_SUBTRACT (numlock on/off)
+    keyMap[107] = 625; // NUMPAD_ADD (numlock on/off)
+    keyMap[109] = 626; // NUMPAD_SUBTRACT (numlock on/off)
     keyMap[91] = 627; // LEFT_WIN
     keyMap[224] = 627; // LEFT_WIN (mac, firefox)
     keyMap[92] = 628; // RIGHT_WIN
@@ -1607,6 +1656,10 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
 
     // Add canvas touch event listeners
     id.setEventHandlersTouch();
+
+    // Record the platforms so that we can enable workarounds, etc.
+    var sysInfo = TurbulenzEngine.getSystemInfo();
+    id.macosx = ("Darwin" === sysInfo.osName);
 
     return id;
 };

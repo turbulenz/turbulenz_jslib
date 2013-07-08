@@ -933,7 +933,7 @@ CanvasContext.prototype =
         return CanvasRadialGradient.create(x0, y0, r0, x1, y1, r1);
     },
 
-    createPattern : function createPatternFn(image, repetition)
+    createPattern : function createPatternFn(image /*, repetition */)
     {
         if (!image)
         {
@@ -2034,12 +2034,12 @@ CanvasContext.prototype =
     },
 
 
-    drawSystemFocusRing : function drawSystemFocusRingFn(element)
+    drawSystemFocusRing : function drawSystemFocusRingFn(/* element */)
     {
         // TODO
     },
 
-    drawCustomFocusRing : function drawCustomFocusRingFn(element)
+    drawCustomFocusRing : function drawCustomFocusRingFn(/* element */)
     {
         // TODO
         return false;
@@ -2295,7 +2295,7 @@ CanvasContext.prototype =
         font.drawTextRect(text, params);
     },
 
-    strokeText : function strokeTextFn(text, x, y, maxWidth)
+    strokeText : function strokeTextFn(/* text, x, y, maxWidth */)
     {
         // TODO
     },
@@ -5136,11 +5136,13 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
         'transient': true
     });
 
+    /*jshint newcap: false*/
     var arrayConstructor = c.arrayConstructor;
 
     c.bufferData = new arrayConstructor(512);
 
     c.tempRect = new arrayConstructor(8);
+    /*jshint newcap: true*/
 
     c.tempVertices = [];
 
@@ -5150,7 +5152,9 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
     c.cachedColors = {};
     c.numCachedColors = 0;
 
+    /*jshint newcap: false*/
     c.uvtransform = new arrayConstructor(6);
+    /*jshint newcap: true*/
     c.uvtransform[0] = 1;
     c.uvtransform[1] = 0;
     c.uvtransform[2] = 0;
@@ -5211,7 +5215,9 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
     //
     // Transformation matrix and related operations
     //
+    /*jshint newcap: false*/
     c.matrix = new arrayConstructor(6);
+    /*jshint newcap: true*/
     c.matrix[0] = 1;
     c.matrix[1] = 0;
     c.matrix[2] = 0;
@@ -5348,7 +5354,9 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
     //
     // Clipping
     //
+    /*jshint newcap: false*/
     c.clipExtents = new arrayConstructor(4);
+    /*jshint newcap: true*/
     c.clipExtents[0] = 0;
     c.clipExtents[1] = 0;
     c.clipExtents[2] = width;
@@ -5381,7 +5389,7 @@ Canvas.prototype =
         }
     },
 
-    toDataURL : function toDataURLFn(type)
+    toDataURL : function toDataURLFn(/* type */)
     {
         if (this.width === 0 ||
             this.height === 0)
@@ -5399,7 +5407,7 @@ Canvas.prototype =
         return null;
     },
 
-    toBlob : function toBlobFn(fileCallback, type)
+    toBlob : function toBlobFn(fileCallback /*, type */)
     {
         if (fileCallback)
         {

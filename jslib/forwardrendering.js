@@ -41,6 +41,8 @@ ForwardRendering.prototype =
             this.skyboxTechnique = shader.getTechnique("skybox");
             this.ambientRigidTechnique = shader.getTechnique("ambient");
             this.ambientSkinnedTechnique = shader.getTechnique("ambient_skinned");
+            this.ambientFlatRigidTechnique = shader.getTechnique("ambient_flat");
+            this.ambientFlatSkinnedTechnique = shader.getTechnique("ambient_flat_skinned");
             this.ambientGlowmapRigidTechnique = shader.getTechnique("ambient_glowmap");
             this.ambientGlowmapSkinnedTechnique = shader.getTechnique("ambient_glowmap_skinned");
             this.glowmapRigidTechnique = shader.getTechnique("glowmap");
@@ -482,7 +484,7 @@ ForwardRendering.prototype =
         return (0 < numVisibleDrawParameters);
     },
 
-    directionalLightsUpdateVisibleRenderables : function directionalLightsUpdateVisibleRenderablesFn(gd, scene)
+    directionalLightsUpdateVisibleRenderables : function directionalLightsUpdateVisibleRenderablesFn(gd /*, scene */)
     {
         var directionalLights = this.directionalLights;
         var numDirectionalLights = directionalLights.length;
@@ -1137,6 +1139,8 @@ ForwardRendering.prototype =
             delete this.skyboxTechnique;
             delete this.ambientRigidTechnique;
             delete this.ambientSkinnedTechnique;
+            delete this.ambientFlatRigidTechnique;
+            delete this.ambientFlatSkinnedTechnique;
             delete this.ambientGlowmapRigidTechnique;
             delete this.ambientGlowmapSkinnedTechnique;
             delete this.glowmapRigidTechnique;
@@ -1483,6 +1487,10 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
                 {
                     drawParameters.technique = fr.ambientGlowmapSkinnedTechnique;
                 }
+                else if (0 === techniqueName.indexOf("flat"))
+                {
+                    drawParameters.technique = fr.ambientFlatSkinnedTechnique;
+                }
                 else
                 {
                     drawParameters.technique = fr.ambientSkinnedTechnique;
@@ -1493,6 +1501,10 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
                 if (sharedMaterialTechniqueParameters.glow_map)
                 {
                     drawParameters.technique = fr.ambientGlowmapRigidTechnique;
+                }
+                else if (0 === techniqueName.indexOf("flat"))
+                {
+                    drawParameters.technique = fr.ambientFlatRigidTechnique;
                 }
                 else
                 {
@@ -1647,7 +1659,7 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
         geometryInstance.rendererInfo.renderUpdate = this.update;
     }
 
-    function forwardBlendUpdateFn(camera)
+    function forwardBlendUpdateFn(/* camera */)
     {
         var techniqueParameters = this.techniqueParameters;
         var node = this.node;
@@ -1659,7 +1671,7 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
         }
     }
 
-    function forwardBlendSkinnedUpdateFn(camera)
+    function forwardBlendSkinnedUpdateFn(/* camera */)
     {
         var techniqueParameters = this.techniqueParameters;
         var node = this.node;
@@ -1677,7 +1689,7 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
         }
     }
 
-    function forwardSkyboxUpdateFn(camera)
+    function forwardSkyboxUpdateFn(/* camera */)
     {
         var techniqueParameters = this.techniqueParameters;
         var node = this.node;
@@ -1689,7 +1701,7 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
         }
     }
 
-    function forwardEnvUpdateFn(camera)
+    function forwardEnvUpdateFn(/* camera */)
     {
         var techniqueParameters = this.techniqueParameters;
         var node = this.node;
@@ -1703,7 +1715,7 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
         }
     }
 
-    function forwardEnvSkinnedUpdateFn(camera)
+    function forwardEnvSkinnedUpdateFn(/* camera */)
     {
         var techniqueParameters = this.techniqueParameters;
         var node = this.node;
@@ -1833,10 +1845,12 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
             var v32 = oldVertexData[brOff + 2];
             oldVertexData = null;
 
-            var va01 = [(v00 + v10) * 0.5, (v01 + v11) * 0.5, (v02 + v12) * 0.5];
-            var va02 = [(v00 + v20) * 0.5, (v01 + v21) * 0.5, (v02 + v22) * 0.5];
-            var va13 = [(v10 + v30) * 0.5, (v11 + v31) * 0.5, (v12 + v32) * 0.5];
-            var va23 = [(v20 + v30) * 0.5, (v21 + v31) * 0.5, (v22 + v32) * 0.5];
+
+            var v3Build = md.v3Build;
+            var va01 = v3Build.call(md, (v00 + v10) * 0.5, (v01 + v11) * 0.5, (v02 + v12) * 0.5);
+            var va02 = v3Build.call(md, (v00 + v20) * 0.5, (v01 + v21) * 0.5, (v02 + v22) * 0.5);
+            var va13 = v3Build.call(md, (v10 + v30) * 0.5, (v11 + v31) * 0.5, (v12 + v32) * 0.5);
+            var va23 = v3Build.call(md, (v20 + v30) * 0.5, (v21 + v31) * 0.5, (v22 + v32) * 0.5);
 
             var oldTop, oldBottom;
             if (VMath.v3LengthSq(VMath.v3Sub(va01, va23)) > VMath.v3LengthSq(VMath.v3Sub(va02, va13)))
@@ -1850,14 +1864,11 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
                 oldBottom = va13;
             }
 
-            var c10 = VMath.v3Normalize([(v10 - v00), (v11 - v01), (v12 - v02)]);
-            var c20 = VMath.v3Normalize([(v20 - v00), (v21 - v01), (v22 - v02)]);
+            var c10 = VMath.v3Normalize(v3Build.call(md, v10 - v00, v11 - v01, v12 - v02));
+            var c20 = VMath.v3Normalize(v3Build.call(md, v20 - v00, v21 - v01, v22 - v02));
             var oldNormal = VMath.v3Cross(c10, c20);
 
-            var v3Build = md.v3Build;
-            geometry.sourceVertices = [v3Build.apply(md, oldTop),
-                                       v3Build.apply(md, oldBottom),
-                                       v3Build.apply(md, oldNormal)];
+            geometry.sourceVertices = [oldTop, oldBottom, oldNormal];
 
             oldGeometry.reference.remove();
 

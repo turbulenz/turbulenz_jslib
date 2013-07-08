@@ -1,7 +1,6 @@
 // Copyright (c) 2010-2012 Turbulenz Limited
-/*global TurbulenzEngine: false*/
 
-"use strict";
+/*global TurbulenzEngine: false*/
 
 function AnimationManager() {}
 AnimationManager.prototype =
@@ -13,7 +12,7 @@ AnimationManager.create = function animationManagerCreateFn(errorCallback, log)
 {
     if (!errorCallback)
     {
-        errorCallback = function (e) {};
+        errorCallback = function (/* e */) {};
     }
 
     var animations = {};
@@ -23,18 +22,27 @@ AnimationManager.create = function animationManagerCreateFn(errorCallback, log)
     function loadAnimationDataFn(data, prefix)
     {
         var fileAnimations = data.animations;
-        for (var a in fileAnimations)
+        var a;
+        for (a in fileAnimations)
         {
             if (fileAnimations.hasOwnProperty(a))
             {
+                var name = prefix ? prefix + a : a;
+                if (animations[name])
+                {
+                    fileAnimations[a] = animations[name];
+                    continue;
+                }
                 var anim = fileAnimations[a];
 
                 var numNodes = anim.numNodes;
                 var nodeDataArray = anim.nodeData;
-                for (var n = 0; n < numNodes; n += 1)
+                var n;
+                for (n = 0; n < numNodes; n += 1)
                 {
                     var nodeData = nodeDataArray[n];
                     var baseframe = nodeData.baseframe;
+
                     if (baseframe)
                     {
                         if (baseframe.rotation)
@@ -57,40 +65,152 @@ AnimationManager.create = function animationManagerCreateFn(errorCallback, log)
                                                                       baseframe.scale[2]);
                         }
                     }
+
                     var keyframes = nodeData.keyframes;
-                    if (keyframes)
+
+                    if (keyframes && keyframes[0].hasOwnProperty('time'))
                     {
                         var numKeys = keyframes.length;
-                        for (var k = 0; k < numKeys; k += 1)
+                        var k, keyframe;
+                        var channels = {};
+                        var channel, value, values, index;
+                        var i;
+                        nodeData.channels = channels;
+
+                        for (k = 0; k < numKeys; k += 1)
                         {
-                            var keyframe = keyframes[k];
-                            if (keyframe.rotation)
+                            keyframe = keyframes[k];
+                            for (value in keyframe)
                             {
-                                keyframe.rotation = this.mathDevice.quatBuild(keyframe.rotation[0],
-                                                                              keyframe.rotation[1],
-                                                                              keyframe.rotation[2],
-                                                                              keyframe.rotation[3]);
-                            }
-                            if (keyframe.translation)
-                            {
-                                keyframe.translation = this.mathDevice.v3Build(keyframe.translation[0],
-                                                                               keyframe.translation[1],
-                                                                               keyframe.translation[2]);
-                            }
-                            if (keyframe.scale)
-                            {
-                                keyframe.scale = this.mathDevice.v3Build(keyframe.scale[0],
-                                                                         keyframe.scale[1],
-                                                                         keyframe.scale[2]);
+                                if (keyframe.hasOwnProperty(value) && value !== "time")
+                                {
+                                    channel = channels[value];
+                                    if (!channel)
+                                    {
+                                        channel = {
+                                            count: 0,
+                                            offset: 0,
+                                            stride: keyframe[value].length + 1
+                                        };
+                                        channels[value] = channel;
+                                        channel.firstKey = k;
+                                    }
+                                    channel.lastKey = k;
+                                    channel.count += 1;
+                                }
                             }
                         }
+
+                        var numberOfValues = 0;
+                        for (value in channels)
+                        {
+                            if (channels.hasOwnProperty(value))
+                            {
+                                channel = channels[value];
+
+                                channel.count = 1 + channel.lastKey - channel.firstKey; // TODO: For now we repeate values for intermediate keyframes
+                                if (channel.firstKey)
+                                {
+                                    channel.count += 1;
+                                }
+                                if (channel.lastKey !== numKeys - 1)
+                                {
+                                    channel.count += 1;
+                                }
+                                channel.offset = numberOfValues;
+                                channel.writeIndex = numberOfValues;
+                                numberOfValues += channel.stride * channel.count;
+                            }
+                        }
+
+                        var keyframeArray = null;
+                        if (numberOfValues)
+                        {
+                            keyframeArray = new Float32Array(numberOfValues);
+                        }
+
+                        for (value in channels)
+                        {
+                            if (channels.hasOwnProperty(value))
+                            {
+                                channel = channels[value];
+                                if (channel.firstKey)
+                                {
+                                    keyframeArray[channel.writeIndex] = keyframes[channel.firstKey - 1].time;
+                                    values = baseframe[value];
+                                    for (i = 0; i < channel.stride - 1; i += 1)
+                                    {
+                                        keyframeArray[channel.writeIndex + 1 + i] = values[i];
+                                    }
+                                    channel.writeIndex += channel.stride;
+                                }
+
+                                if (channel.lastKey !== numKeys - 1)
+                                {
+                                    index = channel.offset + (channel.count - 1) * channel.stride;
+                                    keyframeArray[index] = keyframes[channel.lastKey + 1].time;
+                                    values = baseframe[value];
+                                    for (i = 0; i < channel.stride - 1; i += 1)
+                                    {
+                                        keyframeArray[index + 1 + i] = values[i];
+                                    }
+                                }
+                            }
+                        }
+
+                        for (k = 0; k < numKeys; k += 1)
+                        {
+                            keyframe = keyframes[k];
+
+                            for (value in channels)
+                            {
+                                if (channels.hasOwnProperty(value))
+                                {
+                                    channel = channels[value];
+                                    if (k >= channel.firstKey && k <= channel.lastKey)
+                                    {
+                                        if (keyframe[value])
+                                        {
+                                            values = keyframe[value];
+                                        }
+                                        else
+                                        {
+                                            values = baseframe[value];
+                                        }
+
+                                        keyframeArray[channel.writeIndex] = keyframe.time;
+
+                                        for (i = 0; i < channel.stride - 1; i += 1)
+                                        {
+                                            keyframeArray[channel.writeIndex + 1 + i] = values[i];
+                                        }
+
+                                        channel.writeIndex += channel.stride;
+                                    }
+                                }
+                            }
+                        }
+
+                        for (value in channels)
+                        {
+                            if (channels.hasOwnProperty(value))
+                            {
+                                delete channel.writeIndex;
+                            }
+                        }
+
+                        nodeData.keyframes = keyframeArray;
+                    }
+                    else if (keyframes)
+                    {
+                        nodeData.keyframes = new Float32Array(keyframes);
                     }
                 }
 
                 var bounds = anim.bounds;
                 var numFrames = bounds.length;
-
-                for (var f = 0; f < numFrames; f += 1)
+                var f;
+                for (f = 0; f < numFrames; f += 1)
                 {
                     var bound = bounds[f];
                     bound.center = this.mathDevice.v3Build(bound.center[0],
@@ -101,20 +221,12 @@ AnimationManager.create = function animationManagerCreateFn(errorCallback, log)
                                                                bound.halfExtent[2]);
                 }
 
-                if (prefix !== undefined)
-                {
-                    animations[prefix + a] = anim;
-                }
-                else
-                {
-                    animations[a] = anim;
-                }
-
+                animations[name] = anim;
             }
         }
     }
 
-    function loadAnimationFileFn(path, onload)
+    function loadAnimationFileFn(/* path, onload */)
     {
 
     }
@@ -140,7 +252,8 @@ AnimationManager.create = function animationManagerCreateFn(errorCallback, log)
         {
             var skeleton;
             var numRenderables = renderables.length;
-            for (var r = 0; r < numRenderables; r += 1)
+            var r;
+            for (r = 0; r < numRenderables; r += 1)
             {
                 if (renderables[r].geometry)
                 {
@@ -157,7 +270,8 @@ AnimationManager.create = function animationManagerCreateFn(errorCallback, log)
         if (children)
         {
             var numChildren = children.length;
-            for (var c = 0; c < numChildren; c += 1)
+            var c;
+            for (c = 0; c < numChildren; c += 1)
             {
                 var childSkel = nodeHasSkeletonFn(children[c]);
                 if (childSkel)

@@ -12,10 +12,12 @@ PhysicsManager.prototype =
 {
     version: 1,
 
+    arrayConstructor: Array,
+
     //
     // update
     //
-    update: function physicsManagerUpdateFn(scene)
+    update: function physicsManagerUpdateFn(/* scene */)
     {
         var mathsDevice = this.mathsDevice;
 
@@ -48,13 +50,8 @@ PhysicsManager.prototype =
                     }
                     else
                     {
-                        worldMatrix = body.transform;
-                        origin = physicsNode.origin;
-                        if (origin)
-                        {
-                            worldMatrix = mathsDevice.m43NegOffset(worldMatrix, origin, target.getLocalTransform());
-                        }
-
+                        worldMatrix = target.getLocalTransform();
+                        body.calculateTransform(worldMatrix, physicsNode.origin);
                         target.setLocalTransform(worldMatrix);
                     }
                 }
@@ -273,7 +270,12 @@ PhysicsManager.prototype =
         var min = Math.min;
         var max = Math.max;
         var maxValue = Number.MAX_VALUE;
-        var totalExtents = [maxValue, maxValue, maxValue, -maxValue, -maxValue, -maxValue];
+        var arrayConstructor = this.arrayConstructor;
+        /*jshint newcap: false*/
+        var totalExtents = new arrayConstructor(6);
+        /*jshint newcap: true*/
+        totalExtents[2] = totalExtents[1] = totalExtents[0] = maxValue;
+        totalExtents[5] = totalExtents[4] = totalExtents[3] = -maxValue;
 
         function calculateNodeExtentsFn(sceneNode)
         {
@@ -281,8 +283,9 @@ PhysicsManager.prototype =
             if (physicsNodes)
             {
                 var numPhysicsNodes = physicsNodes.length;
-                var extents = [];
-                extents.length = 6;
+                /*jshint newcap: false*/
+                var extents = new arrayConstructor(6);
+                /*jshint newcap: true*/
                 for (var p = 0; p < numPhysicsNodes; p += 1)
                 {
                     physicsNodes[p].body.calculateExtents(extents);
@@ -323,14 +326,15 @@ PhysicsManager.prototype =
         var min = Math.min;
         var max = Math.max;
         var maxValue = Number.MAX_VALUE;
-        var totalExtents = [maxValue, maxValue, maxValue, -maxValue, -maxValue, -maxValue];
+        var totalExtents = new this.arrayConstructor(6);
+        totalExtents[2] = totalExtents[1] = totalExtents[0] = maxValue;
+        totalExtents[5] = totalExtents[4] = totalExtents[3] = -maxValue;
 
         var physicsNodes = sceneNode.physicsNodes;
         if (physicsNodes)
         {
             var numPhysicsNodes = physicsNodes.length;
-            var extents = [];
-            extents.length = 6;
+            var extents = new this.arrayConstructor(6);
             for (var p = 0; p < numPhysicsNodes; p += 1)
             {
                 physicsNodes[p].body.calculateExtents(extents);
@@ -977,3 +981,16 @@ PhysicsManager.create = function physicsManagerCreateFn(mathsDevice, physicsDevi
 
     return physicsManager;
 };
+
+// Detect correct typed arrays
+(function () {
+    if (typeof Float32Array !== "undefined")
+    {
+        var testArray = new Float32Array(4);
+        var textDescriptor = Object.prototype.toString.call(testArray);
+        if (textDescriptor === '[object Float32Array]')
+        {
+            PhysicsManager.prototype.arrayConstructor = Float32Array;
+        }
+    }
+}());

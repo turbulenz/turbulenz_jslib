@@ -1,7 +1,6 @@
 // Copyright (c) 2009-2012 Turbulenz Limited
 /*global TurbulenzEngine: false*/
 /*global Utilities: false*/
-/*global window: false*/
 
 //
 // Animation
@@ -64,7 +63,8 @@ var AnimationChannels =
     copy: function animationChannelsCopyFn(channels)
     {
         var channelCopy = {};
-        for (var c in channels)
+        var c;
+        for (c in channels)
         {
             if (channels.hasOwnProperty(c))
             {
@@ -99,7 +99,8 @@ var AnimationChannels =
 
     add: function animationChannelsAddFn(channels, newChannels)
     {
-        for (var c in newChannels)
+        var c;
+        for (c in newChannels)
         {
             if (newChannels.hasOwnProperty(c))
             {
@@ -200,9 +201,13 @@ InterpolatorController.prototype =
         while (this.currentTime > animLength)
         {
             var numNodes = this.hierarchy.numNodes;
-            for (var index = 0; index < numNodes; index += 1)
+            var index;
+
+            for (index = 0; index < numNodes; index += 1)
             {
-                this.endFrames[index] = 1;
+                this.translationEndFrames[index] = 0;
+                this.rotationEndFrames[index] = 0;
+                this.scaleEndFrames[index] = 0;
             }
 
             if (this.onUpdateCallback)
@@ -260,11 +265,6 @@ InterpolatorController.prototype =
         var anim = this.currentAnim;
         var nodeData = anim.nodeData;
         var numJoints = this.hierarchy.numNodes;
-
-        var v3Copy = mathDevice.v3Copy;
-        var quatCopy = mathDevice.quatCopy;
-        var quatSlerp = mathDevice.quatSlerp;
-        var v3Lerp = mathDevice.v3Lerp;
         var outputArray = this.output;
 
         var animHasScale = anim.channels.scale;
@@ -275,7 +275,14 @@ InterpolatorController.prototype =
             defaultScale = mathDevice.v3Build(1, 1, 1);
         }
 
-        for (var j = 0; j < numJoints; j += 1)
+        var scratchPad = InterpolatorController.prototype.scratchPad;
+        var v1 = scratchPad.v1;
+        var v2 = scratchPad.v2;
+        var q1 = scratchPad.q1;
+        var q2 = scratchPad.q2;
+        var delta, j;
+
+        for (j = 0; j < numJoints; j += 1)
         {
             var data = nodeData[j];
             var jointChannels = data.channels;
@@ -283,7 +290,6 @@ InterpolatorController.prototype =
             var hasScale = jointHasScale || animHasScale;
             var jointKeys = data.keyframes;
             var jointBase = data.baseframe;
-            var scale;
             var baseQuat, basePos, baseScale;
             var jointOutput = outputArray[j];
 
@@ -292,84 +298,180 @@ InterpolatorController.prototype =
                 baseQuat = jointBase.rotation;
                 basePos = jointBase.translation;
                 baseScale = jointBase.scale;
+                /*jshint bitwise: false*/
+                jointHasScale |= baseScale !== undefined;
+                /*jshint bitwise: true*/
             }
 
             if (!jointKeys)
             {
                 // Completely non animated joint so copy the base
-                jointOutput.rotation = quatCopy.call(mathDevice, baseQuat, jointOutput.rotation);
-                jointOutput.translation = v3Copy.call(mathDevice, basePos, jointOutput.translation);
+                jointOutput.rotation = mathDevice.quatCopy(baseQuat, jointOutput.rotation);
+                jointOutput.translation = mathDevice.v3Copy(basePos, jointOutput.translation);
                 if (hasScale)
                 {
                     if (jointHasScale)
                     {
-                        jointOutput.scale = v3Copy.call(mathDevice, baseScale, jointOutput.scale);
+                        jointOutput.scale = mathDevice.v3Copy(baseScale, jointOutput.scale);
                     }
                     else
                     {
-                        jointOutput.scale = v3Copy.call(mathDevice, defaultScale, jointOutput.scale);
+                        jointOutput.scale = mathDevice.v3Copy(defaultScale, jointOutput.scale);
                     }
                 }
             }
             else
             {
                 // Find the pair of keys wrapping current time
-                var endFrame = this.endFrames[j];
-                while (this.currentTime > jointKeys[endFrame].time)
-                {
-                    endFrame += 1;
-                }
-                this.endFrames[j] = endFrame;
 
-                var startFrame = endFrame - 1;
-                var k1 = jointKeys[startFrame];
-                var k2 = jointKeys[endFrame];
-                var startTime = k1.time;
-                var endTime = k2.time;
-                var delta = (this.currentTime - startTime) / (endTime - startTime);
-
-                // If the delta is small enough we just copy the first keyframe
-                if (delta < Animation.minKeyframeDelta)
+                var offset = 0;
+                var stride = 0;
+                var offsetMinusStride = 0;
+                var endFrameOffset = 0;
+                var channels = data.channels;
+                if (channels.rotation)
                 {
-                    jointOutput.rotation = quatCopy.call(mathDevice, k1.rotation || baseQuat, jointOutput.rotation);
-                    jointOutput.translation = v3Copy.call(mathDevice, k1.translation || basePos, jointOutput.translation);
-                    scale = k1.scale || baseScale;
-                    if (hasScale)
+                    stride = channels.rotation.stride;
+                    offset = channels.rotation.offset;
+                    endFrameOffset = offset + (channels.rotation.count - 1) * stride;
+
+                    if (this.currentTime <= jointKeys[offset])
                     {
-                        if (jointHasScale)
+                        jointOutput.rotation = mathDevice.quatBuild(jointKeys[offset + 1], jointKeys[offset + 2], jointKeys[offset + 3], jointKeys[offset + 4], jointOutput.rotation);
+                    }
+                    else if (this.currentTime >= jointKeys[endFrameOffset])
+                    {
+                        jointOutput.rotation = mathDevice.quatBuild(jointKeys[endFrameOffset + 1], jointKeys[endFrameOffset + 2], jointKeys[endFrameOffset + 3], jointKeys[endFrameOffset + 4], jointOutput.rotation);
+                    }
+                    else
+                    {
+
+                        offset = this.rotationEndFrames[j] || offset;
+
+                        while (this.currentTime > jointKeys[offset])
                         {
-                            jointOutput.scale = v3Copy.call(mathDevice, scale, jointOutput.scale);
+                            offset += stride;
                         }
-                        else
-                        {
-                            jointOutput.scale = v3Copy.call(mathDevice, defaultScale, jointOutput.scale);
-                        }
+
+                        this.rotationEndFrames[j] = offset;
+                        offsetMinusStride = offset - stride;
+
+                        delta = (this.currentTime - jointKeys[offsetMinusStride]) / (jointKeys[offset] - jointKeys[offsetMinusStride]);
+
+                        q1[0] = jointKeys[offsetMinusStride + 1];
+                        q1[1] = jointKeys[offsetMinusStride + 2];
+                        q1[2] = jointKeys[offsetMinusStride + 3];
+                        q1[3] = jointKeys[offsetMinusStride + 4];
+
+                        q2[0] = jointKeys[offset + 1];
+                        q2[1] = jointKeys[offset + 2];
+                        q2[2] = jointKeys[offset + 3];
+                        q2[3] = jointKeys[offset + 4];
+
+                        jointOutput.rotation = mathDevice.quatSlerp(q1, q2, delta, jointOutput.rotation);
                     }
                 }
                 else
                 {
-                    // For each joint slerp between the quats and return the quat pos result
+                    jointOutput.rotation = mathDevice.quatCopy(baseQuat, jointOutput.rotation);
+                }
 
-                    var q1 = k1.rotation || baseQuat;
-                    var q2 = k2.rotation || baseQuat;
-                    jointOutput.rotation = quatSlerp.call(mathDevice, q1, q2, delta, jointOutput.rotation);
+                if (channels.translation)
+                {
+                    stride = channels.translation.stride;
+                    offset = channels.translation.offset;
 
-                    var pos1 = k1.translation || basePos;
-                    var pos2 = k2.translation || basePos;
-                    jointOutput.translation = v3Lerp.call(mathDevice, pos1, pos2, delta, jointOutput.translation);
+                    endFrameOffset = offset + (channels.translation.count - 1) * stride;
 
+                    if (this.currentTime <= jointKeys[offset])
+                    {
+                        jointOutput.translation = mathDevice.v3Build(jointKeys[offset + 1], jointKeys[offset + 2], jointKeys[offset + 3], jointOutput.translation);
+                    }
+                    else if (this.currentTime >= jointKeys[endFrameOffset])
+                    {
+                        jointOutput.translation = mathDevice.v3Build(jointKeys[endFrameOffset + 1], jointKeys[endFrameOffset + 2], jointKeys[endFrameOffset + 3], jointOutput.translation);
+                    }
+                    else
+                    {
+                        offset = this.translationEndFrames[j] || offset;
+
+                        while (this.currentTime > jointKeys[offset])
+                        {
+                            offset += stride;
+                        }
+
+                        this.translationEndFrames[j] = offset;
+                        offsetMinusStride = offset - stride;
+
+                        delta = (this.currentTime - jointKeys[offsetMinusStride]) / (jointKeys[offset] - jointKeys[offsetMinusStride]);
+
+                        v1[0] = jointKeys[offsetMinusStride + 1];
+                        v1[1] = jointKeys[offsetMinusStride + 2];
+                        v1[2] = jointKeys[offsetMinusStride + 3];
+
+                        v2[0] = jointKeys[offset + 1];
+                        v2[1] = jointKeys[offset + 2];
+                        v2[2] = jointKeys[offset + 3];
+
+                        jointOutput.translation = mathDevice.v3Lerp(v1, v2, delta, jointOutput.translation);
+                    }
+                }
+                else
+                {
+                    jointOutput.translation = mathDevice.v3Copy(basePos, jointOutput.translation);
+                }
+
+                if (channels.scale)
+                {
+                    stride = channels.scale.stride;
+                    offset = channels.scale.offset;
+
+                    endFrameOffset = offset + (channels.scale.count - 1) * stride;
+
+                    if (this.currentTime <= jointKeys[offset])
+                    {
+                        jointOutput.scale = mathDevice.v3Build(jointKeys[offset + 1], jointKeys[offset + 2], jointKeys[offset + 3], jointOutput.scale);
+                    }
+                    else if (this.currentTime >= jointKeys[endFrameOffset])
+                    {
+                        jointOutput.scale = mathDevice.v3Build(jointKeys[endFrameOffset + 1], jointKeys[endFrameOffset + 2], jointKeys[endFrameOffset + 3], jointOutput.scale);
+                    }
+                    else
+                    {
+                        offset = this.scaleEndFrames[j] || offset;
+
+                        while (this.currentTime > jointKeys[offset])
+                        {
+                            offset += stride;
+                        }
+
+                        this.scaleEndFrames[j] = offset;
+                        offsetMinusStride = offset - stride;
+
+                        delta = (this.currentTime - jointKeys[offsetMinusStride]) / (jointKeys[offset] - jointKeys[offsetMinusStride]);
+
+                        v1[0] = jointKeys[offsetMinusStride + 1];
+                        v1[1] = jointKeys[offsetMinusStride + 2];
+                        v1[2] = jointKeys[offsetMinusStride + 3];
+
+                        v2[0] = jointKeys[offset + 1];
+                        v2[1] = jointKeys[offset + 2];
+                        v2[2] = jointKeys[offset + 3];
+
+                        jointOutput.scale = mathDevice.v3Lerp(v1, v2, delta, jointOutput.scale);
+                    }
+                }
+                else
+                {
                     if (hasScale)
                     {
                         if (jointHasScale)
                         {
-                            var s1 = k1.scale || baseScale;
-                            var s2 = k2.scale || baseScale;
-
-                            jointOutput.scale = v3Lerp.call(mathDevice, s1, s2, delta, jointOutput.scale);
+                            jointOutput.scale = mathDevice.v3Copy(baseScale, jointOutput.scale);
                         }
                         else
                         {
-                            jointOutput.scale = v3Copy.call(mathDevice, defaultScale, jointOutput.scale);
+                            jointOutput.scale = mathDevice.v3Copy(defaultScale, jointOutput.scale);
                         }
                     }
                 }
@@ -462,7 +564,7 @@ InterpolatorController.prototype =
             ibounds.center = newCenter;
 
             var newExtent = mathDevice.v3Max(boundsStart.halfExtent, boundsEnd.halfExtent, ibounds.halfExtent);
-            var centerOffset = mathDevice.v3Sub(boundsStart.center, newCenter, this.scratchV3);
+            var centerOffset = mathDevice.v3Sub(boundsStart.center, newCenter, this.scratchPad.v1);
             centerOffset = mathDevice.v3Abs(centerOffset, centerOffset);
             ibounds.halfExtent = v3Add.call(mathDevice, newExtent, centerOffset, newExtent);
         }
@@ -607,12 +709,26 @@ InterpolatorController.prototype =
     {
         this.currentAnim = animation;
         this.currentTime = 0.0;
-        this.endFrames = [];
+        var index;
         var numNodes = this.hierarchy.numNodes;
-        for (var index = 0; index < numNodes; index += 1)
+
+        if (!this.translationEndFrames ||
+            this.translationEndFrames.length !== numNodes)
         {
-            this.endFrames[index] = 1;
+            this.translationEndFrames = new Uint32Array(numNodes);
+            this.rotationEndFrames = new Uint32Array(numNodes);
+            this.scaleEndFrames = new Uint32Array(numNodes);
         }
+        else
+        {
+            for (index = 0; index < numNodes; index += 1)
+            {
+                this.translationEndFrames[index] = 0;
+                this.rotationEndFrames[index] = 0;
+                this.scaleEndFrames[index] = 0;
+            }
+        }
+
         this.dirty = true;
         this.dirtyBounds = true;
         if (looping)
@@ -633,9 +749,13 @@ InterpolatorController.prototype =
         this.dirty = true;
         this.dirtyBounds = true;
         var numNodes = this.hierarchy.numNodes;
-        for (var index = 0; index < numNodes; index += 1)
+        var index;
+
+        for (index = 0; index < numNodes; index += 1)
         {
-            this.endFrames[index] = 1;
+            this.translationEndFrames[index] = 0;
+            this.rotationEndFrames[index] = 0;
+            this.scaleEndFrames[index] = 0;
         }
     },
 
@@ -675,9 +795,14 @@ InterpolatorController.create = function interpolatorControllerCreateFn(hierarch
     i.dirty = true;
     i.dirtyBounds = true;
 
-    if (i.scratchV3 === null)
+    if (!InterpolatorController.prototype.scratchPad)
     {
-        InterpolatorController.prototype.scratchV3 = md.v3BuildZero();
+        InterpolatorController.prototype.scratchPad = {
+            v1 : md.v3BuildZero(),
+            v2 : md.v3BuildZero(),
+            q1 : md.quatBuild(0, 0, 0, 1),
+            q2 : md.quatBuild(0, 0, 0, 1)
+        };
     }
 
     return i;
@@ -1562,7 +1687,7 @@ PoseController.prototype =
 {
     version : 1,
 
-    addTime : function addTimeFn(delta)
+    addTime : function addTimeFn(/* delta */)
     {
     },
 
@@ -1643,11 +1768,11 @@ PoseController.prototype =
         return Animation.standardGetJointWorldTransform(this, jointId, this.mathDevice, asMatrix);
     },
 
-    setTime : function setTimeFn(time)
+    setTime : function setTimeFn(/* time */)
     {
     },
 
-    setRate : function setRateFn(rate)
+    setRate : function setRateFn(/* rate */)
     {
     },
 

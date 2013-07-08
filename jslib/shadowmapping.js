@@ -3,8 +3,7 @@
 //
 // ShadowMapping
 //
-/*global renderingCommonCreateRendererInfoFn: false,  renderingCommonGetTechniqueIndexFn: false,
-         renderingCommonSortKeyFn: false, Camera: false*/
+/*global renderingCommonCreateRendererInfoFn: false, Camera: false*/
 
 function ShadowMapping() {}
 

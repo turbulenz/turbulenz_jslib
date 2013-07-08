@@ -41,7 +41,10 @@ LeaderboardManager.prototype =
                 for (var i = 0; i < overviewLength; i += 1)
                 {
                     var leaderboard = overview[i];
-                    that.meta[leaderboard.key].bestScore = leaderboard.score;
+                    if (leaderboard.hasOwnProperty('score'))
+                    {
+                        that.meta[leaderboard.key].bestScore = leaderboard.score;
+                    }
                 }
                 callbackFn(overview);
             }
@@ -65,6 +68,43 @@ LeaderboardManager.prototype =
             method: 'GET',
             data : dataSpec,
             callback: getOverviewCallbackFn,
+            requestHandler: this.requestHandler
+        });
+    },
+
+    getAggregates: function leaderboardManagerGetAggregatesFn(spec, callbackFn, errorCallbackFn)
+    {
+        var errorCallback = errorCallbackFn || this.errorCallbackFn;
+        if (!this.meta)
+        {
+            errorCallback("The leaderboard manager failed to initialize properly.");
+            return;
+        }
+
+        var that = this;
+        function getAggregatesCallbackFn(jsonResponse, status)
+        {
+            if (status === 200)
+            {
+                var aggregates = jsonResponse.data;
+                callbackFn(aggregates);
+            }
+            else
+            {
+                errorCallback("LeaderboardManager.getKeys failed with status " + status + ": " + jsonResponse.msg,
+                              status,
+                              that.getAggregates,
+                              [spec, callbackFn, errorCallbackFn]);
+            }
+        }
+
+        var dataSpec = {};
+
+        this.service.request({
+            url: '/api/v1/leaderboards/aggregates/read/' + that.gameSession.gameSlug,
+            method: 'GET',
+            data : dataSpec,
+            callback: getAggregatesCallbackFn,
             requestHandler: this.requestHandler
         });
     },
@@ -187,10 +227,16 @@ LeaderboardManager.prototype =
             return;
         }
 
+        if (typeof(score) !== 'number' || isNaN(score))
+        {
+            errorCallback("Score must be a number.");
+            return;
+        }
+
         var sortBy = meta.sortBy;
         var bestScore = meta.bestScore;
         // Avoid making an ajax query if the new score is worse than current score
-        if (bestScore && ((sortBy === 1 && score <= bestScore) || (sortBy === -1 && score >= bestScore)))
+        if ((bestScore && ((sortBy === 1 && score <= bestScore) || (sortBy === -1 && score >= bestScore))))
         {
             TurbulenzEngine.setTimeout(function () {
                 callbackFn(key, score, false, bestScore);
@@ -259,6 +305,53 @@ LeaderboardManager.prototype =
                 encrypt: true
             });
         }
+    },
+
+    // ONLY available on Local and Hub
+    reset: function leaderboardManagerResetFn(callbackFn, errorCallbackFn)
+    {
+        var errorCallback = errorCallbackFn || this.errorCallbackFn;
+        if (!this.meta)
+        {
+            errorCallback("The leaderboard manager failed to initialize properly.");
+            return;
+        }
+
+        var that = this;
+        function resetCallbackFn(jsonResponse, status)
+        {
+            if (status === 200)
+            {
+                var meta = that.meta;
+                var m;
+                for (m in meta)
+                {
+                    if (meta.hasOwnProperty(m))
+                    {
+                        delete meta[m].bestScore;
+                    }
+                }
+                if (callbackFn)
+                {
+                    callbackFn();
+                }
+            }
+            else
+            {
+                errorCallback("LeaderboardManager.reset failed with status " + status + ": " + jsonResponse.msg,
+                              status,
+                              that.reset,
+                              [callbackFn]);
+            }
+        }
+
+        // for testing only (this is not available on the Gamesite)
+        this.service.request({
+            url: '/api/v1/leaderboards/scores/remove-all/' + this.gameSession.gameSlug,
+            method: 'POST',
+            callback: resetCallbackFn,
+            requestHandler: this.requestHandler
+        });
     }
 };
 
@@ -286,6 +379,7 @@ LeaderboardManager.create = function createLeaderboardManagerFn(requestHandler,
     leaderboardManager.errorCallbackFn = errorCallbackFn || TurbulenzServices.defaultErrorCallback;
     leaderboardManager.service = TurbulenzServices.getService('leaderboards');
     leaderboardManager.requestHandler = requestHandler;
+    leaderboardManager.ready = false;
 
     leaderboardManager.service.request({
         url: '/api/v1/leaderboards/read/' + gameSession.gameSlug,
@@ -305,6 +399,7 @@ LeaderboardManager.create = function createLeaderboardManagerFn(requestHandler,
                         leaderboardManager.meta[board.key] = board;
                     }
                 }
+                leaderboardManager.ready = true;
                 if (leaderboardMetaRecieved)
                 {
                     leaderboardMetaRecieved(leaderboardManager);
@@ -385,13 +480,15 @@ LeaderboardResult.prototype =
             time: offsetScore.time,
             size: this.requestSize,
             // remeber to map to backend lowercase format!
-            friendsonly: this.spec.friendsOnly && 1 || 0
+            friendsonly: this.originalSpec.friendsOnly && 1 || 0
         };
+        // store the spec for refresh calls
+        this.spec = newSpec;
 
         var that = this;
         function parseResults(data)
         {
-            that.results = that.parseResults(that.key, newSpec, data);
+            that.parseResults(that.key, newSpec, data);
             that.computeOverlap();
             callbackFn();
         }
@@ -439,6 +536,31 @@ LeaderboardResult.prototype =
         };
     },
 
+    refresh: function refreshFn(callbackFn, errorCallbackFn)
+    {
+        if (!this.viewOperationBegin())
+        {
+            return false;
+        }
+        var that = this;
+        function parseResults(data)
+        {
+            that.parseResults(that.key, that.spec, data);
+            that.computeOverlap();
+            that.invalidView = true;
+
+            if (that.onSlidingWindowUpdate)
+            {
+                that.onSlidingWindowUpdate();
+            }
+            that.viewOperationEnd(callbackFn);
+        }
+
+        this.leaderboardManager.getRaw(this.key, this.spec, parseResults, this.wrapViewOperationError(errorCallbackFn));
+
+        return true;
+    },
+
     moveUp: function moveUpFn(offset, callbackFn, errorCallbackFn)
     {
         if (!this.viewOperationBegin())
@@ -452,6 +574,11 @@ LeaderboardResult.prototype =
             var results = that.results;
             that.viewTop = Math.max(0, results.ranking.length - that.viewSize - results.overlap);
             that.invalidView = true;
+
+            if (that.onSlidingWindowUpdate)
+            {
+                that.onSlidingWindowUpdate();
+            }
             that.viewOperationEnd(callbackFn);
         }
 
@@ -491,6 +618,11 @@ LeaderboardResult.prototype =
             var results = that.results;
             that.viewTop = Math.min(results.overlap, Math.max(results.ranking.length - that.viewSize, 0));
             that.invalidView = true;
+
+            if (that.onSlidingWindowUpdate)
+            {
+                that.onSlidingWindowUpdate();
+            }
             that.viewOperationEnd(callbackFn);
         }
 
@@ -571,6 +703,11 @@ LeaderboardResult.prototype =
         return this.view;
     },
 
+    getSlidingWindow: function getSlidingWindowFn()
+    {
+        return this.results;
+    },
+
     parseResults: function parseResultsFn(key, spec, data)
     {
         var results = {
@@ -613,6 +750,7 @@ LeaderboardResult.prototype =
         results.top = data.top;
         results.bottom = data.bottom;
 
+        this.results = results;
         return results;
     }
 };
@@ -628,6 +766,9 @@ LeaderboardResult.create = function LeaderboardResultCreate(leaderboardManager, 
     // patch up friendsOnly for frontend
     spec.friendsOnly = spec.friendsonly;
     delete spec.friendsonly;
+    // store the original spec used to create the results
+    leaderboardResult.originalSpec = spec;
+    // the spec used to generate the current results
     leaderboardResult.spec = spec;
 
     var results = leaderboardResult.results = leaderboardResult.parseResults(key, spec, data);
@@ -646,6 +787,9 @@ LeaderboardResult.create = function LeaderboardResultCreate(leaderboardManager, 
         bottom: results.bottom
     };
     leaderboardResult.invalidView = false;
+
+    // callback called when the results is requested
+    leaderboardResult.onSlidingWindowUpdate = null;
 
     return leaderboardResult;
 };

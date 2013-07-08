@@ -1,5 +1,7 @@
 // Copyright (c) 2009-2011 Turbulenz Limited
 
+/*exported dumpTexture*/
+
 var dumpTexture = function dumpTextureFn(texture, log)
 {
     log("<h2>Texture: " + texture.name + "</h2>");

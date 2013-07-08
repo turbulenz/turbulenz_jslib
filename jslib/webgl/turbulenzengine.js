@@ -1,5 +1,4 @@
 // Copyright (c) 2011-2012 Turbulenz Limited
-/*global VMathArrayConstructor: true*/
 /*global VMath*/
 /*global WebGLGraphicsDevice*/
 /*global WebGLInputDevice*/
@@ -17,7 +16,7 @@
 function WebGLTurbulenzEngine() {}
 WebGLTurbulenzEngine.prototype = {
 
-    version : '0.23.1.0',
+    version : '0.24.0.0',
 
     setInterval: function (f, t)
     {
@@ -125,7 +124,7 @@ WebGLTurbulenzEngine.prototype = {
         }
     },
 
-    createMathDevice: function (params)
+    createMathDevice: function (/* params */)
     {
         // Check if the browser supports using apply with Float32Array
         try
@@ -145,7 +144,7 @@ WebGLTurbulenzEngine.prototype = {
         return VMath;
     },
 
-    createNativeMathDevice: function (params)
+    createNativeMathDevice: function (/* params */)
     {
         return VMath;
     },
@@ -210,12 +209,12 @@ WebGLTurbulenzEngine.prototype = {
         return msg;
     },
 
-    generateSignature: function (msg)
+    generateSignature: function (/* msg */)
     {
         return null;
     },
 
-    verifySignature: function (msg, sig)
+    verifySignature: function (/* msg, sig */)
     {
         return true;
     },

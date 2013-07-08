@@ -20,6 +20,7 @@ SessionToken.prototype =
         var random = Math.random() * this.randomMax;
         var bytes = this.bytes;
 
+        /*jshint bitwise: false*/
         bytes[0] = random & 0x000000FF;
         bytes[1] = (random & 0x0000FF00) >>> 8;
         bytes[2] = (random & 0x00FF0000) >>> 16;
@@ -29,6 +30,7 @@ SessionToken.prototype =
         // this means that we fit into 8 base64 characters exactly (no extra padding)
         bytes[4] = count & 0x000000FF;
         bytes[5] = (count & 0x0000FF00) >>> 8;
+        /*jshint bitwise: true*/
 
         return TurbulenzEngine.base64Encode(bytes);
     }

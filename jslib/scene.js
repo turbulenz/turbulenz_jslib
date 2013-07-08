@@ -9,7 +9,6 @@
 /*global Utilities*/
 /*global VertexBufferManager*/
 /*global IndexBufferManager*/
-/*global window*/
 /*global alert*/
 /*global Uint16Array*/
 /*global Uint32Array*/
@@ -2641,7 +2640,9 @@ Scene.prototype =
         this.frustumPlanes = [];
         this.animations = {};
         this.skeletons = {};
-        this.extents = [];
+        this.extents = (this.float32ArrayConstructor ?
+                        new this.float32ArrayConstructor(6) :
+                        new Array(6));
         this.visibleNodes = [];
         this.visibleRenderables = [];
         this.visibleLights = [];
@@ -3961,6 +3962,10 @@ Scene.prototype =
             shape.name = shapeName;
             shape.reference.subscribeDestroyed(this.onGeometryDestroyed);
         }
+        else
+        {
+            throw "Geometry '" + shapeName + "' already exists in the scene";
+        }
         return shape;
     },
 
@@ -3981,6 +3986,15 @@ Scene.prototype =
         {
             if (fileShapes.hasOwnProperty(fileShapeName))
             {
+                // Early check whether a geometry of the same name is
+                // already scheduled to load.
+
+                if (shapesToLoad[fileShapeName] ||
+                    customShapesToLoad[fileShapeName])
+                {
+                    throw "Multiple geometries named '" + fileShapeName + "'";
+                }
+
                 var fileShape = fileShapes[fileShapeName];
                 if (fileShape.meta && fileShape.meta.graphics)
                 {
@@ -4217,7 +4231,18 @@ Scene.prototype =
                         var fileGeometryInstance = geometryinstances[gi];
                         var fileShapeName = fileGeometryInstance.geometry;
                         var shapeName = (shapesNamePrefix ? (shapesNamePrefix + "-" + fileShapeName) : fileShapeName);
-                        var nodeShape = currentScene.loadShape(shapeName, fileShapeName, loadParams);
+
+                        // If the geometry has already been loaded,
+                        // use that, otherwise attempt to load it from
+                        // the current set of parameters.
+
+                        var nodeShape = currentScene.shapes[shapeName];
+                        if (!nodeShape)
+                        {
+                            nodeShape = currentScene.loadShape(shapeName,
+                                                               fileShapeName,
+                                                               loadParams);
+                        }
 
                         if (gd)
                         {
@@ -4710,10 +4735,12 @@ Scene.prototype =
     {
         if (!output)
         {
+            /*jshint newcap: false*/
             var float32ArrayConstructor = Scene.prototype.float32ArrayConstructor;
             output = (float32ArrayConstructor ?
                       new float32ArrayConstructor(4) :
                       new Array(4));
+            /*jshint newcap: true*/
         }
 
         var lsq = ((a * a) + (b * b) + (c * c));

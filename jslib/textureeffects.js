@@ -1,9 +1,5 @@
 // Copyright (c) 2012 Turbulenz Limited
 
-/*global
-Global: false
-*/
-
 function TextureEffects() {}
 TextureEffects.prototype = {
 

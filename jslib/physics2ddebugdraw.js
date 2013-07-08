@@ -4,12 +4,9 @@
 // Copyright (c) 2012 Turbulenz Limited
 
 /*global
-Float32Array: false
-Uint16Array: false
 
 Physics2DDevice: false
 Physics2DConfig: false
-Physics2DCustomConstraint: false
 Physics2DWeldConstraint: false
 Physics2DPointConstraint: false
 Physics2DDistanceConstraint: false
@@ -405,9 +402,9 @@ Physics2DDebugDraw.prototype = {
             }
         }
         verts.push(x2, y2);
-        /*jshint white: false*/
+        /*jshint bitwise: false*/
         var vCount = (verts.length >> 1);
-        /*jshint white: true*/
+        /*jshint bitwise: true*/
 
         var numVertices = this._numVertices;
         var vindex = (numVertices * 6);

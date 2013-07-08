@@ -58,7 +58,7 @@ DebuggingTools.dataBreakpoint = function debuggingToolsDataBreakpointFn(object, 
 										breakpoint.currentValue = value;
 									});
 
-			object.__defineGetter__(propertyName, function (value)
+			object.__defineGetter__(propertyName, function (/* value */)
 									{
 										if (breakpoint.breakOnRead)
 										{
