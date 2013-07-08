@@ -158,7 +158,7 @@ var TurbulenzBridge = {
     },
 
     triggerBasketUpdate: function triggerBasketUpdateFn(basket) {
-        this.emit('basket.game.update', basket);
+        this.emit('basket.game.update.v2', basket);
     },
 
     triggerUserStoreUpdate: function triggerUserStoreUpdateFn(items) {

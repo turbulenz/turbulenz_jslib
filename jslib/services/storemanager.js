@@ -61,10 +61,9 @@ StoreManager.prototype =
         return this.userItems;
     },
 
-    getItems: function getItemsFn()
+    getItemsSortedDict: function getItemsSortedDictFn(items)
     {
         // sort items by index and add keys to item objects
-        var items = this.items;
         var itemsArray = [];
         var sortedItemsDict = {};
 
@@ -91,74 +90,142 @@ StoreManager.prototype =
         return sortedItemsDict;
     },
 
-    updateBasket: function updateBasketFn(items)
+    getOfferings: function getOfferingsFn()
     {
-        if (items)
+        return this.getItemsSortedDict(this.offerings);
+    },
+
+    getResources: function getResourcesFn()
+    {
+        return this.getItemsSortedDict(this.resources);
+    },
+
+    updateBasket: function updateBasketFn(callback)
+    {
+        var token = null;
+        if (callback)
         {
-            this.basket.items = items;
+            token = this.basketUpdateRequestToken.next();
+            this.updateBasketCallbacks[token] = callback;
         }
-        TurbulenzBridge.triggerBasketUpdate(JSON.stringify(this.basket.items));
+
+        var that = this;
+        TurbulenzEngine.setTimeout(function yieldOnUpdate()
+            {
+                TurbulenzBridge.triggerBasketUpdate(JSON.stringify({
+                        basketItems: that.basket.items,
+                        token: token
+                    }));
+            }, 0);
     },
 
     addToBasket: function addToBasketFn(key, amount)
     {
-        var item = this.items[key];
-        if (!item ||
+        var offering = this.offerings[key];
+        if (!offering ||
+            !offering.available ||
             Math.floor(amount) !== amount ||
             amount <= 0)
         {
             return false;
         }
 
+        var resources = this.resources;
+        function isOwnOffering(offering)
+        {
+            var outputKey;
+            var output = offering.output;
+            for (outputKey in output)
+            {
+                if (output.hasOwnProperty(outputKey))
+                {
+                    if (resources[outputKey].type !== 'own')
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        var userItems = this.userItems;
+        function allOutputOwned(offering)
+        {
+            var outputKey;
+            var output = offering.output;
+            for (outputKey in output)
+            {
+                if (output.hasOwnProperty(outputKey))
+                {
+                    if (!userItems.hasOwnProperty(outputKey) ||
+                        userItems[outputKey].amount === 0)
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
         var basketItems = this.basket.items;
-        var userItem = this.userItems[key];
-        var userItemAmount = userItem && userItem.amount || 0;
-        var newBasketAmount = amount;
+        var oldBasketAmount = 0;
         if (basketItems[key])
         {
-            newBasketAmount = basketItems[key].amount + amount;
+            oldBasketAmount = basketItems[key].amount;
         }
-        if (newBasketAmount > item.max - userItemAmount)
+        else
         {
-            newBasketAmount = item.max - userItemAmount;
+            oldBasketAmount = 0;
         }
-        if (newBasketAmount <= 0)
+        var newBasketAmount = oldBasketAmount + amount;
+        var ownOffering = isOwnOffering(offering);
+        if (ownOffering && newBasketAmount > 1)
+        {
+            newBasketAmount = 1;
+            if (oldBasketAmount === 1)
+            {
+                // no change made so return false
+                return false;
+            }
+        }
+        if (newBasketAmount <= 0 || (ownOffering && allOutputOwned(offering)))
         {
             return false;
         }
 
         basketItems[key] = {amount: newBasketAmount};
-
-        this.updateBasket();
         return true;
     },
 
     removeFromBasket: function removeFromBasketFn(key, amount)
     {
-        if (!this.items[key] ||
+        if (!this.offerings[key] ||
             Math.floor(amount) !== amount ||
             amount <= 0)
         {
             return false;
         }
-        var basketItems = this.basket.items;
-        if (!basketItems[key])
+        var basketItem = this.basket.items[key];
+        if (!basketItem || basketItem.amount <= 0)
         {
-            return true;
+            return false;
         }
 
-        basketItems[key].amount -= amount;
-        if (basketItems[key].amount <= 0)
+        var newAmount = basketItem.amount - amount;
+        if (newAmount <= 0)
         {
-            delete basketItems[key];
+            delete this.basket.items[key];
         }
-        this.updateBasket();
+        else
+        {
+            this.basket.items[key] = {amount: newAmount};
+        }
         return true;
     },
 
     emptyBasket: function emptyBasketFn()
     {
-        this.updateBasket({});
+        this.basket.items = {};
     },
 
     isBasketEmpty: function isBasketEmptyFn()
@@ -181,8 +248,10 @@ StoreManager.prototype =
         {
             return false;
         }
-
-        TurbulenzBridge.triggerShowConfirmPurchase();
+        this.updateBasket(function showConfirmPurchaseBasketUpdate()
+            {
+                TurbulenzBridge.triggerShowConfirmPurchase();
+            });
         return true;
     },
 
@@ -233,9 +302,12 @@ StoreManager.prototype =
     }
 };
 
+// backwards compatibility
+StoreManager.prototype.getItems = StoreManager.prototype.getOfferings;
+
 StoreManager.create = function storeManagerCreateFn(requestHandler,
                                                     gameSession,
-                                                    storeMetaRecieved,
+                                                    storeMetaReceived,
                                                     errorCallbackFn)
 {
     if (!TurbulenzServices.available())
@@ -259,39 +331,55 @@ StoreManager.create = function storeManagerCreateFn(requestHandler,
     storeManager.requestHandler = requestHandler;
 
     storeManager.userItemsRequestToken = SessionToken.create();
+    storeManager.basketUpdateRequestToken = SessionToken.create();
     storeManager.consumeRequestToken = SessionToken.create();
 
-    var calledMetaRecieved = false;
+    var calledMetaReceived = false;
 
     storeManager.ready = false;
 
-    storeManager.items = null;
+    storeManager.offerings = null;
+    storeManager.resources = null;
     storeManager.basket = null;
     storeManager.userItems = null;
 
     function checkMetaRecieved()
     {
-        if (!calledMetaRecieved &&
-            storeManager.items !== null &&
+        if (!calledMetaReceived &&
+            storeManager.offerings !== null &&
+            storeManager.resources !== null &&
             storeManager.basket !== null &&
             storeManager.userItems !== null)
         {
-            if (storeMetaRecieved)
+            if (storeMetaReceived)
             {
-                storeMetaRecieved(storeManager);
+                storeMetaReceived(storeManager);
             }
             storeManager.ready = true;
-            calledMetaRecieved = true;
+            calledMetaReceived = true;
         }
     }
 
     storeManager.requestUserItems(checkMetaRecieved);
 
     storeManager.onBasketUpdate = null;
-    function onBasketUpdate(jsonBasket)
+    storeManager.updateBasketCallbacks = {};
+    function onBasketUpdate(jsonParams)
     {
-        var basket = JSON.parse(jsonBasket);
+        var basket = JSON.parse(jsonParams);
+        var token;
+        if (basket.token)
+        {
+            token = basket.token;
+            delete basket.token;
+        }
+
         storeManager.basket = basket;
+        if (token && storeManager.updateBasketCallbacks.hasOwnProperty(token))
+        {
+            storeManager.updateBasketCallbacks[token]();
+            delete storeManager.updateBasketCallbacks[token];
+        }
         if (storeManager.onBasketUpdate)
         {
             storeManager.onBasketUpdate(basket);
@@ -306,7 +394,8 @@ StoreManager.create = function storeManagerCreateFn(requestHandler,
     {
         var meta = JSON.parse(jsonMeta);
         storeManager.currency = meta.currency;
-        storeManager.items = meta.items;
+        storeManager.offerings = meta.items || meta.offerings;
+        storeManager.resources = meta.resources;
         checkMetaRecieved();
     }
     TurbulenzBridge.setOnStoreMeta(onStoreMeta);
