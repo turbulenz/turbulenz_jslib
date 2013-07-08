@@ -17,7 +17,7 @@
 function WebGLTurbulenzEngine() {}
 WebGLTurbulenzEngine.prototype = {
 
-    version : '0.20.0.0',
+    version : '0.20.1.0',
 
     setInterval: function (f, t)
     {
@@ -478,7 +478,19 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
     tz.plugin = null;
 
     // time property
-    var getTime = (window.performance && window.performance.now ? window.performance.now : Date.now);
+    var getTime;
+    if (window.performance && window.performance.now)
+    {
+        getTime = function getTimeFn()
+        {
+            // It seems high resolution "now" requires a proper "this"
+            return window.performance.now();
+        };
+    }
+    else
+    {
+        getTime = Date.now;
+    }
     var baseTime = getTime(); // all in milliseconds (our "time" property is in seconds)
 
     if (Object.defineProperty)

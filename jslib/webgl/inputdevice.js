@@ -464,6 +464,7 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
     handlers.mouselocklost = [];
 
     // KeyCodes: List of key codes and their values
+
     var keyCodes =
     {
         A : 0,
@@ -568,6 +569,9 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         PAGE_DOWN: 637
     };
 
+    // Populate the keyCodeToUnicodeTable.  Just use the 'key' part of
+    // the keycodes, overriding some special cases.
+
     var keyCodeToUnicodeTable = {};
     for (var k in keyCodes)
     {
@@ -577,6 +581,28 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
             keyCodeToUnicodeTable[code] = k;
         }
     }
+    keyCodeToUnicodeTable[keyCodes.SPACE] = ' ';
+    keyCodeToUnicodeTable[keyCodes.NUMBER_0] = '0';
+    keyCodeToUnicodeTable[keyCodes.NUMBER_1] = '1';
+    keyCodeToUnicodeTable[keyCodes.NUMBER_2] = '2';
+    keyCodeToUnicodeTable[keyCodes.NUMBER_3] = '3';
+    keyCodeToUnicodeTable[keyCodes.NUMBER_4] = '4';
+    keyCodeToUnicodeTable[keyCodes.NUMBER_5] = '5';
+    keyCodeToUnicodeTable[keyCodes.NUMBER_6] = '6';
+    keyCodeToUnicodeTable[keyCodes.NUMBER_7] = '7';
+    keyCodeToUnicodeTable[keyCodes.NUMBER_8] = '8';
+    keyCodeToUnicodeTable[keyCodes.NUMBER_9] = '9';
+    keyCodeToUnicodeTable[keyCodes.GRAVE] = '`';
+    keyCodeToUnicodeTable[keyCodes.MINUS] = '-';
+    keyCodeToUnicodeTable[keyCodes.EQUALS] = '=';
+    keyCodeToUnicodeTable[keyCodes.LEFT_BRACKET] = '[';
+    keyCodeToUnicodeTable[keyCodes.RIGHT_BRACKET] = ']';
+    keyCodeToUnicodeTable[keyCodes.SEMI_COLON] = ';';
+    keyCodeToUnicodeTable[keyCodes.APOSTROPHE] = "'";
+    keyCodeToUnicodeTable[keyCodes.COMMA] = ',';
+    keyCodeToUnicodeTable[keyCodes.PERIOD] = '.';
+    keyCodeToUnicodeTable[keyCodes.SLASH] = '/';
+    keyCodeToUnicodeTable[keyCodes.BACKSLASH] = '\\';
 
     var mouseCodes =
     {

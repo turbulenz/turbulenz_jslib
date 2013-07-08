@@ -257,7 +257,57 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
 
         if (soundPath)
         {
-            if (!sd.isResourceSupported(soundPath))
+            var extension = soundPath.slice(-3);
+
+            data = params.data;
+            if (data)
+            {
+                /*global Uint8Array*/
+                var dataArray = new Uint8Array(data);
+
+                // Check extension based on data
+
+                if (dataArray[0] === 79 &&
+                    dataArray[1] === 103 &&
+                    dataArray[2] === 103 &&
+                    dataArray[3] === 83)
+                {
+                    extension = 'ogg';
+                    soundPath = 'data:audio/ogg;base64,';
+                }
+                else if (dataArray[0] === 82 &&
+                         dataArray[1] === 73 &&
+                         dataArray[2] === 70 &&
+                         dataArray[3] === 70)
+                {
+                    extension = 'wav';
+                    soundPath = 'data:audio/wav;base64,';
+                }
+                else
+                {
+                    // Assume it's an mp3?
+                    extension = 'mp3';
+                    soundPath = 'data:audio/mpeg;base64,';
+                }
+
+                // Mangle data into a data URI
+
+                var arrayToStr = function arrayToStrFn(bytes)
+                {
+                    var numBytes = bytes.length;
+                    var a = [];
+                    a.length = numBytes;
+                    for (var n = 0; n < numBytes; n += 1)
+                    {
+                        a[n] = bytes[n];
+                    }
+                    return String.fromCharCode.apply(null, a);
+                };
+
+                soundPath = soundPath + window.btoa(arrayToStr(dataArray));
+            }
+
+            if (!(extension in sd.supportedExtensions))
             {
                 if (onload)
                 {
@@ -1189,12 +1239,13 @@ WebGLSoundDevice.prototype =
     },
 
     // Private API
-    addLoadingSound : function addLoadingSoundFn(soundCheck)
+    addLoadingSound : function addLoadingSoundFn(soundCheckCall)
     {
         var loadingSounds = this.loadingSounds;
-        loadingSounds[loadingSounds.length] = soundCheck;
+        loadingSounds[loadingSounds.length] = soundCheckCall;
 
         var loadingInterval = this.loadingInterval;
+        var that = this;
         if (loadingInterval === null)
         {
             this.loadingInterval = loadingInterval = window.setInterval(function checkLoadingSources() {
@@ -1221,7 +1272,7 @@ WebGLSoundDevice.prototype =
                 if (numLoadingSounds === 0)
                 {
                     window.clearInterval(loadingInterval);
-                    this.loadingInterval = null;
+                    that.loadingInterval = null;
                 }
             }, 100);
         }
