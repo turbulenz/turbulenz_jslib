@@ -1248,6 +1248,11 @@ DeferredRendering.prototype =
 // Constructor function
 DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderManager, effectManager, settings)
 {
+    if (gd.maxSupported("RENDERTARGET_COLOR_TEXTURES") < 4)
+    {
+        return null;
+    }
+
     var dr = new DeferredRendering();
 
     dr.md = md;

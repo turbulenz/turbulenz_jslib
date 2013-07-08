@@ -36,9 +36,30 @@ Utilities.beget = function begetFn(o)
 //
 Utilities.log = function logFn()
 {
-    if (window.console)
+    var console = window.console;
+    if (console)
     {
-        return window.console.log.apply(window.console, arguments);
+        // "console.log.apply" will crash when using the plugin on Chrome...
+        switch (arguments.length)
+        {
+        case 1:
+            console.log(arguments[0]);
+            break;
+        case 2:
+            console.log(arguments[0], arguments[1]);
+            break;
+        case 3:
+            console.log(arguments[0], arguments[1], arguments[2]);
+            break;
+        case 4:
+            console.log(arguments[0], arguments[1], arguments[2], arguments[3]);
+            break;
+        default:
+            // Note: this will fail if using printf-style string formatting
+            var args = [].splice.call(arguments, 0);
+            console.log(args.join(' '));
+            break;
+        }
     }
 };
 
@@ -165,6 +186,7 @@ Utilities.ajax = function utilitiesAjaxFn(params)
     var data = params.data || {};
     var encrypted = params.encrypt;
     var signature = null;
+    var async = params.async || true;
     var url = params.url;
     var requestHandler = params.requestHandler;
     var callbackFn = params.callback;
@@ -302,12 +324,12 @@ Utilities.ajax = function utilitiesAjaxFn(params)
                     return;
                 }
 
-                onload(xhrResponseText, xhrStatus);
+                onload.call(callContext, xhrResponseText, xhrStatus);
             }
         };
 
         // Send request
-        xhr.open(method, ((requestText && (method !== "POST")) ? url + "?" + requestText : url), params.async);
+        xhr.open(method, ((requestText && (method !== "POST")) ? url + "?" + requestText : url), async);
         if (callbackFn)
         {
             xhr.onreadystatechange = httpCallback;
@@ -329,11 +351,22 @@ Utilities.ajax = function utilitiesAjaxFn(params)
         }
     };
 
-    requestHandler.request({
-        src: url,
-        requestFn: httpRequest,
-        onload: httpResponseCallback
-    });
+    if (requestHandler)
+    {
+        requestHandler.request({
+            src: url,
+            requestFn: httpRequest,
+            customErrorHandler: params.customErrorHandler,
+            onload: httpResponseCallback
+        });
+    }
+    else
+    {
+        var callContext = {
+            src: url
+        };
+        httpRequest(url, httpResponseCallback, callContext);
+    }
 };
 
 

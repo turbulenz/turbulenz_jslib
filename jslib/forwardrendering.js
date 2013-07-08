@@ -626,9 +626,6 @@ ForwardRendering.prototype =
         this.depthTexture = null;
         this.finalTexture = null;
         this.finalRenderTarget = null;
-        this.testDepthTexture = null;
-        this.testTexture = null;
-        this.testRenderTarget = null;
         TurbulenzEngine.flush();
     },
 
@@ -656,21 +653,6 @@ ForwardRendering.prototype =
                 format: "D24S8"
             });
 
-        this.testTexture = gd.createTexture({
-                name: "final",
-                width: deviceWidth,
-                height: deviceHeight,
-                format: "R8G8B8A8",
-                mipmaps: false,
-                renderable: true
-            });
-
-        this.testDepthBuffer = gd.createRenderBuffer({
-                width: deviceWidth,
-                height: deviceHeight,
-                format: "D24S8"
-            });
-
         if (this.finalTexture &&
             this.depthBuffer)
         {
@@ -679,13 +661,7 @@ ForwardRendering.prototype =
                     depthBuffer: this.depthBuffer
                 });
 
-            this.testRenderTarget = gd.createRenderTarget({
-                    colorTexture0: this.testTexture,
-                    depthBuffer: this.testDepthBuffer
-                });
-
-            if (this.finalRenderTarget &&
-                this.testRenderTarget)
+            if (this.finalRenderTarget)
             {
                 this.bufferWidth = deviceWidth;
                 this.bufferHeight = deviceHeight;

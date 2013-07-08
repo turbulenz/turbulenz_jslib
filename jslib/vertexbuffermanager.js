@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2011 Turbulenz Limited
+// Copyright (c) 2010-2012 Turbulenz Limited
 
 //
 // VertexBufferManager
@@ -179,11 +179,10 @@ VertexBufferManager.prototype =
                 vertexbufferParameters.numVertices = maxVerticesPerVertexBuffer;
                 vertexbuffer = this.graphicsDevice.createVertexBuffer(vertexbufferParameters);
                 this.debugCreatedVertexBuffers += 1;
-                if (!vertexbuffer)
-                {
-                    window.alert("VertexBuffer not created.");
-                }
-                else
+
+                Utilities.assert(vertexbuffer, "VertexBuffer not created.");
+
+                if (vertexbuffer)
                 {
                     vertexBufferData = {vertexBuffer: vertexbuffer,
                                         bucket: this.makeBuckets()};
@@ -202,11 +201,10 @@ VertexBufferManager.prototype =
             vertexbufferParameters.numVertices = numVertices;
             vertexbuffer = this.graphicsDevice.createVertexBuffer(vertexbufferParameters);
             this.debugCreatedVertexBuffers += 1;
-            if (!vertexbuffer)
-            {
-                window.alert("VertexBuffer not created.");
-            }
-            else
+
+            Utilities.assert(vertexbuffer, "VertexBuffer not created.");
+
+            if (vertexbuffer)
             {
                 vertexBuffersPool.vertexBufferData.push({vertexBuffer: vertexbuffer,
                                                          bucket: this.makeBuckets()});

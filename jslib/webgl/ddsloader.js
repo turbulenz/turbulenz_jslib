@@ -1,4 +1,5 @@
-// Copyright (c) 2011 Turbulenz Limited
+// Copyright (c) 2011-2012 Turbulenz Limited
+/*global TurbulenzEngine*/
 /*global Uint8Array*/
 /*global Uint16Array*/
 /*global window*/
@@ -113,7 +114,7 @@ DDSLoader.prototype = {
         var header = this.parseHeader(bytes, offset);
         offset += 31 * 4;
 
-        this.width  = header.dwWidth;
+        this.width = header.dwWidth;
         this.height = header.dwHeight;
 
         /*jslint bitwise: false*/
@@ -222,7 +223,7 @@ DDSLoader.prototype = {
                 bpe = 2;
                 break;
 
-            //these are unsupported for now
+                //these are unsupported for now
             case this.FOURCC_UNKNOWN:
             case this.FOURCC_ATI1:
             case this.FOURCC_ATI2:
@@ -272,7 +273,7 @@ DDSLoader.prototype = {
             }
             bpe = 4;
         }
-        else if (header.ddspf.dwFlags === this.DDSF_RGB  && header.ddspf.dwRGBBitCount === 32)
+        else if (header.ddspf.dwFlags === this.DDSF_RGB && header.ddspf.dwRGBBitCount === 32)
         {
             if (header.ddspf.dwRBitMask === 0x000000FF &&
                 header.ddspf.dwGBitMask === 0x0000FF00 &&
@@ -286,7 +287,7 @@ DDSLoader.prototype = {
             }
             bpe = 4;
         }
-        else if (header.ddspf.dwFlags === this.DDSF_RGB  && header.ddspf.dwRGBBitCount === 24)
+        else if (header.ddspf.dwFlags === this.DDSF_RGB && header.ddspf.dwRGBBitCount === 24)
         {
             if (header.ddspf.dwRBitMask === 0x000000FF &&
                 header.ddspf.dwGBitMask === 0x0000FF00 &&
@@ -300,7 +301,7 @@ DDSLoader.prototype = {
             }
             bpe = 3;
         }
-        else if (header.ddspf.dwFlags === this.DDSF_RGB  && header.ddspf.dwRGBBitCount === 16)
+        else if (header.ddspf.dwFlags === this.DDSF_RGB && header.ddspf.dwRGBBitCount === 16)
         {
             if (header.ddspf.dwRBitMask === 0x0000F800 &&
                 header.ddspf.dwGBitMask === 0x000007E0 &&
@@ -375,20 +376,26 @@ DDSLoader.prototype = {
             data = this.convertBGR2RGB(data);
         }
 
-        // TODO: support DXT formats when supported
-        switch (this.format)
+        if (this.format === gd.PIXELFORMAT_DXT1)
         {
-        case gd.PIXELFORMAT_DXT1:
-            data = this.convertDXT1ToRGBA(data);
-            break;
-        case gd.PIXELFORMAT_DXT3:
-            data = this.convertDXT3ToRGBA(data);
-            break;
-        case gd.PIXELFORMAT_DXT5:
-            data = this.convertDXT5ToRGBA(data);
-            break;
-        default:
-            break;
+            if (!gd.isSupported('TEXTURE_DXT1'))
+            {
+                data = this.convertDXT1ToRGBA(data);
+            }
+        }
+        else if (this.format === gd.PIXELFORMAT_DXT3)
+        {
+            if (!gd.isSupported('TEXTURE_DXT3'))
+            {
+                data = this.convertDXT3ToRGBA(data);
+            }
+        }
+        else if (this.format === gd.PIXELFORMAT_DXT5)
+        {
+            if (!gd.isSupported('TEXTURE_DXT5'))
+            {
+                data = this.convertDXT5ToRGBA(data);
+            }
         }
 
         this.data = data;
@@ -396,13 +403,12 @@ DDSLoader.prototype = {
 
     parseHeader : function parseHeaderFn(bytes, offset)
     {
-        /*jslint bitwise: false*/
         function readUInt32()
         {
-            var value = ((bytes[offset]) |
-                         (bytes[offset + 1] << 8) |
-                         (bytes[offset + 2] << 16) |
-                         (bytes[offset + 3] << 24));
+            var value = ((bytes[offset]) +
+                         (bytes[offset + 1] * 256) +
+                         (bytes[offset + 2] * 65536) +
+                         (bytes[offset + 3] * 16777216));
             offset += 4;
             return value;
         }
@@ -437,7 +443,6 @@ DDSLoader.prototype = {
             dwCaps2 : readUInt32(),
             dwReserved2 : [readUInt32(), readUInt32(), readUInt32()]
         };
-        /*jslint bitwise: true*/
 
         return header;
     },
@@ -535,8 +540,10 @@ DDSLoader.prototype = {
             {
                 for (i = 0; i < 3; i += 1)
                 {
-                    c2[i] = ((((c0[i] * 2) + c1[i]) / 3) | 0);
-                    c3[i] = (((c0[i] + (c1[i] * 2)) / 3) | 0);
+                    var c0i = c0[i];
+                    var c1i = c1[i];
+                    c2[i] = ((((c0i * 2) + c1i) / 3) | 0);
+                    c3[i] = (((c0i + (c1i * 2)) / 3) | 0);
                 }
                 c2[3] = 255;
                 c3[3] = 255;
@@ -802,10 +809,10 @@ DDSLoader.create = function ddsLoaderFn(params)
     /*jslint bitwise: false*/
     function MAKEFOURCC(c0, c1, c2, c3)
     {
-        return (c0.charCodeAt(0) |
-               (c1.charCodeAt(0) << 8) |
-               (c2.charCodeAt(0) << 16) |
-               (c3.charCodeAt(0) << 24));
+        return (c0.charCodeAt(0) +
+               (c1.charCodeAt(0) * 256) +
+               (c2.charCodeAt(0) * 65536) +
+               (c3.charCodeAt(0) * 16777216));
     }
     /*jslint bitwise: true*/
     loader.FOURCC_ATI1 = MAKEFOURCC('A', 'T', 'I', '1');
@@ -908,15 +915,18 @@ DDSLoader.create = function ddsLoaderFn(params)
             }
         };
         xhr.open("GET", params.src, true);
-        if (xhr.hasOwnProperty("responseType"))
+        if (xhr.hasOwnProperty && xhr.hasOwnProperty("responseType"))
         {
             xhr.responseType = "arraybuffer";
         }
-        else
+        else if (xhr.overrideMimeType)
         {
             xhr.overrideMimeType("text/plain; charset=x-user-defined");
         }
-        xhr.setRequestHeader("Content-Type", "text/plain");
+        else
+        {
+            xhr.setRequestHeader("Content-Type", "text/plain; charset=x-user-defined");
+        }
         xhr.send(null);
     }
     else

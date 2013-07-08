@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 
 //
 // MouseForces
@@ -140,36 +140,20 @@ MouseForces.create = function mouseForcesCreateFn(gd, id, md, pd, dragExtentsMin
     c.grabBody = false;
 
     // Mouse handling
-    var oldmousemove = id.onmousemove;
-    var oldmouseup = id.onmouseup;
-    var oldmousewheel = id.onmousewheel;
-
     c.onmousewheel = function onmousewheelFn(delta)
     {
         c.mouseZ += delta;
 
-        if (oldmousewheel)
-        {
-            oldmousewheel(delta);
-        }
-
         return false;
     };
-    id.onmousewheel = c.onmousewheel;
 
     c.onmousemove = function onmousemoveFn(deltaX, deltaY)
     {
         c.mouseX += (deltaX / gd.width);
         c.mouseY += (deltaY / gd.height);
 
-        if (oldmousemove)
-        {
-            oldmousemove(deltaX, deltaY);
-        }
-
         return false;
     };
-    id.onmousemove = c.onmousemove;
 
     c.onmousedown = function onmousedownFn(button, x, y)
     {
@@ -186,14 +170,14 @@ MouseForces.create = function mouseForcesCreateFn(gd, id, md, pd, dragExtentsMin
         c.mouseY = 0.5;
         c.mouseZ = 0.0;
 
-        if (oldmouseup)
-        {
-            oldmouseup(button, x, y);
-        }
-
         c.grabBody = false;
         return false;
     };
+
+    id.addEventListener("mousewheel", c.onmousewheel);
+    id.addEventListener("mousemove", c.onmousemove);
+    id.addEventListener("mousedown", c.onmousedown);
+    id.addEventListener("mouseup", c.onmouseup);
 
     return c;
 };

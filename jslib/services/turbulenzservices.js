@@ -1,19 +1,143 @@
-// Copyright (c) 2011 Turbulenz Limited
+// Copyright (c) 2011-2012 Turbulenz Limited
 
 /*global BadgeManager: false*/
-/*global TurbulenzGamesiteBridge: false*/
 /*global window: false*/
 /*global GameSession: false*/
+/*global TurbulenzBridge: false*/
 /*global TurbulenzEngine: false*/
 /*global Utilities: false*/
 /*global MappingTable: false*/
 /*global LeaderboardManager: false*/
+/*global ServiceRequester: false*/
 /*global Badges*/
+/*global MultiPlayerSession: false*/
+/*global Observer*/
+
+var TurbulenzServices;
+
+function ServiceRequester() {}
+ServiceRequester.prototype =
+{
+
+    // make a request if the service is available. Same parameters as an
+    // Utilities.ajax call with extra argument:
+    //     neverDiscard - Never discard the request. Always queues the request
+    //                    for when the service is again available. (Ignores
+    //                    server preference)
+    request: function requestFn(params)
+    {
+        var discardRequestFn = function discardRequestFn()
+        {
+            if (params.callback)
+            {
+                params.callback({'ok': false, 'msg': 'Service Unavailable. Discarding request'}, 503);
+            }
+        };
+
+        var that = this;
+        var serviceStatusObserver = this.serviceStatusObserver;
+
+        var onServiceStatusChange;
+        onServiceStatusChange = function onServiceStatusChangeFn(running, discardRequest)
+        {
+            if (discardRequest)
+            {
+                if (!params.neverDiscard)
+                {
+                    serviceStatusObserver.unsubscribe(onServiceStatusChange);
+                    discardRequestFn();
+                }
+            }
+            else if (running)
+            {
+                serviceStatusObserver.unsubscribe(onServiceStatusChange);
+                that.request(params);
+            }
+        };
+
+        if (!this.running)
+        {
+            if (this.discardRequests && !params.neverDiscard)
+            {
+                TurbulenzEngine.setTimeout(discardRequestFn, 0);
+                return false;
+            }
+
+            // we check waiting so that we don't get into an infinite loop of callbacks
+            // when a service goes down, then up and then down again before the subscribed
+            // callbacks have all been called.
+            if (!params.waiting)
+            {
+                params.waiting = true;
+                serviceStatusObserver.subscribe(onServiceStatusChange);
+            }
+            return true;
+        }
+
+        var oldCustomErrorHandler = params.customErrorHandler;
+        params.customErrorHandler = function checkServiceUnavailableFn(callContext, makeRequest, responseJSON, status)
+        {
+            if (status === 503)
+            {
+                var responseObj = JSON.parse(responseJSON);
+                var statusObj = responseObj.data;
+                var discardRequests = (statusObj ? statusObj.discardRequests : true);
+                that.discardRequests = discardRequests;
+
+                if (discardRequests && !params.neverDiscard)
+                {
+                    discardRequestFn();
+                }
+                else
+                {
+                    serviceStatusObserver.subscribe(onServiceStatusChange);
+                }
+                TurbulenzServices.serviceUnavailable(that, callContext);
+                // An error occurred so return false to avoid calling the success callback
+                return false;
+            }
+            else
+            {
+                // call the old custom error handler
+                if (oldCustomErrorHandler)
+                {
+                    return oldCustomErrorHandler.call(that.requestHandler, callContext, makeRequest, responseJSON, status);
+                }
+                return true;
+            }
+        };
+
+        Utilities.ajax(params);
+        return true;
+    }
+};
+
+ServiceRequester.create = function apiServiceCreateFn(serviceName, params)
+{
+    var serviceRequester = new ServiceRequester();
+
+    if (!params)
+    {
+        params = {};
+    }
+
+    // we assume everything is working at first
+    serviceRequester.running = true;
+    serviceRequester.discardRequests = false;
+    serviceRequester.serviceStatusObserver = Observer.create();
+
+    serviceRequester.serviceName = serviceName;
+
+    serviceRequester.onServiceUnavailable = params.onServiceUnavailable;
+    serviceRequester.onServiceAvailable = params.onServiceAvailable;
+
+    return serviceRequester;
+};
 
 //
 // TurbulenzServices
 //
-var TurbulenzServices = {
+TurbulenzServices = {
 
     available: function turbulenzServicesAvailableFn()
     {
@@ -21,6 +145,9 @@ var TurbulenzServices = {
     },
 
     defaultErrorCallback: function turbulenzServicesDefaultErrorCallbackFn(errorMsg, httpStatus) {},
+
+    onServiceUnavailable: function turbulenzServicesOnServiceUnavailableFn(serviceName, callContext) {},
+    onServiceAvailable : function turbulenzServicesOnServiceAvailableFn(serviceName, callContext) {},
 
     createGameSession: function turbulenzServicesCreateGameSession(requestHandler, sessionCreatedFn, errorCallbackFn)
     {
@@ -32,18 +159,17 @@ var TurbulenzServices = {
         gameSession.requestHandler = requestHandler;
         gameSession.errorCallbackFn = errorCallbackFn || TurbulenzServices.defaultErrorCallback;
         gameSession.gameSessionId = null;
-
-        function sessionCreatedCall()
-        {
-            sessionCreatedFn(gameSession);
-        }
+        gameSession.service = this.getService('gameSessions');
 
         if (!TurbulenzServices.available())
         {
             // Call sessionCreatedFn on a timeout to get the same behaviour as the AJAX call
             if (sessionCreatedFn)
             {
-                TurbulenzEngine.setTimeout(sessionCreatedCall, 0);
+                TurbulenzEngine.setTimeout(function sessionCreatedCall()
+                    {
+                        sessionCreatedFn(gameSession);
+                    }, 0);
             }
             return gameSession;
         }
@@ -54,10 +180,13 @@ var TurbulenzServices = {
             {
                 gameSession.mappingTable = jsonResponse.mappingTable;
                 gameSession.gameSessionId = jsonResponse.gameSessionId;
+
                 if (sessionCreatedFn)
                 {
                     sessionCreatedFn(gameSession);
                 }
+
+                TurbulenzBridge.createdGameSession(gameSession.gameSessionId);
             }
             else
             {
@@ -65,12 +194,20 @@ var TurbulenzServices = {
             }
         }
 
-        Utilities.ajax({
-            url: '/api/v1/games/create-session/' + gameSlug,
+        var createSessionURL = '/api/v1/games/create-session/' + gameSlug;
+
+        var Turbulenz = window.top.Turbulenz;
+        if (Turbulenz && Turbulenz.Data && Turbulenz.Data.mode)
+        {
+            createSessionURL += '/' + Turbulenz.Data.mode;
+        }
+
+        gameSession.service.request({
+            url: createSessionURL,
             method: 'POST',
-            async: true,
             callback: gameSessionRequestCallbackFn,
-            requestHandler: requestHandler
+            requestHandler: requestHandler,
+            neverDiscard: true
         });
 
         return gameSession;
@@ -133,17 +270,13 @@ var TurbulenzServices = {
             tableRecievedFn(mappingTable);
         }
 
-        // Cant request files from the hard disk using AJAX
-        if (TurbulenzServices.available() && mappingTable.mappingTableURL.indexOf('https://') !== 0)
-        {
-            Utilities.ajax({
-                url: mappingTable.mappingTableURL,
-                method: 'GET',
-                async: true,
-                callback: function createMappingTableAjaxErrorCheck(jsonResponse, status) {
+        requestHandler.request({
+                src: mappingTable.mappingTableURL,
+                onload: function jsonifyResponse(jsonResponse, status) {
+                    var obj = JSON.parse(jsonResponse);
                     if (status === 200)
                     {
-                        createMappingTableCallbackFn(jsonResponse);
+                        createMappingTableCallbackFn(obj);
                     }
                     else
                     {
@@ -151,29 +284,8 @@ var TurbulenzServices = {
                         mappingTable.urlMapping = defaultMappingSettings && (defaultMappingSettings.urnMapping || {});
                         tableRecievedFn(mappingTable);
                     }
-                },
-                requestHandler: requestHandler
+                }
             });
-        }
-        else
-        {
-            requestHandler.request({
-                    src: mappingTable.mappingTableURL,
-                    onload: function createMappingTablePluginErrorCheck(responseText, status)
-                    {
-                        if (responseText)
-                        {
-                            createMappingTableCallbackFn(JSON.parse(responseText));
-                        }
-                        else
-                        {
-                            mappingTable.errorCallbackFn("TurbulenzServices.createMappingTable could not load mapping table");
-                            mappingTable.urlMapping = defaultMappingSettings.urnMapping || {};
-                            tableRecievedFn(mappingTable);
-                        }
-                    }
-                });
-        }
 
         return mappingTable;
     },
@@ -185,14 +297,15 @@ var TurbulenzServices = {
     {
         var leaderboardManager = new LeaderboardManager();
 
-        leaderboardManager.requestHandler = requestHandler;
         leaderboardManager.gameSession = gameSession;
         leaderboardManager.gameSessionId = gameSession.gameSessionId;
         leaderboardManager.errorCallbackFn = errorCallbackFn || this.defaultErrorCallback;
+        leaderboardManager.service = this.getService('leaderboards');
+        leaderboardManager.requestHandler = requestHandler;
 
         if (!TurbulenzServices.available())
         {
-            // Call error callback on a timeout to get the same behaviour as the AJAX call
+            // Call error callback on a timeout to get the same behaviour as the ajax call
             TurbulenzEngine.setTimeout(function () {
                 leaderboardManager.errorCallbackFn('TurbulenzServices.createLeaderboardManager could not load leaderboards meta data');
             }, 0);
@@ -202,10 +315,9 @@ var TurbulenzServices = {
         var dataSpec = {};
         dataSpec.gameSessionId = gameSession.gameSessionId;
 
-        Utilities.ajax({
+        leaderboardManager.service.request({
             url: '/api/v1/leaderboards/read/' + gameSession.gameSlug,
             method: 'GET',
-            async: true,
             data: dataSpec,
             callback: function createLeaderboardManagerAjaxErrorCheck(jsonResponse, status) {
                 if (status === 200)
@@ -231,7 +343,8 @@ var TurbulenzServices = {
                     leaderboardManager.errorCallbackFn("TurbulenzServices.createLeaderboardManager error with HTTP status " + status + ": " + jsonResponse.msg, status);
                 }
             },
-            requestHandler: requestHandler
+            requestHandler: requestHandler,
+            neverDiscard: true
         });
 
         return leaderboardManager;
@@ -240,14 +353,14 @@ var TurbulenzServices = {
     //just a factory, Badges have to be included from the caller!->TODO change to a less obtrusive pattern
     createBadgeManager: function turbulenzServicesCreateBadgeManager(requestHandler, gameSession)
     {
-        var badgemanager = new BadgeManager();
+        var badgeManager = new BadgeManager();
 
-        badgemanager.requestHandler = requestHandler;
-        badgemanager.gameSession = gameSession;
-        badgemanager.gameSessionId = gameSession.gameSessionId;
-        //got to init the global event Object at the beginning to register it in the window.document
-        TurbulenzGamesiteBridge.getSingleton(gameSession);
-        return badgemanager;
+        badgeManager.gameSession = gameSession;
+        badgeManager.gameSessionId = gameSession.gameSessionId;
+        badgeManager.service = this.getService('badges');
+        badgeManager.requestHandler = requestHandler;
+
+        return badgeManager;
     },
 
     createUserProfile: function turbulenzServicesCreateUserProfile(requestHandler,
@@ -276,21 +389,20 @@ var TurbulenzServices = {
             }
         }
 
-        // Cant request files from the hard disk using AJAX
         var url = '/api/v1/profiles/user';
+        // Can't request files from the hard disk using AJAX
         if (TurbulenzServices.available())
         {
-            Utilities.ajax({
+            this.getService('profiles').request({
                 url: url,
                 method: 'GET',
-                async: true,
                 callback: function createUserProfileAjaxErrorCheck(jsonResponse, status)
                 {
                     if (status === 200)
                     {
                         loadUserProfileCallbackFn(jsonResponse);
                     }
-                    else
+                    else if (errorCallbackFn)
                     {
                         errorCallbackFn("TurbulenzServices.createUserProfile error with HTTP status " + status + ": " + jsonResponse.msg, status);
                     }
@@ -301,5 +413,250 @@ var TurbulenzServices = {
         }
 
         return userProfile;
+    },
+
+    createMultiplayerSession: function turbulenzServicesCreateMultiplayerSession(numSlots,
+                                                                                 requestHandler,
+                                                                                 sessionCreatedFn,
+                                                                                 errorCallbackFn)
+    {
+        if (!errorCallbackFn)
+        {
+            errorCallbackFn = TurbulenzServices.defaultErrorCallback;
+        }
+
+        if (!TurbulenzServices.available())
+        {
+            if (errorCallbackFn)
+            {
+                errorCallbackFn("TurbulenzServices.createMultiplayerSession failed: Service not available",
+                                0);
+            }
+        }
+        else
+        {
+            var requestCallback = function requestCallbackFn(jsonResponse, status)
+            {
+                if (status === 200)
+                {
+                    var sessionData = jsonResponse.data;
+                    sessionData.requestHandler = requestHandler;
+
+                    MultiPlayerSession.create(sessionData,
+                                              sessionCreatedFn,
+                                              errorCallbackFn);
+                }
+                else if (errorCallbackFn)
+                {
+                    errorCallbackFn("TurbulenzServices.createMultiplayerSession error with HTTP status " +
+                                    status + ": " + jsonResponse.msg,
+                                    status);
+                }
+            };
+
+            this.getService('multiplayer').request({
+                url: '/api/v1/multiplayer/session/create/' + window.gameSlug,
+                method: 'POST',
+                data: {'slots': numSlots},
+                callback: requestCallback,
+                requestHandler: requestHandler
+            });
+        }
+    },
+
+    joinMultiplayerSession: function turbulenzServicesJoinMultiplayerSession(sessionID,
+                                                                             requestHandler,
+                                                                             sessionCreatedFn,
+                                                                             errorCallbackFn)
+    {
+        if (!errorCallbackFn)
+        {
+            errorCallbackFn = TurbulenzServices.defaultErrorCallback;
+        }
+
+        if (!TurbulenzServices.available())
+        {
+            if (errorCallbackFn)
+            {
+                errorCallbackFn("TurbulenzServices.joinMultiplayerSession failed: Service not available",
+                                0);
+            }
+        }
+        else
+        {
+            var requestCallback = function requestCallbackFn(jsonResponse, status)
+            {
+                if (status === 200)
+                {
+                    var sessionData = jsonResponse.data;
+                    sessionData.requestHandler = requestHandler;
+                    MultiPlayerSession.create(sessionData,
+                                              sessionCreatedFn,
+                                              errorCallbackFn);
+                }
+                else if (errorCallbackFn)
+                {
+                    errorCallbackFn("TurbulenzServices.joinMultiplayerSession error with HTTP status " +
+                                    status + ": " + jsonResponse.msg,
+                                    status);
+                }
+            };
+
+            this.getService('multiplayer').request({
+                url: '/api/v1/multiplayer/session/join',
+                method: 'POST',
+                data: {'session': sessionID},
+                callback: requestCallback,
+                requestHandler: requestHandler
+            });
+        }
+    },
+
+    services: {},
+    waitingServices: {},
+    pollingServiceStatus: false,
+    // milliseconds
+    defaultPollInterval: 4000,
+
+    getService: function getServiceFn(serviceName)
+    {
+        var services = this.services;
+        if (services.hasOwnProperty(serviceName))
+        {
+            return services[serviceName];
+        }
+        else
+        {
+            var service = ServiceRequester.create(serviceName);
+            services[serviceName] = service;
+            return service;
+        }
+    },
+
+    serviceUnavailable: function serviceUnavailableFn(service, callContext)
+    {
+        var waitingServices = this.waitingServices;
+        var serviceName = service.serviceName;
+        if (waitingServices.hasOwnProperty(serviceName))
+        {
+            return;
+        }
+
+        waitingServices[serviceName] = service;
+
+        service.running = false;
+
+        var onServiceUnavailableCallbacks = function onServiceUnavailableCallbacksFn(service)
+        {
+            var onServiceUnavailable = callContext.onServiceUnavailable;
+            if (onServiceUnavailable)
+            {
+                onServiceUnavailable.call(service, callContext);
+            }
+            if (service.onServiceUnavailable)
+            {
+                service.onServiceUnavailable();
+            }
+            if (TurbulenzServices.onServiceUnavailable)
+            {
+                TurbulenzServices.onServiceUnavailable(service);
+            }
+        };
+
+        if (service.discardRequests)
+        {
+            onServiceUnavailableCallbacks(service);
+        }
+
+        if (this.pollingServiceStatus)
+        {
+            return;
+        }
+
+        var that = this;
+        var pollServiceStatus;
+
+        var serviceUrl = '/api/v1/service-status/game/read/' + window.gameSlug;
+        var servicesStatusCB = function servicesStatusCBFn(responseObj, status)
+        {
+            if (status === 200)
+            {
+                var statusObj = responseObj.data;
+                var servicesObj = statusObj.services;
+
+                var retry = false;
+                for (var serviceName in waitingServices)
+                {
+                    if (waitingServices.hasOwnProperty(serviceName))
+                    {
+                        var service = waitingServices[serviceName];
+                        var serviceData = servicesObj[serviceName];
+                        var serviceRunning = serviceData.running;
+
+                        service.running = serviceRunning;
+                        service.description = serviceData.description;
+
+                        if (serviceRunning)
+                        {
+                            if (service.discardRequests)
+                            {
+                                var onServiceAvailable = callContext.onServiceAvailable;
+                                if (onServiceAvailable)
+                                {
+                                    onServiceAvailable.call(service, callContext);
+                                }
+                                if (service.onServiceAvailable)
+                                {
+                                    service.onServiceAvailable();
+                                }
+                                if (TurbulenzServices.onServiceAvailable)
+                                {
+                                    TurbulenzServices.onServiceAvailable(service);
+                                }
+                            }
+
+                            delete waitingServices[serviceName];
+                            service.discardRequests = false;
+                            service.serviceStatusObserver.notify(serviceRunning, service.discardRequests);
+
+                        }
+                        else
+                        {
+                            // if discardRequests has been set
+                            if (serviceData.discardRequests && !service.discardRequests)
+                            {
+                                service.discardRequests = true;
+                                onServiceUnavailableCallbacks(service);
+                                // discard all waiting requests
+                                service.serviceStatusObserver.notify(serviceRunning, service.discardRequests);
+                            }
+                            retry = true;
+                        }
+                    }
+                }
+                if (!retry)
+                {
+                    this.pollingServiceStatus = false;
+                    return;
+                }
+                TurbulenzEngine.setTimeout(pollServiceStatus, statusObj.pollInterval * 1000);
+            }
+            else
+            {
+                TurbulenzEngine.setTimeout(pollServiceStatus, that.defaultPollInterval);
+            }
+        };
+
+        pollServiceStatus = function pollServiceStatusFn()
+        {
+            Utilities.ajax({
+                url: serviceUrl,
+                method: 'GET',
+                callback: servicesStatusCB
+            });
+        };
+
+        pollServiceStatus();
     }
+
 };

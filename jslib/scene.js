@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 /*global AABBTree*/
 /*global Material*/
 /*global SceneNode*/
@@ -2179,6 +2179,7 @@ Scene.prototype =
             var newMaterial = this.createMaterial(materialName, material, effectName, null, null, graphicsDevice);
             if (newMaterial)
             {
+                delete newMaterial.effectName;
                 var effect = effectManager.get(effectName);
                 if (effect)
                 {
@@ -2888,7 +2889,7 @@ Scene.prototype =
             }
         }
 
-        material.techniqueParameters.effect = effectType;
+        material.effectName = effectType;
 
         if (fileMaterial.meta)
         {
@@ -3179,17 +3180,12 @@ Scene.prototype =
                     };
                 }
 
-                var vertexBufferManager = (loadParams.vertexBufferManager || this.vertexBufferManager);
-                if (!vertexBufferManager)
-                {
-                    vertexBufferManager = VertexBufferManager.create(gd);
-                    this.vertexBufferManager = vertexBufferManager;
-                }
-
                 var surface;
                 var destSurface;
                 var faces;
-                for (var s in surfaces)
+                var s;
+
+                for (s in surfaces)
                 {
                     if (surfaces.hasOwnProperty(s))
                     {
@@ -3225,18 +3221,19 @@ Scene.prototype =
                             }
                             else
                             {
+
                                 numVertices = (vertexSources[0].data.length / vertexSources[0].stride);
                                 if (numVertices > faces.length)
                                 {
                                     numVertices = faces.length;
                                 }
+                                destSurface.numVertices = numVertices;
                             }
-                            totalNumVertices += numVertices;
                         }
                     }
                 }
 
-                // Create 1-index per vertex from data
+                // For cases where > 1-index per vertex we process it to create 1-index per vertex from data
 
                 var updateSingleIndexTables =
                     function updateSingleIndexTablesFn(surface, indicesPerVertex,
@@ -3349,20 +3346,68 @@ Scene.prototype =
                     indicesPerVertex = 1;
                 }
 
+                Utilities.assert(indicesPerVertex === 1);
+
+                totalNumVertices = vertexSources[0].data.length / vertexSources[0].stride;
+
+                var vertexBufferManager = (loadParams.vertexBufferManager || this.vertexBufferManager);
+                if (!vertexBufferManager)
+                {
+                    vertexBufferManager = VertexBufferManager.create(gd);
+                    this.vertexBufferManager = vertexBufferManager;
+                }
+
                 var baseIndex;
-                var vertexbuffer = null;
+                var vertexBuffer = null;
                 var vertexBufferAllocation = vertexBufferManager.allocate(totalNumVertices, attributes);
-                vertexbuffer = vertexBufferAllocation.vertexBuffer;
-                if (!vertexbuffer)
+                vertexBuffer = vertexBufferAllocation.vertexBuffer;
+                if (!vertexBuffer)
                 {
                     return undefined;
                 }
 
-                shape.vertexBuffer = vertexbuffer;
+                shape.vertexBuffer = vertexBuffer;
                 shape.vertexBufferManager = vertexBufferManager;
                 shape.vertexBufferAllocation = vertexBufferAllocation;
 
                 baseIndex = vertexBufferAllocation.baseIndex;
+                var t, index, nextIndex;
+                //
+                // We no have the simple case of each index maps to one vertex so create one vertex buffer and fill in.
+                //
+                var vertexData = [];
+                var vertexDataCount = 0;
+                for (t = 0; t < totalNumVertices; t += 1)
+                {
+                    vs = 0;
+                    do
+                    {
+                        vertexSource = vertexSources[vs];
+                        var sourceData = vertexSource.data;
+                        stride = vertexSource.stride;
+                        index = t * stride;
+                        nextIndex = (index + stride);
+                        destStride = vertexSource.destStride;
+                        do
+                        {
+                            vertexData[vertexDataCount] = sourceData[index];
+                            vertexDataCount += 1;
+                            index += 1;
+                        }
+                        while (index < nextIndex);
+
+                        while (stride < destStride)
+                        {
+                            vertexData[vertexDataCount] = 0;
+                            vertexDataCount += 1;
+                            destStride -= 1;
+                        }
+
+                        vs += 1;
+                    }
+                    while (vs < numVertexSources);
+                }
+                vertexBuffer.setData(vertexData, vertexBufferAllocation.baseIndex, totalNumVertices);
 
                 for (s in surfaces)
                 {
@@ -3371,14 +3416,9 @@ Scene.prototype =
                         surface = surfaces[s];
                         destSurface = shape.surfaces[s];
 
+                        var firstVertex = baseIndex;
                         var indexbuffer = null;
                         var numIndices;
-                        var sourceData;
-                        var t, i;
-                        var nextIndex, index;
-                        var firstVertex = baseIndex;
-
-                        //var startTime = TurbulenzEngine.time;
 
                         faces = destSurface.faces;
                         delete destSurface.faces;
@@ -3386,236 +3426,59 @@ Scene.prototype =
                         if (faces)
                         {
 
-                            var vertexData = [];        // Array of size numVertices * stride
-                            var vertexDataCount = 0;
                             var indexData = [];
+                            // Vertices already de-indexed (1 index per vert)
 
-                            if (1 < indicesPerVertex)
+                            numIndices = faces.length;
+                            numVertices = destSurface.numVertices;
+
+                            //See if they are all sequential, in which case we don't need an index buffer
+                            var sequentialIndices = true;
+                            var lastIndex = faces[0];
+                            nextIndex = 0;
+                            for (t = 1; t < numIndices; t += 1)
                             {
-                                numVertices = destSurface.numVertices;
-
-                                // Indices per vertex
-                                var maxSurfaceOffset = (faces.length / numVertices);
-
-                                if (maxSurfaceOffset === numVertexSources)
+                                nextIndex = faces[t];
+                                if (nextIndex !== lastIndex + 1)
                                 {
-                                    // There is exactly one vertex
-                                    // source per offset
-
-                                    for (t = 0, i = 0; t < numVertices; t += 1)
-                                    {
-                                        vs = 0;
-                                        do
-                                        {
-                                            vertexSource = vertexSources[vs];
-                                            sourceData = vertexSource.data;
-                                            stride = vertexSource.stride;
-                                            index = (faces[i] * stride);
-                                            nextIndex = (index + stride);
-                                            destStride = vertexSource.destStride;
-                                            do
-                                            {
-                                                vertexData[vertexDataCount] = sourceData[index];
-                                                vertexDataCount += 1;
-                                                index += 1;
-                                            }
-                                            while (index < nextIndex);
-
-                                            while (stride < destStride)
-                                            {
-                                                vertexData[vertexDataCount] = 0;
-                                                vertexDataCount += 1;
-                                                destStride -= 1;
-                                            }
-
-                                            vs += 1;
-                                            i += 1;
-                                        }
-                                        while (vs < numVertexSources);
-                                    }
+                                    sequentialIndices = false;
+                                    break;
                                 }
-                                else
+                                lastIndex = nextIndex;
+                            }
+
+                            if (sequentialIndices === false)
+                            {
+                                var vertexDataIndexData = [];
+                                vertexDataIndexData.length = numIndices;
+                                var maxIndex = 0;
+                                for (t = 0; t < numIndices; t += 1)
                                 {
-                                    // There may be multiple
-                                    // vertex sources per offset
-                                    for (t = 0, i = 0; t < numVertices; t += 1)
-                                    {
-                                        vs = 0;
-
-                                        // Vertices have been
-                                        // sorted by offset so we
-                                        // can iterate through in
-                                        // order.
-
-                                        do
-                                        {
-                                            vertexSource = vertexSources[vs];
-                                            sourceData = vertexSource.data;
-                                            stride = vertexSource.stride;
-                                            offset = vertexSource.offset;
-                                            destStride = vertexSource.destStride;
-                                            if (offset < maxSurfaceOffset)
-                                            {
-                                                // Write data from this offset
-
-                                                index = (faces[i + offset] * stride);
-                                                nextIndex = (index + stride);
-                                                do
-                                                {
-                                                    vertexData[vertexDataCount] = sourceData[index];
-                                                    vertexDataCount += 1;
-                                                    index += 1;
-                                                }
-                                                while (index < nextIndex);
-
-                                                while (stride < destStride)
-                                                {
-                                                    vertexData[vertexDataCount] = 0;
-                                                    vertexDataCount += 1;
-                                                    destStride -= 1;
-                                                }
-                                            }
-                                            else
-                                            {
-                                                // Offset of this
-                                                // vertex source
-                                                // is out of
-                                                // range.  Fill in
-                                                // with zeroes.
-
-                                                // COMMENT: When will this occur.  Can we remove it?
-
-                                                nextIndex = (vertexDataCount + stride);
-                                                do
-                                                {
-                                                    vertexData[vertexDataCount] = 0;
-                                                    vertexDataCount += 1;
-                                                }
-                                                while (vertexDataCount < nextIndex);
-
-                                                while (stride < destStride)
-                                                {
-                                                    vertexData[vertexDataCount] = 0;
-                                                    vertexDataCount += 1;
-                                                    destStride -= 1;
-                                                }
-                                            }
-                                            vs += 1;
-                                        }
-                                        while (vs < numVertexSources);
-
-                                        i += maxSurfaceOffset;
-                                    }
+                                    vertexDataIndexData[t] = faces[t] + firstVertex;
+                                    maxIndex = Math.max(maxIndex, vertexDataIndexData[t]);
                                 }
+
+                                var indexbufferParameters =
+                                {
+                                    numIndices: numIndices,
+                                    format: (maxIndex < 65536 ? 'USHORT' : 'UINT'),
+                                    data: vertexDataIndexData,
+                                    dynamic: false
+                                };
+
+                                indexbuffer = gd.createIndexBuffer(indexbufferParameters);
+                                if (!indexbuffer)
+                                {
+                                    return undefined;
+                                }
+
+                                indexData = faces;
                             }
                             else
                             {
-                                // Vertices already de-indexed (1 index per vert)
-
-                                numIndices = faces.length;
-                                numVertices = (vertexSources[0].data.length / vertexSources[0].stride);
-
-                                // extract data
-                                if (numVertices < numIndices)
-                                {
-                                    // Fewer vertices than indices.
-                                    // Create an index buffer
-                                    for (t = 0; t < numVertices; t += 1)
-                                    {
-                                        vs = 0;
-                                        do
-                                        {
-                                            vertexSource = vertexSources[vs];
-                                            sourceData = vertexSource.data;
-                                            stride = vertexSource.stride;
-                                            index = (t * stride);
-                                            nextIndex = (index + stride);
-                                            destStride = vertexSource.destStride;
-                                            do
-                                            {
-                                                vertexData[vertexDataCount] = sourceData[index];
-                                                vertexDataCount += 1;
-                                                index += 1;
-                                            }
-                                            while (index < nextIndex);
-
-                                            while (stride < destStride)
-                                            {
-                                                vertexData[vertexDataCount] = 0;
-                                                vertexDataCount += 1;
-                                                destStride -= 1;
-                                            }
-
-                                            vs += 1;
-                                        }
-                                        while (vs < numVertexSources);
-                                    }
-
-                                    //Utilities.log("VertexBuffer creation time: " + (TurbulenzEngine.time - startTime));
-
-                                    var vertexDataIndexData = [];
-                                    vertexDataIndexData.length = numIndices;
-                                    for (t = 0; t < numIndices; t += 1)
-                                    {
-                                        vertexDataIndexData[t] = faces[t] + firstVertex;
-                                    }
-
-                                    var indexbufferParameters =
-                                    {
-                                        numIndices: numIndices,
-                                        format: ((firstVertex + numVertices) <= 65536 ? 'USHORT' : 'UINT'),
-                                        data: vertexDataIndexData,
-                                        dynamic: false
-                                    };
-                                    indexbuffer = gd.createIndexBuffer(indexbufferParameters);
-                                    if (!indexbuffer)
-                                    {
-                                        window.alert("IndexBuffer not created.");
-                                    }
-                                    indexData = faces;
-                                }
-                                else
-                                {
-                                    // At least as many vertices as
-                                    // indices.  Must be unused
-                                    // vertices.  De-index directly
-                                    // into the vertex buffer.
-
-                                    //alert("numVertices : " + numVertices + "\nnumIndices: " + numIndices);
-                                    numVertices = numIndices;
-
-                                    for (i = 0; i < numIndices; i += 1)
-                                    {
-                                        vs = 0;
-                                        do
-                                        {
-                                            vertexSource = vertexSources[vs];
-                                            sourceData = vertexSource.data;
-                                            stride = vertexSource.stride;
-                                            index = (faces[i] * stride);
-                                            nextIndex = (index + stride);
-                                            destStride = vertexSource.destStride;
-                                            do
-                                            {
-                                                vertexData[vertexDataCount] = sourceData[index];
-                                                vertexDataCount += 1;
-                                                index += 1;
-                                            }
-                                            while (index < nextIndex);
-
-                                            while (stride < destStride)
-                                            {
-                                                vertexData[vertexDataCount] = 0;
-                                                vertexDataCount += 1;
-                                                destStride -= 1;
-                                            }
-
-                                            vs += 1;
-                                        }
-                                        while (vs < numVertexSources);
-                                    }
-                                }
+                                firstVertex += faces[0];
                             }
+
                             if (indexbuffer)
                             {
                                 destSurface.indexBuffer = indexbuffer;
@@ -3631,8 +3494,6 @@ Scene.prototype =
                                 destSurface.first = firstVertex;
                             }
 
-                            vertexbuffer.setData(vertexData, firstVertex, numVertices);
-                            baseIndex = firstVertex + numVertices;
                             if (keepVertexData)
                             {
                                 destSurface.vertexData = vertexData;
@@ -3642,7 +3503,6 @@ Scene.prototype =
                         {
                             delete shape.surfaces[s];
                         }
-
                     }
                 }
 
@@ -3887,11 +3747,10 @@ Scene.prototype =
                     if (material)
                     {
                         lightParams.material = material;
-                        var techniqueParameters = material.techniqueParameters;
 
-                        if (techniqueParameters.effect)
+                        if (material.effectName)
                         {
-                            techniqueParameters.effect = undefined; // Some browsers don't support delete on NPObjects
+                            delete material.effectName;
                             material.loadTextures(textureManager);
                         }
                     }
@@ -4023,8 +3882,8 @@ Scene.prototype =
                                 // Load the textures since if the effect is undefined then scene.loadMaterial
                                 // has not yet been called for this material
                                 sharedMaterial.loadTextures(textureManager);
-                                var effectName = sharedMaterial.techniqueParameters.effect;
-                                sharedMaterial.techniqueParameters.effect = undefined; // Some browsers don't support delete on NPObjects
+                                var effectName = sharedMaterial.effectName;
+                                delete sharedMaterial.effectName;
                                 effect = effectManager.get(effectName);
                                 if (effect)
                                 {

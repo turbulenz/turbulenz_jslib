@@ -472,7 +472,7 @@ CameraController.prototype =
             turn *= this.rotateSpeed * degreestoradians;
             turn *= this.mouseRotateFactor;
 
-            rotate = md.m43FromAxisRotation(md.v3Build(0, 1, 0), turn);
+            rotate = md.m43FromAxisRotation(md.v3BuildYAxis(), turn);
 
             matrix = md.m43Mul(matrix, rotate);
         }
@@ -570,21 +570,10 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
     c.padforward = 0.0;
     c.padbackward = 0.0;
 
-    var oldOnKeyDown, oldOnKeyUp, oldOnMouseUp, oldOnMouseWheel, oldOnMouseMove,
-    oldOnPadMove, oldOnMouseLockLost;
-
     var keyCodes;
 
     if (id)
     {
-        oldOnKeyDown = id.onkeydown;
-        oldOnKeyUp = id.onkeyup;
-        oldOnMouseUp = id.onmouseup;
-        oldOnMouseWheel = id.onmousewheel;
-        oldOnMouseMove = id.onmousemove;
-        oldOnPadMove = id.onpadmove;
-        oldOnMouseLockLost = id.onmouselocklost;
-
         keyCodes = id.keyCodes;
     }
 
@@ -626,11 +615,6 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
         case keyCodes.NUMPAD_7:
             c.down = 1.0;
             break;
-        }
-
-        if (oldOnKeyDown)
-        {
-            oldOnKeyDown(keynum);
         }
     }
 
@@ -676,11 +660,6 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
             gd.fullscreen = !gd.fullscreen;
             break;
         }
-
-        if (oldOnKeyUp)
-        {
-            oldOnKeyUp(keynum);
-        }
     }
 
     if (log)
@@ -717,32 +696,17 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
         {
             id.lockMouse();
         }
-
-        if (oldOnMouseUp)
-        {
-            oldOnMouseUp(button, x, y);
-        }
     };
 
     c.onmousewheel = function onmousewheelFn(delta)
     {
         c.step = delta * 5;
-
-        if (oldOnMouseMove)
-        {
-            oldOnMouseMove(delta);
-        }
     };
 
     c.onmousemove = function onmousemoveFn(deltaX, deltaY)
     {
         c.turn  += deltaX;
         c.pitch += deltaY;
-
-        if (oldOnMouseMove)
-        {
-            oldOnMouseMove(deltaX, deltaY);
-        }
     };
 
     // Pad handling
@@ -772,11 +736,6 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
             c.padforward  = 0.0;
             c.padbackward = -rY;
         }
-
-        if (oldOnPadMove)
-        {
-            oldOnPadMove(lX, lY, lZ, rX, rY, rZ, dpadState);
-        }
     };
 
     c.onmouselocklost = function onmouselocklostFn()
@@ -787,13 +746,13 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
     // Attach to an InputDevice
     c.attach = function attachFn(id)
     {
-        id.onkeydown        = c.onkeydown;
-        id.onkeyup          = c.onkeyup;
-        id.onmouseup        = c.onmouseup;
-        id.onmousewheel     = c.onmousewheel;
-        id.onmousemove      = c.onmousemove;
-        id.onpadmove        = c.onpadmove;
-        id.onmouselocklost  = c.onmouselocklost;
+        id.addEventListener('keydown', c.onkeydown);
+        id.addEventListener('keyup', c.onkeyup);
+        id.addEventListener('mouseup', c.onmouseup);
+        id.addEventListener('mousewheel', c.onmousewheel);
+        id.addEventListener('mousemove', c.onmousemove);
+        id.addEventListener('padmove', c.onpadmove);
+        id.addEventListener('mouselocklost', c.onmouselocklost);
     };
 
     if (id)

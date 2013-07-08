@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 
 function DrawPrimitives() {}
 DrawPrimitives.prototype =
@@ -53,11 +53,13 @@ DrawPrimitives.prototype =
         this.rectPositions = gd.createVertexBuffer(this.rectPositionsParameters);
         this.rectTexPrimitive = gd.PRIMITIVE_TRIANGLE_STRIP;
         this.rectTexPositions = gd.createVertexBuffer(this.rectTexPositionsParameters);
-        if (!this.boxPositions || !this.rectPositions || !this.rectTexPositions)
-        {
-            window.alert("Buffers not created.");
-        }
-        else
+
+        Utilities.assert((this.boxPositions && this.rectPositions && this.rectTexPositions),
+                         "Buffers not created.");
+
+        if (this.boxPositions &&
+            this.rectPositions &&
+            this.rectTexPositions)
         {
             var that = this;
             var fileName = shaderPath + this.shaderName;
@@ -103,7 +105,6 @@ DrawPrimitives.prototype =
 
     update2DTex : function update2DTexFn(posa, posb)
     {
-        var gd = this.device;
         var positions = this.rectTexPositions;
         var writer = positions.map();
         if (writer)
@@ -140,7 +141,6 @@ DrawPrimitives.prototype =
 
     update2D : function update2DFn(posa, posb)
     {
-        var gd = this.device;
         var positions = this.rectPositions;
         var writer = positions.map();
         if (writer)
@@ -168,7 +168,6 @@ DrawPrimitives.prototype =
 
     update : function updateFn(posa, posb)
     {
-        var gd = this.device;
         var positions = this.boxPositions;
         var writer = positions.map();
         if (writer)

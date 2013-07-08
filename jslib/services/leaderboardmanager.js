@@ -1,7 +1,6 @@
-// Copyright (c) 2011 Turbulenz Limited
+// Copyright (c) 2011-2012 Turbulenz Limited
 
 /*global TurbulenzEngine: false*/
-/*global Utilities: false*/
 
 //
 // API
@@ -13,6 +12,13 @@ LeaderboardManager.prototype =
 
     getOverview: function leaderboardManagerGetOverviewFn(spec, callbackFn, errorCallbackFn)
     {
+        var errorCallback = errorCallbackFn || this.errorCallbackFn;
+        if (!this.meta)
+        {
+            errorCallback("The leaderboard manager failed to initialize properly.");
+            return;
+        }
+
         var that = this;
         function getOverviewCallbackFn(jsonResponse, status)
         {
@@ -29,7 +35,6 @@ LeaderboardManager.prototype =
             }
             else
             {
-                var errorCallback = errorCallbackFn || that.errorCallbackFn;
                 errorCallback("LeaderboardManager.getKeys failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               that.getOverview,
@@ -45,10 +50,9 @@ LeaderboardManager.prototype =
 
         dataSpec.gameSessionId = that.gameSessionId;
 
-        Utilities.ajax({
+        this.service.request({
             url: '/api/v1/leaderboards/scores/read/' + that.gameSession.gameSlug,
             method: 'GET',
-            async: true,
             data : dataSpec,
             callback: getOverviewCallbackFn,
             requestHandler: this.requestHandler
@@ -57,8 +61,17 @@ LeaderboardManager.prototype =
 
     get: function leaderboardManagerGetFn(key, spec, callbackFn, errorCallbackFn)
     {
-        if (!this.meta || !this.meta.hasOwnProperty(key))
+        var errorCallback = errorCallbackFn || this.errorCallbackFn;
+        if (!this.meta)
         {
+            errorCallback("The leaderboard manager failed to initialize properly.");
+            return;
+        }
+
+        var meta = this.meta[key];
+        if (!meta)
+        {
+            errorCallback("No leaderboard with the name '" + key + "' exists.");
             return;
         }
 
@@ -68,15 +81,39 @@ LeaderboardManager.prototype =
             if (status === 200)
             {
                 var data = jsonResponse.data;
-                if (data.playerIndex)
+                var player = data.player;
+                var entities = data.entities;
+                var ranking = data.ranking;
+                var player_user_id;
+                var user_id;
+
+                if (player)
                 {
-                    that.meta[key].bestScore = data.ranking[data.playerIndex].score;
+                    that.meta[key].bestScore = player.score;
+                    player_user_id = player.user;
+                    player.user = entities[player_user_id];
                 }
+
+                var rankingLength = ranking.length;
+                var i;
+                var topEqualRank;
+                for (i = 0; i < rankingLength; i += 1)
+                {
+                    var rank = ranking[i];
+
+                    user_id = rank.user;
+                    if (user_id === player_user_id)
+                    {
+                        data.playerIndex = i;
+                        rank.me = true;
+                    }
+                    rank.user = entities[user_id];
+                }
+
                 callbackFn(key, data);
             }
             else
             {
-                var errorCallback = errorCallbackFn || that.errorCallbackFn;
                 errorCallback("LeaderboardManager.get failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               that.get,
@@ -85,13 +122,32 @@ LeaderboardManager.prototype =
         }
 
         var dataSpec = {};
+
+        // backwards compatibility
         if (spec.numNear)
         {
-            dataSpec.numnear = spec.numNear;
+            dataSpec.type = 'near';
+            dataSpec.size = spec.numNear * 2 + 1;
         }
         if (spec.numTop)
         {
-            dataSpec.numtop = spec.numTop;
+            dataSpec.type = 'top';
+            dataSpec.size = spec.numTop;
+        }
+
+        // new arguments
+        if (spec.size)
+        {
+            dataSpec.size = spec.size;
+        }
+        if (!dataSpec.size)
+        {
+            // default value
+            dataSpec.size = 9;
+        }
+        if (spec.type)
+        {
+            dataSpec.type = spec.type;
         }
         if (spec.friendsOnly)
         {
@@ -100,10 +156,9 @@ LeaderboardManager.prototype =
 
         dataSpec.gameSessionId = that.gameSessionId;
 
-        Utilities.ajax({
+        this.service.request({
             url: '/api/v1/leaderboards/scores/read/' + that.gameSession.gameSlug + '/' + key,
             method: 'GET',
-            async: true,
             data : dataSpec,
             callback: getCallbackFn,
             requestHandler: this.requestHandler
@@ -112,15 +167,23 @@ LeaderboardManager.prototype =
 
     set: function leaderboardManagerSetFn(key, score, callbackFn, errorCallbackFn)
     {
-        if (!this.meta || !this.meta.hasOwnProperty(key))
+        var errorCallback = errorCallbackFn || this.errorCallbackFn;
+        if (!this.meta)
         {
+            errorCallback("The leaderboard manager failed to initialize properly.");
             return;
         }
 
         var meta = this.meta[key];
+        if (!meta)
+        {
+            errorCallback("No leaderboard with the name '" + key + "' exists.");
+            return;
+        }
+
         var sortBy = meta.sortBy;
         var bestScore = meta.bestScore;
-        // Avoid making an Ajax query if the new score is worse than current score
+        // Avoid making an ajax query if the new score is worse than current score
         if (bestScore && ((sortBy === 1 && score <= bestScore) || (sortBy === -1 && score >= bestScore)))
         {
             TurbulenzEngine.setTimeout(function () {
@@ -146,7 +209,6 @@ LeaderboardManager.prototype =
             }
             else
             {
-                var errorCallback = errorCallbackFn || that.errorCallbackFn;
                 errorCallback("LeaderboardManager.set failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               that.set,
@@ -158,14 +220,13 @@ LeaderboardManager.prototype =
         dataSpec.score = score;
         dataSpec.gameSessionId = that.gameSessionId;
 
-        Utilities.ajax({
+        this.service.request({
             url: '/api/v1/leaderboards/scores/set/' + key,
             method: 'POST',
-            async: true,
             data : dataSpec,
             callback: setCallbackFn,
-            encrypt: true,
-            requestHandler: this.requestHandler
+            requestHandler: this.requestHandler,
+            encrypt: true
         });
     }
 };

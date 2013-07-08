@@ -1,5 +1,9 @@
 // Copyright (c) 2011 Turbulenz Limited
 
+/*global TurbulenzServices: false*/
+/*global ServiceRequester: false*/
+/*global Utilities: false*/
+
 //
 // API
 //
@@ -48,14 +52,13 @@ UserDataManager.prototype =
         var dataSpec = {};
         dataSpec.gameSessionId = that.gameSessionId;
 
-        Utilities.ajax({
+        this.service.request({
             url: '/api/v1/user-data/get-keys',
             method: 'GET',
-            async: true,
             data: dataSpec,
             callback: getKeysCallbackFn,
-            encrypt: true,
-            requestHandler: this.requestHandler
+            requestHandler: this.requestHandler,
+            encrypt: true
         });
     },
 
@@ -86,14 +89,13 @@ UserDataManager.prototype =
         var dataSpec = {};
         dataSpec.gameSessionId = that.gameSessionId;
 
-        Utilities.ajax({
+        this.service.request({
             url: '/api/v1/user-data/exists/' + key,
             method: 'GET',
-            async: true,
             data: dataSpec,
             callback: existsCallbackFn,
-            encrypt: true,
-            requestHandler: this.requestHandler
+            requestHandler: this.requestHandler,
+            encrypt: true
         });
     },
 
@@ -128,14 +130,13 @@ UserDataManager.prototype =
         var dataSpec = {};
         dataSpec.gameSessionId = that.gameSessionId;
 
-        Utilities.ajax({
+        this.service.request({
             url: '/api/v1/user-data/get/' + key,
             method: 'GET',
-            async: true,
             data: dataSpec,
             callback: getCallbackFn,
-            encrypt: true,
-            requestHandler: this.requestHandler
+            requestHandler: this.requestHandler,
+            encrypt: true
         });
     },
 
@@ -173,14 +174,13 @@ UserDataManager.prototype =
         dataSpec.value = value;
         dataSpec.gameSessionId = that.gameSessionId;
 
-        Utilities.ajax({
+        this.service.request({
             url: '/api/v1/user-data/set/' + key,
             method: 'POST',
-            async: true,
             data : dataSpec,
             callback: setCallbackFn,
-            encrypt: true,
-            requestHandler: this.requestHandler
+            requestHandler: this.requestHandler,
+            encrypt: true
         });
     },
 
@@ -215,14 +215,13 @@ UserDataManager.prototype =
         var dataSpec = {};
         dataSpec.gameSessionId = that.gameSessionId;
 
-        Utilities.ajax({
+        this.service.request({
             url: '/api/v1/user-data/remove/' + key,
             method: 'POST',
-            async: true,
             data: dataSpec,
             callback: removeCallbackFn,
-            encrypt: true,
-            requestHandler: this.requestHandler
+            requestHandler: this.requestHandler,
+            encrypt: true
         });
     },
 
@@ -248,14 +247,13 @@ UserDataManager.prototype =
         var dataSpec = {};
         dataSpec.gameSessionId = that.gameSessionId;
 
-        Utilities.ajax({
+        this.service.request({
             url: '/api/v1/user-data/remove-all',
             method: 'POST',
-            async: true,
             data: dataSpec,
             callback: removeAllCallbackFn,
-            encrypt: true,
-            requestHandler: this.requestHandler
+            requestHandler: this.requestHandler,
+            encrypt: true
         });
     }
 
@@ -273,6 +271,8 @@ UserDataManager.create = function UserDataManagerCreateFn(requestHandler, gameSe
     userdataManager.requestHandler = requestHandler;
     userdataManager.errorCallbackFn = errorCallbackFn || TurbulenzServices.defaultErrorCallback;
     userdataManager.gameSessionId = gameSession.gameSessionId;
+
+    userdataManager.service = TurbulenzServices.getService('userdata');
 
     return userdataManager;
 };

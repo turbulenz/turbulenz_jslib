@@ -515,12 +515,18 @@ TextureManager.create = function textureManagerCreateFn(gd, rh, dt, errorCallbac
             if (onTextureLoaded)
             {
                 var texturesInArchive = archive.textures;
+                var numTexturesLoading = 0;
 
                 var textureAlreadyLoadedWrapper = function textureAlreadyLoadedWrapper(texture)
                 {
                     return function textureAlreadyLoadedFn()
                     {
                         onTextureLoaded(texture);
+                        numTexturesLoading -= 1;
+                        if (numTexturesLoading === 0 && onArchiveLoaded)
+                        {
+                            onArchiveLoaded(archive);
+                        }
                     };
                 };
 
@@ -528,19 +534,11 @@ TextureManager.create = function textureManagerCreateFn(gd, rh, dt, errorCallbac
                 {
                     if (texturesInArchive.hasOwnProperty(t))
                     {
+                        numTexturesLoading += 1;
                         // the callback should always be called asynchronously
                         TurbulenzEngine.setTimeout(textureAlreadyLoadedWrapper(texturesInArchive[t]), 0);
                     }
                 }
-            }
-
-            if (onArchiveLoaded)
-            {
-                // the callback should always be called asynchronously
-                TurbulenzEngine.setTimeout(function textureArchiveAlreadyLoadedFn()
-                    {
-                        onArchiveLoaded(archive);
-                    }, 0);
             }
         }
     }

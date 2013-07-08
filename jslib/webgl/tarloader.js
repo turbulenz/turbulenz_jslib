@@ -1,4 +1,5 @@
-// Copyright (c) 2011 Turbulenz Limited
+// Copyright (c) 2011-2012 Turbulenz Limited
+/*global TurbulenzEngine*/
 /*global Uint8Array*/
 /*global window*/
 "use strict";
@@ -259,15 +260,18 @@ TARLoader.create = function tgaLoaderFn(params)
             }
         };
         xhr.open("GET", params.src, true);
-        if (xhr.hasOwnProperty("responseType"))
+        if (xhr.hasOwnProperty && xhr.hasOwnProperty("responseType"))
         {
             xhr.responseType = "arraybuffer";
         }
-        else
+        else if (xhr.overrideMimeType)
         {
             xhr.overrideMimeType("text/plain; charset=x-user-defined");
         }
-        xhr.setRequestHeader("Content-Type", "text/plain");
+        else
+        {
+            xhr.setRequestHeader("Content-Type", "text/plain; charset=x-user-defined");
+        }
         xhr.send(null);
     }
 

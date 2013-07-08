@@ -1,8 +1,9 @@
-// Copyright (c) 2011 Turbulenz Limited
+// Copyright (c) 2011-2012 Turbulenz Limited
 /*global VMathArrayConstructor: true*/
 /*global VMath*/
 /*global WebGLGraphicsDevice*/
 /*global WebGLInputDevice*/
+/*global WebGLSoundDevice*/
 /*global WebGLPhysicsDevice*/
 /*global WebGLNetworkDevice*/
 /*global Float32Array*/
@@ -17,7 +18,7 @@
 function WebGLTurbulenzEngine() {}
 WebGLTurbulenzEngine.prototype = {
 
-    version : '0.18.0',
+    version : '0.19.0',
 
     setInterval: function (f, t)
     {
@@ -72,14 +73,24 @@ WebGLTurbulenzEngine.prototype = {
 
     createSoundDevice: function (params)
     {
-        var plugin = this.getPluginObject();
-        if (plugin)
+        if (this.soundDevice)
         {
-            return plugin.createSoundDevice(params);
+            throw 'SoundDevice already created';
         }
         else
         {
-            return null;
+            var soundDevice;
+            var plugin = this.getPluginObject();
+            if (plugin)
+            {
+                soundDevice = plugin.createSoundDevice(params);
+            }
+            else
+            {
+                soundDevice = WebGLSoundDevice.create(params);
+            }
+            this.soundDevice = soundDevice;
+            return soundDevice;
         }
     },
 
@@ -116,46 +127,55 @@ WebGLTurbulenzEngine.prototype = {
         // Check if the browser supports using apply with Float32Array
         try
         {
-            VMath.v3Build.apply(VMath, new Float32Array([1, 2, 3]));
+            var testVector = new Float32Array([1, 2, 3]);
 
-            Float32Array.prototype.slice = function Float32ArraySlice(s, e)
+            VMath.v3Build.apply(VMath, testVector);
+
+            if (Float32Array.prototype.slice === undefined)
             {
-                var length = this.length;
-                if (s === undefined)
+                Float32Array.prototype.slice = function Float32ArraySlice(s, e)
                 {
-                    s = 0;
-                }
-                else if (s < 0)
-                {
-                    s += length;
-                }
-                if (e === undefined)
-                {
-                    e = length;
-                }
-                else if (e < 0)
-                {
-                    e += length;
-                }
-                length = (e - s);
-                if (0 < length)
-                {
-                    var dst = new Float32Array(length);
-                    var n = 0;
-                    do
+                    var length = this.length;
+                    if (s === undefined)
                     {
-                        dst[n] = this[s];
-                        n += 1;
-                        s += 1;
+                        s = 0;
                     }
-                    while (s < e);
-                    return dst;
-                }
-                else
-                {
-                    return new Float32Array();
-                }
-            };
+                    else if (s < 0)
+                    {
+                        s += length;
+                    }
+                    if (e === undefined)
+                    {
+                        e = length;
+                    }
+                    else if (e < 0)
+                    {
+                        e += length;
+                    }
+                    length = (e - s);
+                    if (0 < length)
+                    {
+                        var dst = new Float32Array(length);
+                        var n = 0;
+                        do
+                        {
+                            dst[n] = this[s];
+                            n += 1;
+                            s += 1;
+                        }
+                        while (s < e);
+                        return dst;
+                    }
+                    else
+                    {
+                        return new Float32Array();
+                    }
+                };
+            }
+
+            // Clamp FLOAT_MAX
+            testVector[0] = VMath.FLOAT_MAX;
+            VMath.FLOAT_MAX = testVector[0];
 
             VMathArrayConstructor = Float32Array;
         }
@@ -168,7 +188,16 @@ WebGLTurbulenzEngine.prototype = {
 
     getGraphicsDevice: function ()
     {
-        return this.graphicsDevice;
+        var graphicsDevice = this.graphicsDevice;
+        if (graphicsDevice === null)
+        {
+            var onerror = this.onerror;
+            if (onerror)
+            {
+                onerror("GraphicsDevice not created yet.");
+            }
+        }
+        return graphicsDevice;
     },
 
     getPhysicsDevice: function ()
@@ -178,15 +207,7 @@ WebGLTurbulenzEngine.prototype = {
 
     getSoundDevice: function ()
     {
-        var plugin = this.getPluginObject();
-        if (plugin)
-        {
-            return plugin.getSoundDevice();
-        }
-        else
-        {
-            return null;
-        }
+        return this.soundDevice;
     },
 
     getInputDevice: function ()
@@ -236,7 +257,7 @@ WebGLTurbulenzEngine.prototype = {
 
     onerror: function (msg)
     {
-        window.alert(msg);
+        Utilities.assert(false, msg);
     },
 
     onwarning: function (msg)
@@ -246,7 +267,7 @@ WebGLTurbulenzEngine.prototype = {
 
     getSystemInfo: function ()
     {
-        return {};
+        return this.systemInfo;
     },
 
     request: function (url, callback)
@@ -332,6 +353,10 @@ WebGLTurbulenzEngine.prototype = {
         {
             delete this.physicsDevice;
         }
+        if (this.soundDevice)
+        {
+            delete this.soundDevice;
+        }
         if (this.graphicsDevice)
         {
             delete this.graphicsDevice;
@@ -339,6 +364,10 @@ WebGLTurbulenzEngine.prototype = {
         if (this.canvas)
         {
             delete this.canvas;
+        }
+        if (this.resizeCanvas)
+        {
+            window.removeEventListener('resize', this.resizeCanvas, false);
         }
     },
 
@@ -365,6 +394,10 @@ WebGLTurbulenzEngine.prototype = {
             if (this.onunload)
             {
                 this.onunload();
+            }
+            if (this.destroy)
+            {
+                this.destroy();
             }
         }
     },
@@ -411,6 +444,9 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
     var canvas = params.canvas;
     var fillParent = params.fillParent;
 
+    // To expose unload (the whole interaction needs a re-design)
+    window.TurbulenzEngineCanvas = tz;
+
     tz.pluginId = params.pluginId;
     tz.plugin = null;
 
@@ -421,7 +457,18 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
                     return tz.getTime();
                 },
                 set : function (newValue) {
-                    tz.baseTime = ((Date.now() * 0.001) - newValue);
+                    if (typeof newValue === 'number')
+                    {
+                        tz.baseTime = ((Date.now() * 0.001) - newValue);
+                    }
+                    else
+                    {
+                        var onerror = tz.onerror;
+                        if (onerror)
+                        {
+                            onerror("Must set 'time' attribute to a number");
+                        }
+                    }
                 },
                 enumerable : false,
                 configurable : false
@@ -655,26 +702,30 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
     }
 
     tz.canvas = canvas;
+    tz.networkDevice = null;
+    tz.inputDevice = null;
+    tz.physicsDevice = null;
+    tz.soundDevice = null;
+    tz.graphicsDevice = null;
 
     if (fillParent)
     {
         // Resize canvas to fill parent
-        var resizeCanvas = function resizeCanvasFn()
+        tz.resizeCanvas = function ()
         {
             canvas.width = canvas.parentNode.clientWidth;
             canvas.height = canvas.parentNode.clientHeight;
         };
 
-        resizeCanvas();
+        tz.resizeCanvas();
 
-        window.addEventListener('resize', resizeCanvas, false);
+        window.addEventListener('resize', tz.resizeCanvas, false);
     }
 
     var previousOnBeforeUnload = window.onbeforeunload;
     window.onbeforeunload = function ()
     {
         tz.unload();
-        tz.destroy();
 
         if (previousOnBeforeUnload)
         {
@@ -686,5 +737,77 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
     tz.baseTime = tz.getTime();
     tz.time = 0;
 
+    // System info
+    var systemInfo = {
+        architecture: '',
+        cpuDescription: '',
+        cpuVendor: '',
+        numPhysicalCores: 1,
+        numLogicalCores: 1,
+        ramInMegabytes: 0,
+        frequencyInMegaHZ: 0,
+        osVersionMajor: 0,
+        osVersionMinor: 0,
+        osVersionBuild: 0,
+        osName: navigator.platform,
+        userLocale: (navigator.language || navigator.userLanguage).replace('-', '_')
+    };
+    var userAgent = navigator.userAgent;
+    var osIndex = userAgent.indexOf('Windows');
+    if (osIndex !== -1)
+    {
+        systemInfo.osName = 'Windows';
+        if (navigator.platform === 'Win64')
+        {
+            systemInfo.architecture = 'x86_64';
+        }
+        else if (navigator.platform === 'Win32')
+        {
+            systemInfo.architecture = 'x86';
+        }
+        osIndex += 7;
+        if (userAgent.slice(osIndex, (osIndex + 4)) === ' NT ')
+        {
+            osIndex += 4;
+            systemInfo.osVersionMajor = parseInt(userAgent.slice(osIndex, (osIndex + 1)), 10);
+            systemInfo.osVersionMinor = parseInt(userAgent.slice((osIndex + 2), (osIndex + 4)), 10);
+        }
+    }
+    else
+    {
+        osIndex = userAgent.indexOf('Mac OS X');
+        if (osIndex !== -1)
+        {
+            systemInfo.osName = 'Darwin';
+            if (navigator.platform.indexOf('Intel') !== -1)
+            {
+                systemInfo.architecture = 'x86';
+            }
+            osIndex += 9;
+            systemInfo.osVersionMajor = parseInt(userAgent.slice(osIndex, (osIndex + 2)), 10);
+            systemInfo.osVersionMinor = parseInt(userAgent.slice((osIndex + 3), (osIndex + 4)), 10);
+            systemInfo.osVersionBuild = (parseInt(userAgent.slice((osIndex + 5), (osIndex + 6)), 10) || 0);
+        }
+        else
+        {
+            osIndex = userAgent.indexOf('Linux');
+            if (osIndex !== -1)
+            {
+                systemInfo.osName = 'Linux';
+                if (navigator.platform.indexOf('64') !== -1)
+                {
+                    systemInfo.architecture = 'x86_64';
+                }
+                else if (navigator.platform.indexOf('x86') !== -1)
+                {
+                    systemInfo.architecture = 'x86';
+                }
+            }
+        }
+    }
+    tz.systemInfo = systemInfo;
+
     return tz;
 };
+
+window.WebGLTurbulenzEngine = WebGLTurbulenzEngine;

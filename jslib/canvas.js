@@ -956,7 +956,7 @@ CanvasContext.prototype =
 
             gd.setTechnique(technique);
 
-            technique.screen = screen;
+            technique.screen = this.screen;
             technique.color = this.v4Zero;
 
             gd.draw(this.triangleStripPrimitive, 4);

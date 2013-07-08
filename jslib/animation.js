@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 /*global TurbulenzEngine: false*/
 /*global window: false*/
 
@@ -1237,10 +1237,10 @@ BlendController.create = function blendControllerCreateFn(controllers)
     {
         var inputController = controllers[i];
         c.controllers[i] = inputController;
-        if (inputController.getHierarchy().numNodes !== c.getHierarchy().numNodes)
-        {
-            window.alert("All controllers to a blend controller must have the same number of joints");
-        }
+
+        Utilities.assert(inputController.getHierarchy().numNodes === c.getHierarchy().numNodes,
+                         "All controllers to a blend controller must have the same number of joints");
+
         AnimationChannels.add(c.outputChannels, inputController.outputChannels);
     }
 
@@ -1519,10 +1519,10 @@ MaskController.create = function maskControllerCreateFn(controllers)
     {
         var inputController = controllers[i];
         c.controllers[i] = inputController;
-        if (inputController.getHierarchy().numNodes !== c.getHierarchy().numNodes)
-        {
-            window.alert("All controllers to a mask controller must have the same number of joints");
-        }
+
+        Utilities.assert(inputController.getHierarchy().numNodes === c.getHierarchy().numNodes,
+                         "All controllers to a mask controller must have the same number of joints");
+
         AnimationChannels.add(c.outputChannels, inputController.outputChannels);
     }
 

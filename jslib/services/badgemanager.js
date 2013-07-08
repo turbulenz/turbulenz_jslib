@@ -1,11 +1,13 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
-/*global TurbulenzGamesiteBridge*/
+// Copyright (c) 2011-2012 Turbulenz Limited
+
+/*global TurbulenzBridge*/
+/*global Utilities*/
+
 //
 // API
 //
 //badges is created by Turbulenzservices.createBadges
-function BadgeManager() {
-}
+function BadgeManager() {}
 
 BadgeManager.prototype =
 {
@@ -34,13 +36,12 @@ BadgeManager.prototype =
         }
 
         var dataSpec = {};
-        dataSpec.gameSessionId = that.gameSessionId;
+        dataSpec.gameSessionId = this.gameSessionId;
 
-        Utilities.ajax({
-            url: '/api/v1/badges/progress/read/' + that.gameSession.gameSlug,
+        this.service.request({
+            url: '/api/v1/badges/progress/read/' + this.gameSession.gameSlug,
             method: 'GET',
             data : dataSpec,
-            async: true,
             callback: cb,
             requestHandler: this.requestHandler
         });
@@ -76,7 +77,7 @@ BadgeManager.prototype =
             if (status === 200)
             {
                 var userbadge = jsonResponse.data;
-                TurbulenzGamesiteBridge.emit('UserBadge.update', userbadge);
+                TurbulenzBridge.updateUserBadge(userbadge);
                 callbackFn(userbadge);
             }
             else
@@ -89,7 +90,7 @@ BadgeManager.prototype =
         }
 
         var dataSpec = {};
-        dataSpec.gameSessionId = that.gameSessionId;
+        dataSpec.gameSessionId = this.gameSessionId;
         dataSpec.badge_key = badge_key;
 
         if (current)
@@ -97,21 +98,19 @@ BadgeManager.prototype =
             dataSpec.current = current;
         }
 
-        Utilities.ajax({
-            url: '/api/v1/badges/progress/add/' + that.gameSession.gameSlug,
+        this.service.request({
+            url: '/api/v1/badges/progress/add/' + this.gameSession.gameSlug,
             method: 'POST',
-            async: true,
             data : dataSpec,
             callback: cb,
-            encrypt: true,
-            requestHandler: this.requestHandler
+            requestHandler: this.requestHandler,
+            encrypt: true
         });
     },
 
     // list all badges (just queries the yaml file)
     listBadges: function badgesListFn(callbackFn, errorCallbackFn)
     {
-
         var that = this;
         function cb(jsonResponse, status)
         {
@@ -135,10 +134,9 @@ BadgeManager.prototype =
         var dataSpec = {};
         dataSpec.gameSessionId = that.gameSessionId;
 
-        Utilities.ajax({
+        this.service.request({
             url: '/api/v1/badges/read/' + that.gameSession.gameSlug,
             method: 'GET',
-            async: true,
             data: dataSpec,
             callback: cb,
             requestHandler: this.requestHandler

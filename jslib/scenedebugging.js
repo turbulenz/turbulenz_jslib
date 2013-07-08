@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2011 Turbulenz Limited
+// Copyright (c) 2010-2012 Turbulenz Limited
 /*global Scene*/
 /*global Geometry*/
 /*global GeometryInstance*/
@@ -2852,8 +2852,11 @@ Scene.prototype.drawWireframe = function drawWireframeFn(gd, sm, camera, wirefra
                     var renderable = renderables[i];
                     var oldSurface = renderable.surface;
                     var surfacePrimitive = oldSurface.primitive;
-                    if (!renderable.disabled && (surfacePrimitive === gd.PRIMITIVE_TRIANGLES ||
-                                                 surfacePrimitive === gd.PRIMITIVE_TRIANGLE_STRIP || surfacePrimitive === gd.PRIMITIVE_TRIANGLE_FAN))
+                    if (!renderable.disabled &&
+                        oldSurface.vertexData &&
+                        (surfacePrimitive === gd.PRIMITIVE_TRIANGLES ||
+                         surfacePrimitive === gd.PRIMITIVE_TRIANGLE_STRIP ||
+                         surfacePrimitive === gd.PRIMITIVE_TRIANGLE_FAN))
                     {
                         var skinController = renderable.skinController;
                         if (skinController)

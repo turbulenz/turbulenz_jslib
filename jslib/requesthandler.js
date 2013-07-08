@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Turbulenz Limited
+// Copyright (c) 2011-2012 Turbulenz Limited
 
 /*global TurbulenzEngine*/
 /*global Observer*/
@@ -14,7 +14,6 @@ RequestHandler.prototype =
         if (!this.notifiedConnectionLost &&
             TurbulenzEngine.time - this.connectionLostTime > (this.notifyTime * 0.001))
         {
-            //TurbulenzGamesiteBridge.emit('TurbulenzServices.connectionLost');
             this.notifiedConnectionLost = true;
 
             var reason;
@@ -43,7 +42,12 @@ RequestHandler.prototype =
         }
         else if (this.reconnectTest !== callContext)
         {
-            this.reconnectedObserver.subscribe(requestFn);
+            var reconnectedObserver = this.reconnectedObserver;
+            reconnectedObserver.subscribe(function onReconnected()
+                {
+                    reconnectedObserver.unsubscribe(onReconnected);
+                    requestFn();
+                });
             return;
         }
 
@@ -68,7 +72,6 @@ RequestHandler.prototype =
         {
             callContext.retries = 1;
         }
-
         TurbulenzEngine.setTimeout(requestFn, callContext.expTime);
     },
 
@@ -84,7 +87,7 @@ RequestHandler.prototype =
             callContext.retries = 1;
         }
 
-        if (callContext.notifiedMaxRetries &&
+        if (!callContext.notifiedMaxRetries &&
             TurbulenzEngine.time - callContext.firstRetry + retryAfter > this.notifyTime)
         {
             callContext.notifiedMaxRetries = true;
@@ -97,11 +100,12 @@ RequestHandler.prototype =
         TurbulenzEngine.setTimeout(requestFn, retryAfter * 1000);
     },
 
-    wrappedResponseCallback: function responseCallback(makeRequest, callContext)
+    request: function requestHandlerRequestFn(callContext)
     {
+        var makeRequest;
         var that = this;
 
-        return function responseCallbackFn(responseAsset, status)
+        var responseCallback = function responseCallbackFn(responseAsset, status)
         {
             var xhr = callContext.xhr;
             if (xhr)
@@ -137,7 +141,18 @@ RequestHandler.prototype =
                 }
                 that.reconnectTest = null;
                 that.reconnectedObserver.notify();
-                that.reconnectedObserver.unsubscribeAll();
+            }
+
+            if (callContext.customErrorHandler &&
+                !callContext.customErrorHandler.call(this, callContext, makeRequest, responseAsset, status))
+            {
+                return;
+            }
+
+            if (that.customErrorHandler &&
+                !that.customErrorHandler(callContext, makeRequest, responseAsset, status))
+            {
+                return;
             }
 
             if (callContext.onload)
@@ -147,17 +162,9 @@ RequestHandler.prototype =
             }
             callContext = null;
         };
-    },
-
-    request: function requestHandlerRequestFn(callContext)
-    {
-        var makeRequest;
-        var that = this;
 
         makeRequest = function makeRequestFn()
         {
-            var responseCallback = that.wrappedResponseCallback(makeRequest, callContext);
-
             if (callContext.requestFn)
             {
                 if (callContext.requestOwner)
