@@ -9,7 +9,7 @@
 //
 var WebGLTurbulenzEngine = (function () {
     function WebGLTurbulenzEngine() {
-        this.version = '0.26.0.0';
+        this.version = '0.26.1.0';
     }
     WebGLTurbulenzEngine.prototype.setInterval = function (f, t) {
         var that = this;
