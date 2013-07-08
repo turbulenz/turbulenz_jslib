@@ -97,6 +97,7 @@ MultiPlayerSession.prototype =
             {
                 this.socket = null;
 
+                socket.onopen = null;
                 socket.onmessage = null;
                 socket.onclose = null;
                 socket.onerror = null;

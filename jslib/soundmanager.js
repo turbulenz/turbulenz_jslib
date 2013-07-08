@@ -30,26 +30,34 @@ SoundManager.prototype =
       @function
       @name beep
 
+      @param {number} amplitude Amplitude of the wave
       @param {number} frequency Samples per second of the beep sound
       @param {number} wavefrequency Frequency of the beep sound wave
       @param {number} length Length in seconds of the beep sound
 
       @return {array} returns an Array of numbers with the sample data
     */
-    beep : function beepFn(frequency, wavefrequency, length)
+    beep : function beepFn(amplitude, frequency, wavefrequency, length)
     {
         var sin = Math.sin;
         var twoPI = (2.0 * Math.PI);
         var dphi = (twoPI * wavefrequency / frequency);
         var numSamples = (frequency * length);
-        var phase, value;
-        var data = [];
-        data.length = numSamples;
+        var data, phase, value;
+
+        if (typeof Float32Array !== "undefined")
+        {
+            data = new Float32Array(numSamples);
+        }
+        else
+        {
+            data = new Array(numSamples);
+        }
 
         phase = 0;
         for (var k = 0; k < numSamples; k += 1)
         {
-            value = (sin(phase) * 32767);
+            value = (sin(phase) * amplitude);
 
             phase += dphi;
             if (phase >= twoPI)
@@ -92,7 +100,7 @@ SoundManager.create = function soundManagerCreateFn(sd, rh, ds, errorCallback, l
         var soundParams =
         {
             name : defaultSoundName,
-            data   : SoundManager.prototype.beep(4000, 400, 1),
+            data   : SoundManager.prototype.beep(1.0, 4000, 400, 1),
             channels : 1,
             frequency : 4000,
             onload : function (s)

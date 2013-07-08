@@ -564,24 +564,62 @@ TurbulenzServices = {
                 errorCallbackFn("TurbulenzServices.sendCustomMetricEvent failed: Service not available",
                                 0);
             }
+            return;
         }
-        else
+
+        // Validation
+
+        if (('string' !== typeof eventKey) || (0 === eventKey.length))
         {
-            this.getService('customMetrics').request({
-                url: '/api/v1/custommetrics/add-event/' + gameSession.gameSlug,
-                method: 'POST',
-                data: {'key': eventKey, 'value': eventValue, 'gameSessionId': gameSession.gameSessionId},
-                callback: function sendCustomMetricEventAjaxErrorCheck(jsonResponse, status)
-                {
-                    if (status !== 200 && errorCallbackFn)
-                    {
-                        errorCallbackFn("TurbulenzServices.sendCustomMetricEvent error with HTTP status " + status + ": " + jsonResponse.msg, status);
-                    }
-                },
-                requestHandler: requestHandler,
-                encrypt: true
-            });
+            if (errorCallbackFn)
+            {
+                errorCallbackFn("TurbulenzServices.sendCustomMetricEvent failed: Event key must be a non-empty string",
+                                0);
+            }
+            return;
         }
+
+        if (isNaN(parseFloat(eventValue)) || !isFinite(eventValue))
+        {
+            if ('[object Array]' !== Object.prototype.toString.call(eventValue))
+            {
+                if (errorCallbackFn)
+                {
+                    errorCallbackFn("TurbulenzServices.sendCustomMetricEvent failed: Event value must be a number or an array of numbers",
+                                    0);
+                }
+                return;
+            }
+
+            var i, valuesLength = eventValue.length;
+            for (i = 0; i < valuesLength; i += 1)
+            {
+                if (isNaN(parseFloat(eventValue[i])) || !isFinite(eventValue[i]))
+                {
+                    if (errorCallbackFn)
+                    {
+                        errorCallbackFn("TurbulenzServices.sendCustomMetricEvent failed: Event value array elements must be numbers",
+                                        0);
+                    }
+                    return;
+                }
+            }
+        }
+
+        this.getService('customMetrics').request({
+            url: '/api/v1/custommetrics/add-event/' + gameSession.gameSlug,
+            method: 'POST',
+            data: {'key': eventKey, 'value': eventValue, 'gameSessionId': gameSession.gameSessionId},
+            callback: function sendCustomMetricEventAjaxErrorCheck(jsonResponse, status)
+            {
+                if (status !== 200 && errorCallbackFn)
+                {
+                    errorCallbackFn("TurbulenzServices.sendCustomMetricEvent error with HTTP status " + status + ": " + jsonResponse.msg, status);
+                }
+            },
+            requestHandler: requestHandler,
+            encrypt: true
+        });
     },
 
     services: {},

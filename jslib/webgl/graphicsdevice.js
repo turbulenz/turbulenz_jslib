@@ -189,7 +189,22 @@ WebGLTexture.prototype =
             {
                 if (data instanceof Uint8Array)
                 {
-                    bufferData = data;
+                    // Some browsers consider Uint8ClampedArray to be
+                    // an instance of Uint8Array (which is correct as
+                    // per the spec), yet won't accept a
+                    // Uint8ClampedArray as pixel data for a
+                    // gl.UNSIGNED_BYTE Texture.  If we have a
+                    // Uint8ClampedArray then we can just reuse the
+                    // underlying data.
+
+                    if (data instanceof Uint8ClampedArray)
+                    {
+                        bufferData = new Uint8Array(data.buffer);
+                    }
+                    else
+                    {
+                        bufferData = data;
+                    }
                 }
                 else
                 {
@@ -206,7 +221,16 @@ WebGLTexture.prototype =
             {
                 if (data instanceof Uint8Array)
                 {
-                    bufferData = data;
+                    // See comment above about Uint8ClampedArray
+
+                    if (data instanceof Uint8ClampedArray)
+                    {
+                        bufferData = new Uint8Array(data.buffer);
+                    }
+                    else
+                    {
+                        bufferData = data;
+                    }
                 }
                 else
                 {

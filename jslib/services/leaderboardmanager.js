@@ -2,10 +2,12 @@
 
 /*global TurbulenzEngine: false*/
 /*global TurbulenzBridge*/
+/*global TurbulenzServices*/
 
 //
 // API
 //
+
 function LeaderboardManager() {}
 LeaderboardManager.prototype =
 {
@@ -75,40 +77,14 @@ LeaderboardManager.prototype =
         }
 
         var that = this;
+        var dataSpec = {};
+
         function getCallbackFn(jsonResponse, status)
         {
             if (status === 200)
             {
                 var data = jsonResponse.data;
-                var player = data.player;
-                var entities = data.entities;
-                var ranking = data.ranking;
-                var player_user_id;
-                var user_id;
-
-                if (player)
-                {
-                    that.meta[key].bestScore = player.score;
-                    player_user_id = player.user;
-                    player.user = entities[player_user_id];
-                }
-
-                var rankingLength = ranking.length;
-                var i;
-                for (i = 0; i < rankingLength; i += 1)
-                {
-                    var rank = ranking[i];
-
-                    user_id = rank.user;
-                    if (user_id === player_user_id)
-                    {
-                        data.playerIndex = i;
-                        rank.me = true;
-                    }
-                    rank.user = entities[user_id];
-                }
-
-                callbackFn(key, data);
+                callbackFn(key, LeaderboardResult.create(that, key, dataSpec, data));
             }
             else
             {
@@ -118,8 +94,6 @@ LeaderboardManager.prototype =
                               [key, spec, callbackFn]);
             }
         }
-
-        var dataSpec = {};
 
         // backwards compatibility
         if (spec.numNear)
@@ -143,13 +117,22 @@ LeaderboardManager.prototype =
             // default value
             dataSpec.size = 9;
         }
+        if (spec.friendsOnly)
+        {
+            dataSpec.friendsonly = spec.friendsOnly && 1;
+        }
+
         if (spec.type)
         {
             dataSpec.type = spec.type;
         }
-        if (spec.friendsOnly)
+        if (spec.hasOwnProperty('score'))
         {
-            dataSpec.friendsonly = spec.friendsOnly && 1;
+            dataSpec.score = spec.score;
+        }
+        if (spec.hasOwnProperty('time'))
+        {
+            dataSpec.time = spec.time;
         }
 
         this.service.request({
@@ -236,4 +219,177 @@ LeaderboardManager.prototype =
             encrypt: true
         });
     }
+};
+
+LeaderboardManager.create = function createLeaderboardManagerFn(requestHandler,
+                                                                gameSession,
+                                                                leaderboardMetaRecieved,
+                                                                errorCallbackFn)
+{
+    if (!TurbulenzServices.available())
+    {
+        // Call error callback on a timeout to get the same behaviour as the ajax call
+        TurbulenzEngine.setTimeout(function () {
+            if (errorCallbackFn)
+            {
+                errorCallbackFn('TurbulenzServices.createLeaderboardManager could not load leaderboards meta data');
+            }
+        }, 0);
+        return null;
+    }
+
+    var leaderboardManager = new LeaderboardManager();
+
+    leaderboardManager.gameSession = gameSession;
+    leaderboardManager.gameSessionId = gameSession.gameSessionId;
+    leaderboardManager.errorCallbackFn = errorCallbackFn || TurbulenzServices.defaultErrorCallback;
+    leaderboardManager.service = TurbulenzServices.getService('leaderboards');
+    leaderboardManager.requestHandler = requestHandler;
+
+    leaderboardManager.service.request({
+        url: '/api/v1/leaderboards/read/' + gameSession.gameSlug,
+        method: 'GET',
+        callback: function createLeaderboardManagerAjaxErrorCheck(jsonResponse, status) {
+            if (status === 200)
+            {
+                var metaArray = jsonResponse.data;
+                if (metaArray)
+                {
+                    leaderboardManager.meta = {};
+                    var metaLength = metaArray.length;
+                    var i;
+                    for (i = 0; i < metaLength; i += 1)
+                    {
+                        var board = metaArray[i];
+                        leaderboardManager.meta[board.key] = board;
+                    }
+                }
+                if (leaderboardMetaRecieved)
+                {
+                    leaderboardMetaRecieved(leaderboardManager);
+                }
+            }
+            else
+            {
+                leaderboardManager.errorCallbackFn("TurbulenzServices.createLeaderboardManager error with HTTP status " + status + ": " + jsonResponse.msg, status);
+            }
+        },
+        requestHandler: requestHandler,
+        neverDiscard: true
+    });
+
+    return leaderboardManager;
+};
+
+
+function LeaderboardResult() {}
+LeaderboardResult.prototype =
+{
+    version : 1,
+
+    getOffsetPageAbove: function getPageAboveFn(spec, offsetIndex, callbackFn, errorCallbackFn)
+    {
+        if (this.top)
+        {
+            // just repeat the data if we are already at the top
+            var that = this;
+            TurbulenzEngine.setTimeout(function ()
+                {
+                    callbackFn(that.key, that);
+                }, 0);
+            return;
+        }
+
+        var offsetScore = this.ranking[offsetIndex];
+        var newSpec = {
+            type: 'above',
+            score: offsetScore.score,
+            time: offsetScore.time,
+            size: (spec && spec.size) || this.spec.size,
+            friendsonly: this.spec.friendsOnly
+        };
+        this.leaderboardManager.get(this.key, newSpec, callbackFn, errorCallbackFn);
+    },
+
+    getOffsetPageBelow: function getPageBelowFn(spec, offsetIndex, callbackFn, errorCallbackFn)
+    {
+        if (this.bottom)
+        {
+            // just repeat the data if we are already at the top
+            var that = this;
+            TurbulenzEngine.setTimeout(function ()
+                {
+                    callbackFn(that.key, that);
+                }, 0);
+            return;
+        }
+
+        var offsetScore = this.ranking[offsetIndex];
+        var newSpec = {
+            type: 'below',
+            score: offsetScore.score,
+            time: offsetScore.time,
+            size: (spec && spec.size) || this.spec.size,
+            friendsonly: this.spec.friendsOnly
+        };
+        this.leaderboardManager.get(this.key, newSpec, callbackFn, errorCallbackFn);
+    },
+
+    getPageAbove: function getPageAboveFn(callbackFn, errorCallbackFn)
+    {
+        this.getOffsetPageAbove(null, 0, callbackFn, errorCallbackFn);
+    },
+
+    getPageBelow: function getPageBelowFn(callbackFn, errorCallbackFn)
+    {
+        this.getOffsetPageBelow(null, this.ranking.length - 1, callbackFn, errorCallbackFn);
+    }
+};
+
+LeaderboardResult.create = function LeaderboardResultCreate(leaderboardManager, key, spec, data)
+{
+    var leaderboardResult = new LeaderboardResult();
+
+    leaderboardResult.leaderboardManager = leaderboardManager;
+    leaderboardResult.key = key;
+    leaderboardResult.spec = spec;
+
+    var player = leaderboardResult.player = data.player;
+    var ranking = leaderboardResult.ranking = data.ranking;
+
+    var entities = data.entities;
+    var player_username;
+
+    if (player)
+    {
+        leaderboardManager.meta[key].bestScore = player.score;
+        if (entities)
+        {
+            player.user = entities[player.user];
+        }
+        player_username = player.user.username;
+    }
+
+    var rankingLength = ranking.length;
+    var i;
+    for (i = 0; i < rankingLength; i += 1)
+    {
+        var rank = ranking[i];
+        if (entities)
+        {
+            rank.user = entities[rank.user];
+        }
+
+        if (rank.user.username === player_username)
+        {
+            leaderboardResult.playerIndex = i;
+            rank.me = true;
+        }
+    }
+
+    var bestScore = ranking[0];
+    leaderboardResult.top = !bestScore || bestScore.rank === 1;
+    leaderboardResult.bottom = data.bottom;
+
+    return leaderboardResult;
 };
