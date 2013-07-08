@@ -1,5 +1,6 @@
 // Copyright (c) 2011-2012 Turbulenz Limited
 
+/*global TurbulenzServices*/
 /*global TurbulenzBridge*/
 /*global Utilities*/
 
@@ -140,4 +141,21 @@ BadgeManager.prototype =
         Utilities.log('BadgeManager error: ', Array.prototype.slice.call(arguments));
     }
 
+};
+
+BadgeManager.create = function badgeManagerCreateFn(requestHandler, gameSession)
+{
+    if (!TurbulenzServices.available())
+    {
+        return null;
+    }
+
+    var badgeManager = new BadgeManager();
+
+    badgeManager.gameSession = gameSession;
+    badgeManager.gameSessionId = gameSession.gameSessionId;
+    badgeManager.service = TurbulenzServices.getService('badges');
+    badgeManager.requestHandler = requestHandler;
+
+    return badgeManager;
 };

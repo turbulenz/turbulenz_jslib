@@ -17,7 +17,7 @@
 function WebGLTurbulenzEngine() {}
 WebGLTurbulenzEngine.prototype = {
 
-    version : '0.21.3.0',
+    version : '0.22.0.0',
 
     setInterval: function (f, t)
     {
@@ -475,7 +475,19 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
 
     var baseTime = getTime(); // all in milliseconds (our "time" property is in seconds)
 
-    if (Object.defineProperty)
+    // Safari 6.0 has broken object property defines.
+    var canUseDefineProperty = true;
+    var navStr = navigator.userAgent;
+    var navVersionIdx = navStr.indexOf("Version/6.0");
+    if (-1 !== navVersionIdx)
+    {
+        if (-1 !== navStr.substring(navVersionIdx).indexOf("Safari/"))
+        {
+            canUseDefineProperty = false;
+        }
+    }
+
+    if (canUseDefineProperty && Object.defineProperty)
     {
         Object.defineProperty(tz, "time", {
                 get : function () {
@@ -772,7 +784,7 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
 
     var b64ConversionTable = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=".split('');
 
-    tz.base64encode = function base64encodeFn(bytes)
+    tz.base64Encode = function base64EncodeFn(bytes)
     {
         var output = "";
         var numBytes = bytes.length;

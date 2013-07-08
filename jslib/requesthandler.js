@@ -127,8 +127,9 @@ RequestHandler.prototype =
 
             // 0 Connection Lost
             // 408 Request Timeout
+            // 429 Too Many Requests
             // 480 Temporarily Unavailable
-            if (status === 0 || status === 408 || status === 480)
+            if (status === 0 || status === 408 || status === 429 || status === 480)
             {
                 that.retryExponential(callContext, makeRequest, status);
                 return;

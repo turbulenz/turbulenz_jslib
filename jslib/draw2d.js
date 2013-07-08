@@ -323,7 +323,7 @@ Draw2DSprite.prototype = {
     // Method for internal use only.
     //
     // Recompute draw2d coordinate space vertices and vectors.
-    _update : function _updateFn()
+    _update : function _updateFn(angleScaleFactor)
     {
         var data = this.data;
         var x, y, u, v;
@@ -331,7 +331,7 @@ Draw2DSprite.prototype = {
         // Check if rotation has been modified
         x = this.rotation;
         y = x - data[16]; // y = rotation - previousRotation
-        if ((y * y) > data[37]) // if |y| > epsilon
+        if ((y * y) > (data[37] * angleScaleFactor)) // if |y| > epsilon
         {
             data[16] = x; //previousRotation = rotation
             u = Math.cos(x);
@@ -574,6 +574,8 @@ Draw2D.prototype = {
         draw  : 2
     },
 
+    defaultClearColor: [0, 0, 0, 1],
+
     clear: function clearFn(clearColor)
     {
         if (this.state !== this.drawStates.ready)
@@ -589,12 +591,12 @@ Draw2D.prototype = {
                 return false;
             }
 
-            gd.clear(clearColor || [0, 0, 0, 1]);
+            gd.clear(clearColor || this.defaultClearColor);
             gd.endRenderTarget();
         }
         else
         {
-            gd.clear(clearColor || [0, 0, 0, 1]);
+            gd.clear(clearColor || this.defaultClearColor);
         }
 
         return true;
@@ -615,7 +617,7 @@ Draw2D.prototype = {
 
     bufferSprite : function bufferSpriteFn(buffer, sprite, index)
     {
-        sprite._update();
+        sprite._update(0);
         /*jshint bitwise: false*/
         index <<= 4;
         /*jshint bitwise: true*/
@@ -749,6 +751,9 @@ Draw2D.prototype = {
                 this.scissorHeight = viewHeight;
             }
 
+            this.spriteAngleFactor = Math.min(this.viewScaleX, this.viewScaleY);
+            this.spriteAngleFactor *= this.spriteAngleFactor;
+
             this.width = graphicsDeviceWidth;
             this.height = graphicsDeviceHeight;
 
@@ -772,11 +777,11 @@ Draw2D.prototype = {
             this.clipOffsetX -= viewX * this.clipScaleX;
             this.clipOffsetY -= viewY * this.clipScaleY;
 
-            this.initTechniqueParameters.clipSpace[0] = this.clipScaleX;
-            this.initTechniqueParameters.clipSpace[1] = this.clipScaleY;
-            this.initTechniqueParameters.clipSpace[2] = this.clipOffsetX;
-            this.initTechniqueParameters.clipSpace[3] = this.clipOffsetY;
-            this.techniqueParameters = graphicsDevice.createTechniqueParameters(this.initTechniqueParameters);
+            var clipSpace = this.techniqueParameters.clipSpace;
+            clipSpace[0] = this.clipScaleX;
+            clipSpace[1] = this.clipScaleY;
+            clipSpace[2] = this.clipOffsetX;
+            clipSpace[3] = this.clipOffsetY;
 
             this.updateRenderTargetVbo(this.scissorX, this.scissorY, this.scissorWidth, this.scissorHeight);
             this.forceUpdate = false;
@@ -1295,7 +1300,7 @@ Draw2D.prototype = {
         group.numSets = 1;
         this.numGroups = 1;
 
-        sprite._update();
+        sprite._update(this.spriteAngleFactor);
         this._bufferSprite(group, sprite.data);
 
         // Draw render group immediately.
@@ -1360,7 +1365,7 @@ Draw2D.prototype = {
             group.numSets += 1;
         }
 
-        sprite._update();
+        sprite._update(this.spriteAngleFactor);
         this._bufferSprite(group, sprite.data);
     },
 
@@ -1461,7 +1466,7 @@ Draw2D.prototype = {
             this.currentTextureGroup = group;
         }
 
-        sprite._update();
+        sprite._update(this.spriteAngleFactor);
         this._bufferSprite(group, sprite.data);
     },
 
@@ -1575,7 +1580,7 @@ Draw2D.prototype = {
         }
 
         var graphicsDevice = this.graphicsDevice;
-        var technique = this.techniqueParameters;
+        var techniqueParameters = this.techniqueParameters;
         graphicsDevice.setIndexBuffer(this.indexBuffer);
 
         var drawGroups = this.drawGroups;
@@ -1616,7 +1621,7 @@ Draw2D.prototype = {
                 var ilimit = vcount * 1.5;
                 var iindex = 0;
                 while (iindex < ilimit) {
-                    technique.texture = textures[setIndex];
+                    techniqueParameters.texture = textures[setIndex];
 
                     // number of indices remaining to render.
                     var icount = ilimit - iindex;
@@ -1656,7 +1661,7 @@ Draw2D.prototype = {
                         performanceData.avgBatchSize /= performanceData.batchCount;
                     }
 
-                    graphicsDevice.setTechniqueParameters(technique);
+                    graphicsDevice.setTechniqueParameters(techniqueParameters);
                     graphicsDevice.drawIndexed(graphicsDevice.PRIMITIVE_TRIANGLES, icount, iindex);
 
                     iindex += icount;
@@ -2153,11 +2158,10 @@ Draw2D.create = function draw2DCreateFn(params)
     }
 
     // Blending techniques.
-    o.initTechniqueParameters = {
+    o.techniqueParameters = gd.createTechniqueParameters({
         clipSpace: new Draw2D.prototype.floatArray(4),
         texture: null
-    };
-    o.techniqueParameters = null;
+    });
 
     // Current render target
     o.currentRenderTarget = null;
@@ -2370,6 +2374,7 @@ Draw2D.create = function draw2DCreateFn(params)
         if (textDescriptor === '[object Float32Array]')
         {
             Draw2D.prototype.floatArray = Float32Array;
+            Draw2D.prototype.defaultClearColor = new Float32Array(Draw2D.prototype.defaultClearColor);
         }
     }
 }());

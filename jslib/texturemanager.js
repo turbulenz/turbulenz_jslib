@@ -141,12 +141,12 @@ TextureManager.prototype =
     */
     get: function textureManagerGetFn(path)
     {
-        var tex = this.textureInstances[path];
-        if (!tex)
+        var instance = this.textureInstances[path];
+        if (!instance)
         {
             return this.defaultTexture;
         }
-        return tex.getTexture();
+        return instance.getTexture();
     },
 
     //
@@ -169,7 +169,7 @@ TextureManager.prototype =
       @param {boolean} nomipmaps True to disable mipmaps
       @param {function} onTextureLoaded function to call once the texture is loaded
 
-      @return {Texture} object, returns the default texture if the file at given path is not yet loaded
+      @return {Texture} object, returns the default Texture if the file at given path is not yet loaded
     */
 
     load: function textureManagerLoadFn(path, nomipmaps, onTextureLoaded)
@@ -263,16 +263,16 @@ TextureManager.prototype =
         }
         else
         {
-            textureInstance = this.get(path);
+            var texture = this.get(path);
             if (onTextureLoaded)
             {
                 // the callback should always be called asynchronously
                 TurbulenzEngine.setTimeout(function textureAlreadyLoadedFn()
                     {
-                        onTextureLoaded(textureInstance);
+                        onTextureLoaded(texture);
                     }, 0);
             }
-            return textureInstance;
+            return texture;
         }
     },
 

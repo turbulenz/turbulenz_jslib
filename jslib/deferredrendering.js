@@ -1541,7 +1541,10 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
                 drawParameters.technique = this.shadowTechnique;
 
                 drawParameters.sortKey = renderingCommonSortKeyFn(this.shadowTechniqueIndex, 0);
-                drawParameters.setTechniqueParameters(0, geometryInstance.techniqueParameters);   //TODO: This is excessive
+
+                var shadowTechniqueParameters = gd.createTechniqueParameters();
+                geometryInstance.shadowTechniqueParameters = shadowTechniqueParameters;
+                drawParameters.setTechniqueParameters(0, shadowTechniqueParameters);
             }
             else
             {

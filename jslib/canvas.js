@@ -954,18 +954,39 @@ CanvasContext.prototype =
     {
         if (w > 0 && h > 0)
         {
-            var rect = this.transformRect(x, y, w, h, this.tempRect);
-            this.fillFlatBuffer(rect, 4);
-
-            var technique = this.flatTechniques.copy;
             var gd = this.gd;
+            var clipExtents = this.clipExtents;
+            var minClipX = clipExtents[0];
+            var minClipY = clipExtents[1];
+            var maxClipX = clipExtents[2];
+            var maxClipY = clipExtents[3];
 
-            gd.setTechnique(technique);
+            var rect = this.transformRect(x, y, w, h, this.tempRect);
 
-            technique.screen = this.screen;
-            technique.color = this.v4Zero;
+            if (rect[0] <= minClipX &&
+                rect[1] >= maxClipY &&
+                rect[2] >= maxClipX &&
+                rect[3] >= maxClipY &&
+                rect[4] <= minClipX &&
+                rect[5] <= minClipY &&
+                rect[6] >= maxClipX &&
+                rect[7] <= minClipY)
+            {
+                gd.clear(this.v4Zero);
+            }
+            else
+            {
+                this.fillFlatBuffer(rect, 4);
 
-            gd.draw(this.triangleStripPrimitive, 4);
+                var technique = this.flatTechniques.copy;
+
+                gd.setTechnique(technique);
+
+                technique.screen = this.screen;
+                technique.color = this.v4Zero;
+
+                gd.draw(this.triangleStripPrimitive, 4);
+            }
         }
     },
 
@@ -5257,23 +5278,29 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
 
     function scaleIdentity(x, y)
     {
-        var m = this.matrix;
-        m[0] = x;
-        m[4] = y;
+        if (x !== 1 || y !== 1)
+        {
+            var m = this.matrix;
+            m[0] = x;
+            m[4] = y;
 
-        resetTransformMethods();
+            resetTransformMethods();
+        }
     }
 
     function translateIdentity(x, y)
     {
-        var m = this.matrix;
-        m[2] = x;
-        m[5] = y;
+        if (x !== 0 || y !== 0)
+        {
+            var m = this.matrix;
+            m[2] = x;
+            m[5] = y;
 
-        this.translate = translate;
-        this.transform = transformTranslate;
-        this.transformPoint = transformPointTranslate;
-        this.transformRect = transformRectTranslate;
+            this.translate = translate;
+            this.transform = transformTranslate;
+            this.transformPoint = transformPointTranslate;
+            this.transformRect = transformRectTranslate;
+        }
     }
 
     function setTransformIdentity(a, b, c, d, e, f)
@@ -5431,6 +5458,8 @@ Canvas.create = function canvasCreateFn(gd, md)
                     width = newValue;
 
                     this.context.setWidth(newValue);
+
+                    this.clientWidth = newValue;
                 },
                 enumerable : true,
                 configurable : false
@@ -5444,6 +5473,8 @@ Canvas.create = function canvasCreateFn(gd, md)
                     height = newValue;
 
                     this.context.setHeight(newValue);
+
+                    this.clientHeight = newValue;
                 },
                 enumerable : true,
                 configurable : false
@@ -5454,6 +5485,9 @@ Canvas.create = function canvasCreateFn(gd, md)
         c.width = width;
         c.height = height;
     }
+
+    c.clientWidth = width;
+    c.clientHeight = height;
 
     return c;
 };

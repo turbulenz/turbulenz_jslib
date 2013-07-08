@@ -4584,6 +4584,7 @@ WebGLGJKContactSolver.prototype = {
     //   shapeA
     //   shapeB
     //   axis <-- to be mutated by this function
+    //      'on' objectB.
     //   closestA <-- to be populated by this function
     //   closestB <-- to be populated by this function
     evaluate : function gjkEvaluateFn(cache, xformA, xformB)
@@ -5116,6 +5117,7 @@ WebGLContactEPA.prototype = {
     //   shapeA
     //   shapeB
     //   axis <-- to be mutated by this function
+    //     'on' object B.
     //   closestA <-- to be populated by this function
     //   closestB <-- to be populated by this function
     evaluate : function epaEvaluateFn(gjkSimplex, cache, xformA, xformB)
@@ -5448,7 +5450,7 @@ WebGLContactEPA.create = function WebGLContactEPAFn()
 // [3,  6) : localB (vector3)
 // [6,  9) : relA   (vector3)
 // [9, 12) : relB   (vector3)
-// [12,15) : normal (vector3)
+// [12,15) : normal (vector3)  ('on' object B)
 // [15,18) : tangent (vector3)
 // [18,21) : bitangent (vector3)
 // [21,22) : distance
@@ -8764,6 +8766,7 @@ WebGLPrivatePhysicsWorld.prototype = {
     //   shapeA
     //   shapeB
     //   axis <-- to be mutated by this function
+    //      axis is 'on' object B.
     //   closestA <-- to be populated by this function
     //   closestB <-- to be populated by this function
     contactPairTest : function contactPairTest(cache, xformA, xformB)

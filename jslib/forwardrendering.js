@@ -3,7 +3,7 @@
 //
 // ForwardRendering
 //
-/*global ShadowMapping: false, VMath: false, Effect: false,
+/*global ShadowMapping: false, VMath: false, VMathArrayConstructor:false, Effect: false,
          renderingCommonCreateRendererInfoFn: false,  renderingCommonGetTechniqueIndexFn: false,
          renderingCommonSortKeyFn: false*/
 
@@ -13,7 +13,8 @@ ForwardRendering.prototype =
 {
     version : 1,
 
-    minPixelCount: 256,
+    //minPixelCount: 16,
+    //minPixelCountShadows: 256,
 
     updateShader: function forwardRenderingUpdateShaderFn(shaderManager)
     {
@@ -72,10 +73,14 @@ ForwardRendering.prototype =
             }
         }
 
+        var nextRenderableID = this.nextRenderableID;
+        this.nextRenderableID = (nextRenderableID + 1);
+        rendererInfo.id = (1.0 / (1.0 + nextRenderableID));
+
         return rendererInfo;
     },
 
-    sortRenderablesAndLights: function forwardRenderingSortRenderablesAndLightsFn(camera, scene)
+    sortRenderablesAndLights: function forwardRenderingSortRenderablesAndLightsFn(gd, camera, scene)
     {
         var pointLights = this.pointLights;
         var spotLights = this.spotLights;
@@ -158,6 +163,28 @@ ForwardRendering.prototype =
                     pass[pass.length] = drawParameters;
                 }
 
+                drawParametersArray = renderable.diffuseDrawParameters;
+                if (drawParametersArray)
+                {
+                    numDrawParameters = drawParametersArray.length;
+                    for (drawParametersIndex = 0; drawParametersIndex < numDrawParameters; drawParametersIndex += 1)
+                    {
+                        drawParameters = drawParametersArray[drawParametersIndex];
+                        drawParameters.removeInstances();
+                    }
+
+                    drawParametersArray = renderable.diffuseShadowDrawParameters;
+                    if (drawParametersArray)
+                    {
+                        numDrawParameters = drawParametersArray.length;
+                        for (drawParametersIndex = 0; drawParametersIndex < numDrawParameters; drawParametersIndex += 1)
+                        {
+                            drawParameters = drawParametersArray[drawParametersIndex];
+                            drawParameters.removeInstances();
+                        }
+                    }
+                }
+
                 n += 1;
             }
             while (n < numVisibleRenderables);
@@ -170,10 +197,42 @@ ForwardRendering.prototype =
         var lightInstance, light, l;
         if (numVisibleLights)
         {
+            //var widthToPixel = (0.5 * gd.width);
+            //var heightToPixel = (0.5 * gd.height);
+            //var minPixelCount = this.minPixelCount;
+            //var minPixelCountShadows = this.minPixelCountShadows;
+            //var screenExtents;
+
             l = 0;
             do
             {
                 lightInstance = visibleLights[l];
+
+                //screenExtents = lightInstance.screenExtents;
+                //if (screenExtents)
+                //{
+                //    var pixelCount = (((screenExtents[2] - screenExtents[0]) * widthToPixel) +
+                //                      ((screenExtents[3] - screenExtents[1]) * heightToPixel));
+                //    if (pixelCount < minPixelCount)
+                //    {
+                //        numVisibleLights -= 1;
+                //        if (l < numVisibleLights)
+                //        {
+                //            visibleLights[l] = visibleLights[numVisibleLights];
+                //            continue;
+                //        }
+                //        else
+                //        {
+                //            break;
+                //        }
+                //    }
+                //
+                //    lightInstance.pixelCount = pixelCount;
+                //}
+                //else
+                //{
+                //    lightInstance.pixelCount = minPixelCountShadows;
+                //}
 
                 light = lightInstance.light;
                 if (light)
@@ -182,7 +241,7 @@ ForwardRendering.prototype =
                     {
                         lightInstance.shadows = false;
 
-                        if (lightFindVisibleRenderables.call(this, lightInstance, scene))
+                        if (lightFindVisibleRenderables.call(this, gd, lightInstance, scene))
                         {
                             if (light.spot)
                             {
@@ -248,8 +307,23 @@ ForwardRendering.prototype =
 
     },
 
+    addToDiffuseQueue : function addToDiffuseQueueFn(gd, renderableDrawParameters,
+                                                     lightInstanceTechniqueParameters)
+    {
+        renderableDrawParameters.addInstance(lightInstanceTechniqueParameters);
+
+        if (1 === renderableDrawParameters.getNumInstances())
+        {
+            var queue = this.diffuseQueue;
+            var queueLength = this.numDiffuseQueue;
+            this.numDiffuseQueue = (queueLength + 1);
+
+            queue[queueLength] = renderableDrawParameters;
+        }
+    },
+
     //TODO name.
-    lightFindVisibleRenderables: function lightFindVisibleRenderablesFn(lightInstance, scene)
+    lightFindVisibleRenderables: function lightFindVisibleRenderablesFn(gd, lightInstance, scene)
     {
         var origin, overlappingRenderables, numOverlappingRenderables;
         var overlapQueryRenderables, numOverlapQueryRenderables, renderable;
@@ -264,7 +338,8 @@ ForwardRendering.prototype =
 
         lightFrameVisible = lightInstance.frameVisible;
 
-        overlapQueryRenderables = [];
+        overlapQueryRenderables = this.overlapQueryRenderables;
+        overlapQueryRenderables.length = 0;
 
         overlappingRenderables = lightInstance.overlappingRenderables;
 
@@ -330,33 +405,12 @@ ForwardRendering.prototype =
                 numOverlappingRenderables += 1;
             }
         }
-        overlapQueryRenderables = null;
 
         // Build a list of the geometries which are visible this frame, note we compare renderable.frameVisible against
         // lightFrameVisible which is the frame on which the light was last visible, since we're processing the
         // light that number must be the current frame
-        var diffuseDrawParametersQueue = lightInstance.diffuseDrawParametersQueue;
-        if (!diffuseDrawParametersQueue)
-        {
-            lightInstance.diffuseDrawParametersQueue = diffuseDrawParametersQueue = [];
-        }
-        else
-        {
-            diffuseDrawParametersQueue.length = 0;
-        }
-
-        var drawParameterIndex, numDrawParameters, drawParametersArray;
-        var numVisibleDrawParameters = 0;
-
-        var usingShadows = false;
-        if (shadowMaps && light.shadows)
-        {
-            shadowMaps.findVisibleRenderables(lightInstance);
-
-            var shadowRenderables = lightInstance.shadowRenderables;
-            usingShadows = (shadowRenderables && shadowRenderables.length);
-        }
-
+        var visibleRenderables = overlapQueryRenderables;
+        var numVisibleRenderables = 0;
         for (n = 0; n < numOverlappingRenderables; n += 1)
         {
             renderable = overlappingRenderables[n];
@@ -364,68 +418,137 @@ ForwardRendering.prototype =
                 !renderable.disabled &&
                 !renderable.node.disabled)
             {
-                if (usingShadows)
-                {
-                    drawParametersArray = renderable.diffuseShadowDrawParameters;
-                }
-                else
-                {
-                    drawParametersArray = renderable.diffuseDrawParameters;
-                }
-                numDrawParameters = drawParametersArray.length;
-                for (drawParameterIndex = 0; drawParameterIndex < numDrawParameters; drawParameterIndex += 1)
-                {
-                    diffuseDrawParametersQueue[numVisibleDrawParameters] = drawParametersArray[drawParameterIndex];
-                    numVisibleDrawParameters += 1;
-                }
+                visibleRenderables[numVisibleRenderables] = renderable;
+                numVisibleRenderables += 1;
             }
         }
 
-        return (0 < numVisibleDrawParameters);
-    },
+        if (0 === numVisibleRenderables)
+        {
+            lightInstance.numVisibleDrawParameters = 0;
+            return false;
+        }
 
-    directionalLightsUpdateVisibleRenderables : function directionalLightsUpdateVisibleRenderablesFn(scene)
-    {
-        this.diffuseDrawParametersQueue = [];
-        var diffuseDrawParametersQueue = this.diffuseDrawParametersQueue;
-        var visibleRenderables = this.visibleRenderables;
-        var numVisibleRenderables = visibleRenderables.length;
-
-        var drawParameterIndex, numDrawParameters, drawParametersArray;
+        var renderableID;
+        var drawParameterIndex, numDrawParameters, drawParametersArray, drawParameters;
         var numVisibleDrawParameters = 0;
-        var n, renderable;
+
+        var usingShadows = false;
+        if (shadowMaps &&
+            light.shadows /*&&
+            lightInstance.pixelCount >= this.minPixelCountShadows*/)
+        {
+            shadowMaps.findVisibleRenderables(lightInstance);
+
+            var shadowRenderables = lightInstance.shadowRenderables;
+            usingShadows = (shadowRenderables && 0 < shadowRenderables.length);
+        }
+
+        var lightInstanceTechniqueParameters = lightInstance.techniqueParameters;
+        if (!lightInstanceTechniqueParameters)
+        {
+            lightInstanceTechniqueParameters = gd.createTechniqueParameters(light.techniqueParameters);
+            lightInstance.techniqueParameters = lightInstanceTechniqueParameters;
+        }
 
         for (n = 0; n < numVisibleRenderables; n += 1)
         {
             renderable = visibleRenderables[n];
-            if (!renderable.disabled &&
-                !renderable.node.disabled)
+            renderableID = (renderable.rendererInfo.id || 0);
+
+            if (usingShadows)
+            {
+                drawParametersArray = renderable.diffuseShadowDrawParameters;
+            }
+            else
             {
                 drawParametersArray = renderable.diffuseDrawParameters;
-                if (drawParametersArray)
-                {
-                    numDrawParameters = drawParametersArray.length;
-                    for (drawParameterIndex = 0; drawParameterIndex < numDrawParameters; drawParameterIndex += 1)
-                    {
-                        diffuseDrawParametersQueue[numVisibleDrawParameters] = drawParametersArray[drawParameterIndex];
-                        numVisibleDrawParameters += 1;
-                    }
-                }
+            }
+            numDrawParameters = drawParametersArray.length;
+            for (drawParameterIndex = 0; drawParameterIndex < numDrawParameters; drawParameterIndex += 1)
+            {
+                drawParameters = drawParametersArray[drawParameterIndex];
+                /*jshint bitwise:false*/
+                drawParameters.sortKey = ((drawParameters.sortKey | 0) + renderableID);
+                /*jshint bitwise:true*/
+                this.addToDiffuseQueue(gd, drawParameters,
+                                       lightInstanceTechniqueParameters);
+                numVisibleDrawParameters += 1;
             }
         }
 
+        lightInstance.numVisibleDrawParameters = numVisibleDrawParameters;
+
         return (0 < numVisibleDrawParameters);
+    },
+
+    directionalLightsUpdateVisibleRenderables : function directionalLightsUpdateVisibleRenderablesFn(gd, scene)
+    {
+        var directionalLights = this.directionalLights;
+        var numDirectionalLights = directionalLights.length;
+        var visibleRenderables = this.visibleRenderables;
+        var numVisibleRenderables = visibleRenderables.length;
+
+        var light, lightTechniqueParameters, numVisibleDrawParameters, n, renderable;
+        var drawParameterIndex, numDrawParameters, drawParametersArray;
+
+        var totalVisibleDrawParameters = 0;
+        var l = 0;
+        do
+        {
+            light = directionalLights[l];
+
+            lightTechniqueParameters = light.techniqueParameters;
+
+            numVisibleDrawParameters = 0;
+            for (n = 0; n < numVisibleRenderables; n += 1)
+            {
+                renderable = visibleRenderables[n];
+                if (!renderable.disabled &&
+                    !renderable.node.disabled)
+                {
+                    drawParametersArray = renderable.diffuseDrawParameters;
+                    if (drawParametersArray)
+                    {
+                        numDrawParameters = drawParametersArray.length;
+                        for (drawParameterIndex = 0; drawParameterIndex < numDrawParameters; drawParameterIndex += 1)
+                        {
+                            this.addToDiffuseQueue(gd, drawParametersArray[drawParameterIndex],
+                                                   lightTechniqueParameters);
+                            numVisibleDrawParameters += 1;
+                        }
+                    }
+                }
+            }
+
+            light.numVisibleDrawParameters = numVisibleDrawParameters;
+
+            totalVisibleDrawParameters += numVisibleDrawParameters;
+
+            l += 1;
+        }
+        while (l < numDirectionalLights);
+
+
+        return (0 < totalVisibleDrawParameters);
     },
 
     update: function forwardRenderingUpdateFn(gd, camera, scene, currentTime)
     {
         this.camera = camera;
         this.globalCameraMatrix = camera.matrix;
+        this.numDiffuseQueue = 0;
 
-        scene.updateVisibleNodes(camera);
-        this.sceneExtents = scene.extents.slice();
+        if (0 < currentTime)
+        {
+            scene.updateVisibleNodes(camera);
+        }
 
-        this.sortRenderablesAndLights(camera, scene);
+        this.sceneExtents = scene.extents;
+
+        //scene.calculateLightsScreenExtents(camera);
+
+        this.sortRenderablesAndLights(gd, camera, scene);
 
         var md = this.md;
         var m43InverseTransposeProjection = md.m43InverseTransposeProjection;
@@ -435,10 +558,10 @@ ForwardRendering.prototype =
         var v3Build = md.v3Build;
         var v4Build = md.v4Build;
 
-        var viewProjectionMatrix = camera.viewProjectionMatrix;
         var viewMatrix = camera.viewMatrix;
         var globalTechniqueParameters = this.globalTechniqueParameters;
-        globalTechniqueParameters.viewProjection = viewProjectionMatrix;
+        globalTechniqueParameters.projection = camera.projectionMatrix;
+        globalTechniqueParameters.viewProjection = camera.viewProjectionMatrix;
         globalTechniqueParameters.eyePosition = md.m43Pos(camera.matrix, globalTechniqueParameters.eyePosition);
         globalTechniqueParameters.time = currentTime;
 
@@ -487,8 +610,9 @@ ForwardRendering.prototype =
             delete this.ambientColor;
         }
 
-        var l, node, light, lightInstance, lightColor, matrix, techniqueParameters, origin, halfExtents, worldView;
+        var l, node, light, lightInstance, lightColor, matrix, techniqueParameters, origin, halfExtents;
         var lightViewInverseTranspose;
+        var worldView = this.worldView;
 
         var pointInstances = this.pointLights;
         var numPointInstances = pointInstances.length;
@@ -500,11 +624,6 @@ ForwardRendering.prototype =
 
             matrix = node.world;
             techniqueParameters = lightInstance.techniqueParameters;
-            if (!techniqueParameters)
-            {
-                techniqueParameters = gd.createTechniqueParameters();
-                lightInstance.techniqueParameters = techniqueParameters;
-            }
 
             origin = light.origin;
 
@@ -545,9 +664,8 @@ ForwardRendering.prototype =
         var numDirectionalLights = directionalLights.length;
         if (numDirectionalLights)
         {
-            if (this.directionalLightsUpdateVisibleRenderables())
+            if (this.directionalLightsUpdateVisibleRenderables(gd))
             {
-                techniqueParameters = this.directionalLightsTechniqueParameters;
                 var extents = scene.extents;
 
                 var sceneDirectionalLightDistance = (-1e6) * ((extents[3] - extents[0]) +
@@ -559,19 +677,19 @@ ForwardRendering.prototype =
                                                extents[5] - extents[2]);
 
                 lightViewInverseTranspose = m43InverseTransposeProjection.call(md, viewMatrix, halfExtents,
-                                                                               techniqueParameters.lightViewInverseTranspose);
+                                                                               this.lightViewInverseTranspose);
 
-                techniqueParameters.lightFalloff = v4Build.call(md,
-                                                                lightViewInverseTranspose[8],
-                                                                lightViewInverseTranspose[9],
-                                                                lightViewInverseTranspose[10],
-                                                                lightViewInverseTranspose[11],
-                                                                techniqueParameters.lightFalloff);
+                var lightFalloff = v4Build.call(md,
+                                                lightViewInverseTranspose[8],
+                                                lightViewInverseTranspose[9],
+                                                lightViewInverseTranspose[10],
+                                                lightViewInverseTranspose[11],
+                                                this.lightFalloff);
+
                 lightViewInverseTranspose[8] = 0;
                 lightViewInverseTranspose[9] = 0;
                 lightViewInverseTranspose[10] = 0;
                 lightViewInverseTranspose[11] = 1.0;
-                techniqueParameters.lightViewInverseTranspose = lightViewInverseTranspose;
 
                 var v3Normalize = md.v3Normalize;
                 var v3ScalarMul = md.v3ScalarMul;
@@ -584,6 +702,10 @@ ForwardRendering.prototype =
                     light = directionalLights[l];
 
                     techniqueParameters = light.techniqueParameters;
+
+                    techniqueParameters.lightFalloff = lightFalloff;
+
+                    techniqueParameters.lightViewInverseTranspose = lightViewInverseTranspose;
 
                     v3Normalize.call(md, light.direction, lightAt);
                     origin = v3ScalarMul.call(md, lightAt, sceneDirectionalLightDistance);
@@ -611,12 +733,12 @@ ForwardRendering.prototype =
         var numSpotInstances = spotInstances.length;
         if (numSpotInstances)
         {
-            var lightView, lightViewInverse, lightProjection, lightViewInverseProjection;
+            var lightView, lightViewInverse;
+            var lightProjection = this.lightProjection;
+            var lightViewInverseProjection = this.lightViewInverseProjection;
             var m33MulM43 = md.m33MulM43;
             var m43Inverse = md.m43Inverse;
             var m43Transpose = md.m43Transpose;
-
-            lightProjection = md.m43Copy(this.lightProjection);
 
             l = 0;
             do
@@ -627,11 +749,6 @@ ForwardRendering.prototype =
 
                 matrix = node.world;
                 techniqueParameters = lightInstance.techniqueParameters;
-                if (!techniqueParameters)
-                {
-                    techniqueParameters = gd.createTechniqueParameters();
-                    lightInstance.techniqueParameters = techniqueParameters;
-                }
 
                 origin = light.origin;
 
@@ -756,40 +873,6 @@ ForwardRendering.prototype =
         gd.drawArray(this.passes[this.passIndex.glow], [this.globalTechniqueParameters], -1);
     },
 
-    drawDirectionalLights: function forwardRenderingDrawDirectionalLightsFn(gd, globalTechniqueParameters, directionalLights)
-    {
-        var numLights = directionalLights.length;
-        if (!numLights)
-        {
-            return;
-        }
-
-        var light, lightTechniqueParameters;
-
-        var globalParameters = [globalTechniqueParameters, this.directionalLightsTechniqueParameters, null];
-
-        gd.clear(null, null, 1.0);
-
-        var diffuseDrawParametersQueue = this.diffuseDrawParametersQueue;
-        if (diffuseDrawParametersQueue.length)
-        {
-            var l = 0;
-            do
-            {
-                light = directionalLights[l];
-                lightTechniqueParameters = light.techniqueParameters;
-
-                // Draw renderables affected by the light
-                globalParameters[2] = lightTechniqueParameters;
-                gd.drawArray(diffuseDrawParametersQueue, globalParameters, -1);
-
-                l += 1;
-            }
-            while (l < numLights);
-        }
-        gd.clear(null, null, 0.0);
-    },
-
     drawShadowMaps: function drawShadowMapsFn(gd, globalTechniqueParameters, lightInstances, shadowMaps, minExtentsHigh)
     {
         var numInstances = lightInstances.length;
@@ -800,17 +883,16 @@ ForwardRendering.prototype =
 
         var lightShadowMapDraw = shadowMaps.drawShadowMap;
 
-        var diffuseDrawParametersQueue;
         var lightInstance, light;
         var l;
         var globalCameraMatrix = this.globalCameraMatrix;
+        //var minPixelCountShadows = this.minPixelCountShadows;
 
         l = 0;
         do
         {
             lightInstance = lightInstances[l];
-            diffuseDrawParametersQueue = lightInstance.diffuseDrawParametersQueue;
-            if (!diffuseDrawParametersQueue.length)
+            if (!lightInstance.numVisibleDrawParameters)
             {
                 l += 1;
                 continue;
@@ -819,165 +901,11 @@ ForwardRendering.prototype =
 
             // TODO: pixel count test
             if (light.shadows &&
-                !light.ambient)
+                !light.ambient /*&&
+                lightInstance.pixelCount >= minPixelCountShadows*/)
             {
                 lightShadowMapDraw.call(shadowMaps, globalCameraMatrix, minExtentsHigh, lightInstance);
             }
-
-            l += 1;
-        }
-        while (l < numInstances);
-    },
-
-    drawSpotLights: function forwardRenderingDrawLightsFn(gd, globalTechniqueParameters)
-    {
-        var lightInstances = this.spotLights;
-        var numInstances = lightInstances.length;
-        if (!numInstances)
-        {
-            return;
-        }
-
-        var stencilSetTechnique = this.stencilSetSpotLightTechnique;
-        var stencilClearTechnique = this.stencilClearSpotLightTechnique;
-        var lightPrimitive = this.lightPrimitive;
-        var lightSemantics = this.lightSemantics;
-        var lightVolumeVertexBuffer = this.spotLightVolumeVertexBuffer;
-
-        var viewProjectionMatrix = this.camera.viewProjectionMatrix;
-        stencilSetTechnique.viewProjection = viewProjectionMatrix;
-        stencilClearTechnique.viewProjection = viewProjectionMatrix;
-
-        var setTechnique = gd.setTechnique;
-        var setStream = gd.setStream;
-        var draw = gd.draw;
-
-        var globalParameters = [globalTechniqueParameters, null, null];
-        var diffuseDrawParametersQueue;
-        var lightInstance, lightInstanceTechniqueParameters, light, lightTechniqueParameters, lightNode, lightWorld;
-        var l;
-
-        l = 0;
-        do
-        {
-            lightInstance = lightInstances[l];
-
-            diffuseDrawParametersQueue = lightInstance.diffuseDrawParametersQueue;
-            if (!diffuseDrawParametersQueue.length)
-            {
-                l += 1;
-                continue;
-            }
-            lightInstanceTechniqueParameters = lightInstance.techniqueParameters;
-            light = lightInstance.light;
-            lightNode = lightInstance.node;
-            lightTechniqueParameters = light.techniqueParameters;
-            lightWorld = lightNode.world;
-            var frustum = light.frustum;
-
-            // Draw light box to mask stencil
-            setTechnique.call(gd, stencilSetTechnique);
-
-            stencilSetTechnique.lightFrustum = frustum;
-            stencilSetTechnique.world = lightWorld;
-            setStream.call(gd, lightVolumeVertexBuffer, lightSemantics);
-            draw.call(gd, lightPrimitive, 8);
-
-            // Draw renderables affected by the light
-            globalParameters[1] = lightTechniqueParameters;
-            globalParameters[2] = lightInstanceTechniqueParameters;
-            gd.drawArray(diffuseDrawParametersQueue, globalParameters, -1);
-
-            // Draw light box to clear stencil
-            setTechnique.call(gd, stencilClearTechnique);
-            stencilClearTechnique.lightFrustum = frustum;
-            stencilClearTechnique.world = lightWorld;
-            setStream.call(gd, lightVolumeVertexBuffer, lightSemantics);
-            draw.call(gd, lightPrimitive, 8);
-
-            l += 1;
-        }
-        while (l < numInstances);
-    },
-
-    drawPointLights: function forwardRenderingDrawPointLightsFn(gd, globalTechniqueParameters)
-    {
-        var lightInstances = this.pointLights;
-        var numInstances = lightInstances.length;
-        if (!numInstances)
-        {
-            return;
-        }
-
-        var stencilSetTechnique = this.stencilSetTechnique;
-        var stencilClearTechnique = this.stencilClearTechnique;
-        var lightVolumeVertexBuffer = this.pointLightVolumeVertexBuffer;
-        var lightPrimitive = this.lightPrimitive;
-        var lightSemantics = this.lightSemantics;
-        var md = this.md;
-
-        var viewProjectionMatrix = this.camera.viewProjectionMatrix;
-        stencilSetTechnique.viewProjection = viewProjectionMatrix;
-        stencilClearTechnique.viewProjection = viewProjectionMatrix;
-
-        var setTechnique = gd.setTechnique;
-        var setStream = gd.setStream;
-        var draw = gd.draw;
-        var drawArray = gd.drawArray;
-        var m43Offset = md.m43Offset;
-        var m43Scale = md.m43Scale;
-
-        var globalParameters = [globalTechniqueParameters, null, null];
-        var diffuseDrawParametersQueue;
-        var lightInstance, lightInstanceTechniqueParameters, light, lightTechniqueParameters, lightNode, lightWorld;
-        var lightCenter, lightTransform, center;
-        var l;
-
-        l = 0;
-        do
-        {
-            lightInstance = lightInstances[l];
-
-            diffuseDrawParametersQueue = lightInstance.diffuseDrawParametersQueue;
-            if (!diffuseDrawParametersQueue.length)
-            {
-                l += 1;
-                continue;
-            }
-            lightInstanceTechniqueParameters = lightInstance.techniqueParameters;
-            light = lightInstance.light;
-            lightNode = lightInstance.node;
-            lightTechniqueParameters = light.techniqueParameters;
-            lightWorld = lightNode.world;
-
-            center = light.center;
-            if (center)
-            {
-                lightCenter = m43Offset.call(md, lightWorld, center, lightCenter);
-                lightTransform = m43Scale.call(md, lightCenter, light.halfExtents, lightTransform);
-            }
-            else
-            {
-                lightTransform = m43Scale.call(md, lightWorld, light.halfExtents, lightTransform);
-            }
-
-            // Draw light box to mask stencil
-            setTechnique.call(gd, stencilSetTechnique);
-
-            stencilSetTechnique.world = lightTransform;
-            setStream.call(gd, lightVolumeVertexBuffer, lightSemantics);
-            draw.call(gd, lightPrimitive, 14);
-
-            // Draw renderables affected by the light
-            globalParameters[1] = lightTechniqueParameters;
-            globalParameters[2] = lightInstanceTechniqueParameters;
-            drawArray.call(gd, diffuseDrawParametersQueue, globalParameters, -1);
-
-            // Draw light box to clear stencil
-            setTechnique.call(gd, stencilClearTechnique);
-            stencilClearTechnique.world = lightTransform;
-            setStream.call(gd, lightVolumeVertexBuffer, lightSemantics);
-            draw.call(gd, lightPrimitive, 14);
 
             l += 1;
         }
@@ -1033,6 +961,8 @@ ForwardRendering.prototype =
             gd.clear(this.v4Zero, 1.0, 0);
         }
 
+        var globalTechniqueParametersArray = [globalTechniqueParameters];
+
         // z-only prepass
         this.fillZBuffer(gd);
 
@@ -1040,7 +970,7 @@ ForwardRendering.prototype =
         var pass = this.passes[this.passIndex.skybox];
         if (0 < pass.length)
         {
-            gd.drawArray(pass, [globalTechniqueParameters], -1);
+            gd.drawArray(pass, globalTechniqueParametersArray, -1);
         }
 
         // ambient and emissive pass
@@ -1067,17 +997,24 @@ ForwardRendering.prototype =
             this.drawGlowPass(gd);
         }
 
-        // Draw lights
-        this.drawDirectionalLights(gd, globalTechniqueParameters, this.directionalLights);
+        // diffuse pass
+        var numDiffuseQueue = this.numDiffuseQueue;
+        if (0 < numDiffuseQueue)
+        {
+            var diffuseQueue = this.diffuseQueue;
+            if (numDiffuseQueue < diffuseQueue.length)
+            {
+                diffuseQueue.length = numDiffuseQueue;
+            }
 
-        this.drawPointLights(gd, globalTechniqueParameters);
-        this.drawSpotLights(gd, globalTechniqueParameters);
+            gd.drawArray(diffuseQueue, globalTechniqueParametersArray, -1);
+        }
 
         // decals
         pass = this.passes[this.passIndex.decal];
         if (0 < pass.length)
         {
-            gd.drawArray(pass, [globalTechniqueParameters], -1);
+            gd.drawArray(pass, globalTechniqueParametersArray, -1);
         }
 
         if (drawDecalsFn)
@@ -1089,7 +1026,7 @@ ForwardRendering.prototype =
         pass = this.passes[this.passIndex.transparent];
         if (0 < pass.length)
         {
-            gd.drawArray(pass, [globalTechniqueParameters], 1);
+            gd.drawArray(pass, globalTechniqueParametersArray, 1);
         }
 
         if (drawTransparentFn)
@@ -1128,7 +1065,6 @@ ForwardRendering.prototype =
     {
         delete this.globalTechniqueParameters;
         delete this.ambientTechniqueParameters;
-        delete this.directionalLightsTechniqueParameters;
         delete this.passes;
         delete this.passIndex;
 
@@ -1137,12 +1073,15 @@ ForwardRendering.prototype =
 
         delete this.globalCameraMatrix;
 
-        delete this.diffuseDrawParametersQueue;
+        delete this.diffuseQueue;
 
         delete this.spotLights;
         delete this.pointLights;
         delete this.directionalLights;
         delete this.fogLights;
+
+        delete this.lightViewInverseTranspose;
+        delete this.lightFalloff;
 
         delete this.v3Zero;
         delete this.v4Zero;
@@ -1233,8 +1172,6 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
         ambientColor: md.v3BuildZero()
     });
 
-    fr.directionalLightsTechniqueParameters = gd.createTechniqueParameters();
-
     fr.passIndex = { fillZ: 0, skybox: 1, glow: 2, ambient: 3, shadow: 4, diffuse: 5, decal: 6, transparent: 7};
     fr.numPasses = fr.passIndex.transparent + 1;
 
@@ -1248,10 +1185,23 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
 
     fr.lightingScale = 2.0;
 
+    fr.diffuseQueue = [];
+    fr.numDiffuseQueue = 0;
+    fr.drawParametersReuse = [];
+
+    fr.overlapQueryRenderables = [];
+
+    fr.nextRenderableID = 0;
+
     fr.spotLights = [];
     fr.pointLights = [];
     fr.directionalLights = [];
     fr.fogLights = [];
+
+    fr.worldView = md.m43BuildIdentity();
+    fr.lightViewInverseProjection = md.m43BuildIdentity();
+    fr.lightViewInverseTranspose = md.m43BuildIdentity();
+    fr.lightFalloff = md.v4BuildZero();
 
     fr.v3Zero = md.v3BuildZero();
     fr.v4Zero = md.v4BuildZero();
@@ -1338,7 +1288,7 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
         shadowMappingSkinnedUpdateFn = shadowMaps.skinnedUpdate;
     }
 
-    var flareIndexBuffer, flareSemantics;
+    var flareIndexBuffer, flareSemantics, flareVertexData;
 
     var m33InverseTranspose = md.m33InverseTranspose;
     var m43Mul = md.m43Mul;
@@ -1350,9 +1300,9 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
     var lightProjectionPos   = md.v3Build(0.0, 0.0, 0.0);
 
     fr.lightProjection = md.m43Build(lightProjectionRight,
-                                   lightProjectionUp,
-                                   lightProjectionAt,
-                                   lightProjectionPos);
+                                     lightProjectionUp,
+                                     lightProjectionAt,
+                                     lightProjectionPos);
 
     var forwardUpdateFn = function forwardUpdateFn(camera)
     {
@@ -1633,7 +1583,10 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
                 drawParameters.technique = this.shadowMappingTechnique;
 
                 drawParameters.sortKey = renderingCommonSortKeyFn(this.shadowMappingTechniqueIndex, 0);
-                drawParameters.setTechniqueParameters(0, geometryInstance.techniqueParameters);   //TODO: This is excessive
+
+                var shadowTechniqueParameters = gd.createTechniqueParameters();
+                geometryInstance.shadowTechniqueParameters = shadowTechniqueParameters;
+                drawParameters.setTechniqueParameters(0, shadowTechniqueParameters);
             }
             else
             {
@@ -1645,6 +1598,29 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
     fr.defaultUpdateFn = forwardUpdateFn;
     fr.defaultSkinnedUpdateFn = forwardSkinnedUpdateFn;
     fr.defaultPrepareFn = forwardPrepareFn;
+
+
+    var forwardGlowUpdateFn = function forwardUpdateFn(camera)
+    {
+        var techniqueParameters = this.techniqueParameters;
+        var node = this.node;
+        techniqueParameters.worldView = m43Mul.call(md, node.world, camera.viewMatrix, techniqueParameters.worldView);
+        this.techniqueParametersUpdated = node.worldUpdate;
+    };
+
+    var forwardGlowSkinnedUpdateFn = function forwardSkinnedUpdateFn(camera)
+    {
+        var techniqueParameters = this.techniqueParameters;
+        var node = this.node;
+        techniqueParameters.worldView = m43Mul.call(md, node.world, camera.viewMatrix, techniqueParameters.worldView);
+        this.techniqueParametersUpdated = node.worldUpdate;
+        var skinController = this.skinController;
+        if (skinController)
+        {
+            techniqueParameters.skinBones = skinController.output;
+            skinController.update();
+        }
+    };
 
     function forwardSkyboxPrepareFn(geometryInstance)
     {
@@ -1763,6 +1739,8 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
                     });
 
                 flareSemantics = gd.createSemantics(['POSITION', 'TEXCOORD']);
+
+                flareVertexData = new VMathArrayConstructor(6 * (3 + 2));
             }
 
             var oldGeometry = geometryInstance.geometry;
@@ -1961,7 +1939,6 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
         var cameraToBottom0 = (bottom0 - cameraMatrix[9]);
         var cameraToBottom1 = (bottom1 - cameraMatrix[10]);
         var cameraToBottom2 = (bottom2 - cameraMatrix[11]);
-        var writer;
         if (((normal0 * cameraToBottom0) + (normal1 * cameraToBottom1) + (normal2 * cameraToBottom2)) < 0)
         {
             geometry.lastTimeVisible = true;
@@ -1998,47 +1975,57 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
             var flareAt1 = (cameraToBottom1 * atScale);
             var flareAt2 = (cameraToBottom2 * atScale);
 
-            var tl0 = (top0    - flareRight0 + flareUp0 + flareAt0);
-            var tl1 = (top1    - flareRight1 + flareUp1 + flareAt1);
-            var tl2 = (top2    - flareRight2 + flareUp2 + flareAt2);
-            var tr0 = (top0    + flareRight0 + flareUp0 + flareAt0);
-            var tr1 = (top1    + flareRight1 + flareUp1 + flareAt1);
-            var tr2 = (top2    + flareRight2 + flareUp2 + flareAt2);
-            var bl0 = (bottom0 - flareRight0 - flareUp0 + flareAt0);
-            var bl1 = (bottom1 - flareRight1 - flareUp1 + flareAt1);
-            var bl2 = (bottom2 - flareRight2 - flareUp2 + flareAt2);
-            var br0 = (bottom0 + flareRight0 - flareUp0 + flareAt0);
-            var br1 = (bottom1 + flareRight1 - flareUp1 + flareAt1);
-            var br2 = (bottom2 + flareRight2 - flareUp2 + flareAt2);
+            flareVertexData[0] = (top0    - flareRight0 + flareUp0 + flareAt0);
+            flareVertexData[1] = (top1    - flareRight1 + flareUp1 + flareAt1);
+            flareVertexData[2] = (top2    - flareRight2 + flareUp2 + flareAt2);
+            flareVertexData[3] = 1.0;
+            flareVertexData[4] = 0.0;
 
-            writer = vertexBuffer.map();
-            if (writer)
-            {
-                writer(tl0,     tl1,     tl2,     1.0, 0.0);
-                writer(tr0,     tr1,     tr2,     1.0, 1.0);
-                writer(top0,    top1,    top2,    0.5, 0.0);
-                writer(br0,     br1,     br2,     1.0, 0.0);
-                writer(bottom0, bottom1, bottom2, 0.5, 1.0);
-                writer(bl0,     bl1,     bl2,     1.0, 1.0);
-                vertexBuffer.unmap(writer);
-            }
+            flareVertexData[5] = (top0    + flareRight0 + flareUp0 + flareAt0);
+            flareVertexData[6] = (top1    + flareRight1 + flareUp1 + flareAt1);
+            flareVertexData[7] = (top2    + flareRight2 + flareUp2 + flareAt2);
+            flareVertexData[8] = 1.0;
+            flareVertexData[9] = 1.0;
+
+            flareVertexData[10] = top0;
+            flareVertexData[11] = top1;
+            flareVertexData[12] = top2;
+            flareVertexData[13] = 0.5;
+            flareVertexData[14] = 0.0;
+
+            flareVertexData[15] = (bottom0 + flareRight0 - flareUp0 + flareAt0);
+            flareVertexData[16] = (bottom1 + flareRight1 - flareUp1 + flareAt1);
+            flareVertexData[17] = (bottom2 + flareRight2 - flareUp2 + flareAt2);
+            flareVertexData[18] = 1.0;
+            flareVertexData[19] = 0.0;
+
+            flareVertexData[20] = bottom0;
+            flareVertexData[21] = bottom1;
+            flareVertexData[22] = bottom2;
+            flareVertexData[23] = 0.5;
+            flareVertexData[24] = 1.0;
+
+            flareVertexData[25] = (bottom0 - flareRight0 - flareUp0 + flareAt0);
+            flareVertexData[26] = (bottom1 - flareRight1 - flareUp1 + flareAt1);
+            flareVertexData[27] = (bottom2 - flareRight2 - flareUp2 + flareAt2);
+            flareVertexData[28] = 1.0;
+            flareVertexData[29] = 1.0;
+
+            vertexBuffer.setData(flareVertexData);
         }
         else
         {
             if (geometry.lastTimeVisible)
             {
                 geometry.lastTimeVisible = false;
-                writer = vertexBuffer.map();
-                if (writer)
+
+                var n;
+                for (n = 0; n < 30; n += 1)
                 {
-                    writer(0, 0, 0, 0, 0);
-                    writer(0, 0, 0, 0, 0);
-                    writer(0, 0, 0, 0, 0);
-                    writer(0, 0, 0, 0, 0);
-                    writer(0, 0, 0, 0, 0);
-                    writer(0, 0, 0, 0, 0);
-                    vertexBuffer.unmap(writer);
+                    flareVertexData[n] = 0;
                 }
+
+                vertexBuffer.setData(flareVertexData);
             }
         }
     }
@@ -2860,7 +2847,7 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
     effectTypeData = {  prepare : forwardPrepareFn,
                         shaderName : "shaders/forwardrendering.cgfx",
                         techniqueName : "glowmap",
-                        update : forwardBlendUpdateFn,
+                        update : forwardGlowUpdateFn,
                         shadowMappingShaderName : "shaders/shadowmapping.cgfx",
                         shadowMappingTechniqueName : "rigid",
                         shadowMappingUpdate : shadowMappingUpdateFn,
@@ -2871,10 +2858,74 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
     effectTypeData = {  prepare : forwardPrepareFn,
                         shaderName : "shaders/forwardrendering.cgfx",
                         techniqueName : "glowmap_skinned",
-                        update : forwardBlendSkinnedUpdateFn,
+                        update : forwardGlowSkinnedUpdateFn,
                         shadowMappingShaderName : "shaders/shadowmapping.cgfx",
                         shadowMappingTechniqueName : "skinned",
                         shadowMappingUpdate : shadowMappingSkinnedUpdateFn,
+                        loadTechniques : loadTechniques };
+    effectTypeData.loadTechniques(shaderManager);
+    effect.add(skinned, effectTypeData);
+
+    //
+    // constant
+    //
+    effect = Effect.create("constant");
+    effectManager.add(effect);
+
+    effectTypeData = {  prepare : forwardPrepareFn,
+                        shaderName : "shaders/forwardrendering.cgfx",
+                        techniqueName : "flat",
+                        update : forwardUpdateFn,
+                        shadowMappingShaderName : "shaders/shadowmapping.cgfx",
+                        shadowMappingTechniqueName : "rigid",
+                        shadowMappingUpdate : shadowMappingUpdateFn,
+                        shadowShaderName : "shaders/forwardrenderingshadows.cgfx",
+                        shadowTechniqueName : "flat_shadows",
+                        loadTechniques : loadTechniques };
+    effectTypeData.loadTechniques(shaderManager);
+    effect.add(rigid, effectTypeData);
+
+    effectTypeData = {  prepare : forwardPrepareFn,
+                        shaderName : "shaders/forwardrendering.cgfx",
+                        techniqueName : "flat_skinned",
+                        update : forwardSkinnedUpdateFn,
+                        shadowMappingShaderName : "shaders/shadowmapping.cgfx",
+                        shadowMappingTechniqueName : "skinned",
+                        shadowMappingUpdate : shadowMappingSkinnedUpdateFn,
+                        shadowShaderName : "shaders/forwardrenderingshadows.cgfx",
+                        shadowTechniqueName : "flat_skinned_shadows",
+                        loadTechniques : loadTechniques };
+    effectTypeData.loadTechniques(shaderManager);
+    effect.add(skinned, effectTypeData);
+
+    //
+    // constant_nocull
+    //
+    effect = Effect.create("constant_nocull");
+    effectManager.add(effect);
+
+    effectTypeData = {  prepare : forwardPrepareFn,
+                        shaderName : "shaders/forwardrendering.cgfx",
+                        techniqueName : "flat_nocull",
+                        update : forwardUpdateFn,
+                        shadowMappingShaderName : "shaders/shadowmapping.cgfx",
+                        shadowMappingTechniqueName : "rigid",
+                        shadowMappingUpdate : shadowMappingUpdateFn,
+                        shadowShaderName : "shaders/forwardrenderingshadows.cgfx",
+                        shadowTechniqueName : "flat_shadows_nocull",
+                        loadTechniques : loadTechniques };
+    effectTypeData.loadTechniques(shaderManager);
+    effect.add(rigid, effectTypeData);
+
+    effectTypeData = {  prepare : forwardPrepareFn,
+                        shaderName : "shaders/forwardrendering.cgfx",
+                        techniqueName : "flat_skinned_nocull",
+                        update : forwardSkinnedUpdateFn,
+                        shadowMappingShaderName : "shaders/shadowmapping.cgfx",
+                        shadowMappingTechniqueName : "skinned",
+                        shadowMappingUpdate : shadowMappingSkinnedUpdateFn,
+                        shadowShaderName : "shaders/forwardrenderingshadows.cgfx",
+                        shadowTechniqueName : "flat_skinned_shadows_nocull",
                         loadTechniques : loadTechniques };
     effectTypeData.loadTechniques(shaderManager);
     effect.add(skinned, effectTypeData);

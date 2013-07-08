@@ -86,6 +86,16 @@ Utilities.nearestUpperPow2 = function UtilitiesNearestUpperPow2(num)
 
 var MathDeviceConvert =
 {
+    v2ToArray : function v2ToJavaScriptArrayFn(v2)
+    {
+        return [v2[0], v2[1]];
+    },
+
+    arrayToV2 : function arrayToV2Fn(mathDevice, v2Array, v2Dest)
+    {
+        return mathDevice.v2Build(v2Array[0], v2Array[1], v2Dest);
+    },
+
     v3ToArray : function v3ToJavaScriptArrayFn(v3)
     {
         return [v3[0], v3[1], v3[2]];
@@ -207,7 +217,6 @@ Utilities.ajax = function utilitiesAjaxFn(params)
     var data = params.data || {};
     var encrypted = params.encrypt;
     var signature = null;
-    var async = params.async || true;
     var url = params.url;
     var requestHandler = params.requestHandler;
     var callbackFn = params.callback;
@@ -231,7 +240,8 @@ Utilities.ajax = function utilitiesAjaxFn(params)
     }
     else if (data)
     {
-        for (var key in data)
+        var key;
+        for (key in data)
         {
             if (data.hasOwnProperty(key))
             {
@@ -261,9 +271,9 @@ Utilities.ajax = function utilitiesAjaxFn(params)
 
         var response;
 
+        response = JSON.parse(xhrResponseText);
         if (encrypted)
         {
-            response = JSON.parse(xhrResponseText);
             var validSignature = TurbulenzEngine.verifySignature(xhrResponseText, sig);
             xhrResponseText = null;
 
@@ -295,7 +305,6 @@ Utilities.ajax = function utilitiesAjaxFn(params)
         }
         else
         {
-            response = JSON.parse(xhrResponseText);
             xhrResponseText = null;
 
             TurbulenzEngine.setTimeout(function () {
@@ -350,7 +359,7 @@ Utilities.ajax = function utilitiesAjaxFn(params)
         };
 
         // Send request
-        xhr.open(method, ((requestText && (method !== "POST")) ? url + "?" + requestText : url), async);
+        xhr.open(method, ((requestText && (method !== "POST")) ? url + "?" + requestText : url), true);
         if (callbackFn)
         {
             xhr.onreadystatechange = httpCallback;
@@ -577,7 +586,8 @@ var Profile =
         var dataArray = [];
         var data;
         var maxDuration = 0.0;
-        for (var name in this.profiles)
+        var name;
+        for (name in this.profiles)
         {
             if (this.profiles.hasOwnProperty(name))
             {
@@ -636,7 +646,8 @@ var Profile =
         var percentagePrecision = format ? format.percentagePrecision : 1;
         var seperator = format ? format.seperator : " ";
         var length = dataArray.length;
-        for (var index = 0; index < length; index += 1)
+        var index;
+        for (index = 0; index < length; index += 1)
         {
             data = dataArray[index];
             line = data.name;
@@ -714,7 +725,8 @@ JSProfiling.createArray = function JSProfilingCreateArrayFn(rootNode)
         if (children)
         {
             var numberOfChildren = children.length;
-            for (var childIndex = 0; childIndex < numberOfChildren; childIndex += 1)
+            var childIndex;
+            for (childIndex = 0; childIndex < numberOfChildren; childIndex += 1)
             {
                 processNode(children[childIndex]);
             }

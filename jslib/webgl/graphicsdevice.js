@@ -197,7 +197,8 @@ WebGLTexture.prototype =
                     // Uint8ClampedArray then we can just reuse the
                     // underlying data.
 
-                    if (data instanceof Uint8ClampedArray)
+                    if (typeof Uint8ClampedArray !== "undefined" &&
+                        data instanceof Uint8ClampedArray)
                     {
                         bufferData = new Uint8Array(data.buffer);
                     }
@@ -223,7 +224,8 @@ WebGLTexture.prototype =
                 {
                     // See comment above about Uint8ClampedArray
 
-                    if (data instanceof Uint8ClampedArray)
+                    if (typeof Uint8ClampedArray !== "undefined" &&
+                        data instanceof Uint8ClampedArray)
                     {
                         bufferData = new Uint8Array(data.buffer);
                     }
@@ -508,28 +510,32 @@ WebGLTexture.prototype =
                 (format === gd.PIXELFORMAT_S8))
             {
                 return ((typedArray instanceof Uint8Array) ||
-                        (typedArray instanceof Uint8ClampedArray)) &&
+                        (typeof Uint8ClampedArray !== "undefined" &&
+                         typedArray instanceof Uint8ClampedArray)) &&
                     (typedArray.length ===
                      this.width * this.height * this.depth);
             }
             if (format === gd.PIXELFORMAT_L8A8)
             {
                 return ((typedArray instanceof Uint8Array) ||
-                        (typedArray instanceof Uint8ClampedArray)) &&
+                        (typeof Uint8ClampedArray !== "undefined" &&
+                         typedArray instanceof Uint8ClampedArray)) &&
                     (typedArray.length ===
                      2 * this.width * this.height * this.depth);
             }
             if (format === gd.PIXELFORMAT_R8G8B8)
             {
                 return ((typedArray instanceof Uint8Array) ||
-                        (typedArray instanceof Uint8ClampedArray)) &&
+                        (typeof Uint8ClampedArray !== "undefined" &&
+                         typedArray instanceof Uint8ClampedArray)) &&
                     (typedArray.length ===
                      3 * this.width * this.height * this.depth);
             }
             if (format === gd.PIXELFORMAT_R8G8B8A8)
             {
                 return ((typedArray instanceof Uint8Array) ||
-                        (typedArray instanceof Uint8ClampedArray)) &&
+                        (typeof Uint8ClampedArray !== "undefined" &&
+                         typedArray instanceof Uint8ClampedArray)) &&
                     (typedArray.length ===
                      4 * this.width * this.height * this.depth);
             }
@@ -740,11 +746,11 @@ WebGLTexture.create = function webGLTextureCreateFn(gd, params)
         {
             if (extension === '.jpg' || extension === '.jpeg')
             {
-                src = 'data:image/jpeg;base64,' + TurbulenzEngine.base64encode(data);
+                src = 'data:image/jpeg;base64,' + TurbulenzEngine.base64Encode(data);
             }
             else if (extension === '.png')
             {
-                src = 'data:image/png;base64,' + TurbulenzEngine.base64encode(data);
+                src = 'data:image/png;base64,' + TurbulenzEngine.base64Encode(data);
             }
         }
         else
@@ -1325,8 +1331,13 @@ WebGLIndexBuffer.create = function webGLIndexBufferCreateFn(gd, params)
     }
     ib.stride = stride;
 
-    ib.dynamic = params.dynamic;
-    ib.usage = (params.dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
+    /*jshint sub: true*/
+    // Avoid dot notation lookup to prevent Google Closure complaining about transient being a keyword
+    ib['transient'] = (params['transient'] || false);
+    ib.dynamic = (params.dynamic || ib['transient']);
+    ib.usage = (ib['transient'] ? gl.STREAM_DRAW : (ib.dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW));
+    /*jshint sub: false*/
+
     ib.glBuffer = gl.createBuffer();
 
     if (params.data)
@@ -1985,7 +1996,6 @@ WebGLVertexBuffer.prototype =
     {
         var gd = this.gd;
         var gl = gd.gl;
-        var vertexAttribPointer = gl.vertexAttribPointer;
         var vertexAttributes = this.attributes;
         var stride = this.strideInBytes;
         var attributeMask = 0;
@@ -1997,13 +2007,12 @@ WebGLVertexBuffer.prototype =
 
             attributeMask |= (1 << attribute);
 
-            vertexAttribPointer.call(gl,
-                                     attribute,
-                                     vertexAttribute.numComponents,
-                                     vertexAttribute.format,
-                                     vertexAttribute.normalized,
-                                     stride,
-                                     offset);
+            gl.vertexAttribPointer(attribute,
+                                   vertexAttribute.numComponents,
+                                   vertexAttribute.format,
+                                   vertexAttribute.normalized,
+                                   stride,
+                                   offset);
 
             offset += vertexAttribute.stride;
         }
@@ -3347,67 +3356,187 @@ function techniqueParameterBufferCreate(params)
 //
 // WebGLDrawParameters
 //
-function WebGLDrawParameters() {}
+function WebGLDrawParameters()
+{
+    // Streams, TechniqueParameters and Instances are stored as indexed properties
+    this.endStreams = 0;
+    this.endTechniqueParameters = (16 * 3);
+    this.endInstances = ((16 * 3) + 8);
+    this.firstIndex = 0;
+    this.count = 0;
+    this.sortKey = 0;
+    this.technique = null;
+    this.indexBuffer = null;
+    this.primitive = -1;
+    this.userData = null;
+
+    // Initialize for 1 Stream, 2 TechniqueParameters and 8 Instances
+    this[0] = undefined;
+    this[1] = undefined;
+    this[2] = undefined;
+
+    this[(16 * 3) + 0] = undefined;
+    this[(16 * 3) + 1] = undefined;
+
+    this[((16 * 3) + 8) + 0] = undefined;
+    this[((16 * 3) + 8) + 1] = undefined;
+    this[((16 * 3) + 8) + 2] = undefined;
+    this[((16 * 3) + 8) + 3] = undefined;
+    this[((16 * 3) + 8) + 4] = undefined;
+    this[((16 * 3) + 8) + 5] = undefined;
+    this[((16 * 3) + 8) + 6] = undefined;
+    this[((16 * 3) + 8) + 7] = undefined;
+}
+
 WebGLDrawParameters.prototype =
 {
     version : 1,
 
     setTechniqueParameters : function setTechniqueParametersFn(indx, techniqueParameters)
     {
-        this.techniqueParameters[indx] = techniqueParameters;
+        if (indx < 8)
+        {
+            indx += (16 * 3);
+
+            this[indx] = techniqueParameters;
+
+            var endTechniqueParameters = this.endTechniqueParameters;
+            if (techniqueParameters)
+            {
+                if (endTechniqueParameters <= indx)
+                {
+                    this.endTechniqueParameters = (indx + 1);
+                }
+            }
+            else
+            {
+                while ((16 * 3) < endTechniqueParameters &&
+                       !this[endTechniqueParameters - 1])
+                {
+                    endTechniqueParameters -= 1;
+                }
+                this.endTechniqueParameters = endTechniqueParameters;
+            }
+        }
     },
 
     setVertexBuffer : function setVertexBufferFn(indx, vertexBuffer)
     {
-        this.streams[(indx * 3) + 0] = vertexBuffer;
+        if (indx < 16)
+        {
+            indx *= 3;
+
+            this[indx] = vertexBuffer;
+
+            var endStreams = this.endStreams;
+            if (vertexBuffer)
+            {
+                if (endStreams <= indx)
+                {
+                    this.endStreams = (indx + 3);
+                }
+            }
+            else
+            {
+                while (0 < endStreams &&
+                       !this[endStreams - 3])
+                {
+                    endStreams -= 3;
+                }
+                this.endStreams = endStreams;
+            }
+        }
     },
 
     setSemantics : function setSemanticsFn(indx, semantics)
     {
-        this.streams[(indx * 3) + 1] = semantics;
+        if (indx < 16)
+        {
+            this[(indx * 3) + 1] = semantics;
+        }
     },
 
     setOffset : function setOffsetFn(indx, offset)
     {
-        this.streams[(indx * 3) + 2] = offset;
+        if (indx < 16)
+        {
+            this[(indx * 3) + 2] = offset;
+        }
     },
 
     getTechniqueParameters : function getTechniqueParametersFn(indx)
     {
-        return this.techniqueParameters[indx];
+        if (indx < 8)
+        {
+            return this[indx + (16 * 3)];
+        }
+        else
+        {
+            return undefined;
+        }
     },
 
     getVertexBuffer : function getVertexBufferFn(indx)
     {
-        return this.streams[(indx * 3) + 0];
+        if (indx < 16)
+        {
+            return this[(indx * 3) + 0];
+        }
+        else
+        {
+            return undefined;
+        }
     },
 
     getSemantics : function getSemanticsFn(indx)
     {
-        return this.streams[(indx * 3) + 1];
+        if (indx < 16)
+        {
+            return this[(indx * 3) + 1];
+        }
+        else
+        {
+            return undefined;
+        }
     },
 
     getOffset : function getOffsetFn(indx)
     {
-        return this.streams[(indx * 3) + 2];
+        if (indx < 16)
+        {
+            return this[(indx * 3) + 2];
+        }
+        else
+        {
+            return undefined;
+        }
+    },
+
+    addInstance : function drawParametersAddInstanceFn(instanceParameters)
+    {
+        if (instanceParameters)
+        {
+            var endInstances = this.endInstances;
+            this.endInstances = (endInstances + 1);
+            this[endInstances] = instanceParameters;
+        }
+    },
+
+    removeInstances : function drawParametersRemoveInstancesFn()
+    {
+        this.endInstances = ((16 * 3) + 8);
+    },
+
+    getNumInstances : function drawParametersGetNumInstancesFn()
+    {
+        return (this.endInstances - ((16 * 3) + 8));
     }
 };
 
 // Constructor function
 WebGLDrawParameters.create = function webGLDrawParametersFn(params)
 {
-    var drawParameters = new WebGLDrawParameters();
-    drawParameters.techniqueParameters = [];
-    drawParameters.streams = [];
-    drawParameters.firstIndex = 0;
-    drawParameters.count = 0;
-    drawParameters.sortKey = 0;
-    drawParameters.technique = null;
-    drawParameters.indexBuffer = null;
-    drawParameters.primitive = -1;
-    drawParameters.userData = null;
-
-    return drawParameters;
+    return new WebGLDrawParameters();
 };
 
 
@@ -3823,14 +3952,9 @@ WebGLGraphicsDevice.prototype =
     drawArray : function drawArrayFn(drawParametersArray, globalTechniqueParametersArray, sortMode)
     {
         var gl = this.gl;
-        var bindBuffer = gl.bindBuffer;
-        var drawElements = gl.drawElements;
-        var drawArrays = gl.drawArrays;
         var ELEMENT_ARRAY_BUFFER = gl.ELEMENT_ARRAY_BUFFER;
 
-        var setTechniqueCaching = this.setTechniqueCaching;
         var setParametersCaching = this.setParametersCaching;
-        var setTechniqueStandard = this.setTechnique;
         var setParametersDeferred = this.setParametersDeferred;
 
         var setStream = this.setStream;
@@ -3857,22 +3981,32 @@ WebGLGraphicsDevice.prototype =
 
 
         var activeIndexBuffer = this.activeIndexBuffer;
-        var setTechnique = null;
         var setParameters = null;
         var lastTechnique = null;
-        var lastNumStreams = -1;
-        var lastStreams = null;
-        var v, streamsMatch, offset;
-        var passes, numPasses, mask, attributeMask, p, pass, format, t;
+        var lastEndStreams = -1;
+        var lastDrawParameters = null;
+        var techniqueParameters = null;
+        var v = 0;
+        var streamsMatch = false;
+        var vertexBuffer = null;
+        var offset = 0;
+        var passes = null;
+        var p = null;
+        var pass = null;
+        var format = 0;
+        var numPasses = 0;
+        var mask = 0;
+        var attributeMask = 0;
+        var t = 0;
 
         for (var n = 0; n < numDrawParameters; n += 1)
         {
             var drawParameters = drawParametersArray[n];
             var technique = drawParameters.technique;
-            var techniqueParametersArray = drawParameters.techniqueParameters;
+            var endTechniqueParameters = drawParameters.endTechniqueParameters;
+            var endStreams = drawParameters.endStreams;
+            var endInstances = drawParameters.endInstances;
             var indexBuffer = drawParameters.indexBuffer;
-            var streamsArray = drawParameters.streams;
-            var numStreams = streamsArray.length;
             var primitive = drawParameters.primitive;
             var count = drawParameters.count;
             var firstIndex = drawParameters.firstIndex;
@@ -3885,16 +4019,14 @@ WebGLGraphicsDevice.prototype =
                 numPasses = passes.length;
                 if (1 === numPasses)
                 {
-                    setTechnique = setTechniqueCaching;
+                    this.setTechniqueCaching(technique);
                     setParameters = setParametersCaching;
                 }
                 else
                 {
-                    setTechnique = setTechniqueStandard;
+                    this.setTechnique(technique);
                     setParameters = setParametersDeferred;
                 }
-
-                setTechnique.call(this, technique);
 
                 technique.checkProperties(this);
 
@@ -3904,31 +4036,35 @@ WebGLGraphicsDevice.prototype =
                 }
             }
 
-            if (techniqueParametersArray)
+            for (t = (16 * 3); t < endTechniqueParameters; t += 1)
             {
-                var numTechniqueParameters = techniqueParametersArray.length;
-                for (t = 0; t < numTechniqueParameters; t += 1)
+                techniqueParameters = drawParameters[t];
+                if (techniqueParameters)
                 {
-                    setParameters(this, passes, techniqueParametersArray[t]);
+                    setParameters(this, passes, techniqueParameters);
                 }
             }
 
-            streamsMatch = (lastNumStreams === numStreams);
-            for (v = 0; streamsMatch && v < numStreams; v += 3)
+            streamsMatch = (lastEndStreams === endStreams);
+            for (v = 0; streamsMatch && v < endStreams; v += 3)
             {
-                streamsMatch = (lastStreams[v]     === streamsArray[v]     &&
-                                lastStreams[v + 1] === streamsArray[v + 1] &&
-                                lastStreams[v + 2] === streamsArray[v + 2]);
+                streamsMatch = (lastDrawParameters[v]     === drawParameters[v]     &&
+                                lastDrawParameters[v + 1] === drawParameters[v + 1] &&
+                                lastDrawParameters[v + 2] === drawParameters[v + 2]);
             }
 
             if (!streamsMatch)
             {
-                lastNumStreams = numStreams;
-                lastStreams = streamsArray;
+                lastEndStreams = endStreams;
+                lastDrawParameters = drawParameters;
 
-                for (v = 0; v < numStreams; v += 3)
+                for (v = 0; v < endStreams; v += 3)
                 {
-                    setStream.call(this, streamsArray[v], streamsArray[v + 1], streamsArray[v + 2]);
+                    vertexBuffer = drawParameters[v];
+                    if (vertexBuffer)
+                    {
+                        setStream.call(this, vertexBuffer, drawParameters[v + 1], drawParameters[v + 2]);
+                    }
                 }
 
                 attributeMask = this.attributeMask;
@@ -3940,7 +4076,7 @@ WebGLGraphicsDevice.prototype =
                 if (activeIndexBuffer !== indexBuffer)
                 {
                     activeIndexBuffer = indexBuffer;
-                    bindBuffer.call(gl, ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer);
+                    gl.bindBuffer(ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer);
                 }
 
                 offset = firstIndex;
@@ -3959,23 +4095,68 @@ WebGLGraphicsDevice.prototype =
                         enableClientState.call(this, mask);
                     }
 
-                    drawElements.call(gl, primitive, count, format, offset);
+                    t = ((16 * 3) + 8);
+                    if (t < endInstances)
+                    {
+                        do
+                        {
+                            setParameters(this, passes, drawParameters[t]);
+
+                            gl.drawElements(primitive, count, format, offset);
+
+                            t += 1;
+                        }
+                        while (t < endInstances);
+                    }
+                    else
+                    {
+                        gl.drawElements(primitive, count, format, offset);
+                    }
                 }
                 else
                 {
-                    for (p = 0; p < numPasses; p += 1)
+                    t = ((16 * 3) + 8);
+                    if (t < endInstances)
                     {
-                        pass = passes[p];
-
-                        mask = (pass.semanticsMask & attributeMask);
-                        if (mask !== this.clientStateMask)
+                        do
                         {
-                            enableClientState.call(this, mask);
+                            setParameters(this, passes, drawParameters[t]);
+
+                            for (p = 0; p < numPasses; p += 1)
+                            {
+                                pass = passes[p];
+
+                                mask = (pass.semanticsMask & attributeMask);
+                                if (mask !== this.clientStateMask)
+                                {
+                                    enableClientState.call(this, mask);
+                                }
+
+                                this.setPass(pass);
+
+                                gl.drawElements(primitive, count, format, offset);
+                            }
+
+                            t += 1;
                         }
+                        while (t < endInstances);
+                    }
+                    else
+                    {
+                        for (p = 0; p < numPasses; p += 1)
+                        {
+                            pass = passes[p];
 
-                        this.setPass(pass);
+                            mask = (pass.semanticsMask & attributeMask);
+                            if (mask !== this.clientStateMask)
+                            {
+                                enableClientState.call(this, mask);
+                            }
 
-                        drawElements.call(gl, primitive, count, format, offset);
+                            this.setPass(pass);
+
+                            gl.drawElements(primitive, count, format, offset);
+                        }
                     }
                 }
             }
@@ -3989,23 +4170,68 @@ WebGLGraphicsDevice.prototype =
                         enableClientState.call(this, mask);
                     }
 
-                    drawArrays.call(gl, primitive, firstIndex, count);
+                    t = ((16 * 3) + 8);
+                    if (t < endInstances)
+                    {
+                        do
+                        {
+                            setParameters(this, passes, drawParameters[t]);
+
+                            gl.drawArrays(primitive, firstIndex, count);
+
+                            t += 1;
+                        }
+                        while (t < endInstances);
+                    }
+                    else
+                    {
+                        gl.drawArrays(primitive, firstIndex, count);
+                    }
                 }
                 else
                 {
-                    for (p = 0; p < numPasses; p += 1)
+                    t = ((16 * 3) + 8);
+                    if (t < endInstances)
                     {
-                        pass = passes[p];
-
-                        mask = (pass.semanticsMask & attributeMask);
-                        if (mask !== this.clientStateMask)
+                        do
                         {
-                            enableClientState.call(this, mask);
+                            setParameters(this, passes, drawParameters[t]);
+
+                            for (p = 0; p < numPasses; p += 1)
+                            {
+                                pass = passes[p];
+
+                                mask = (pass.semanticsMask & attributeMask);
+                                if (mask !== this.clientStateMask)
+                                {
+                                    enableClientState.call(this, mask);
+                                }
+
+                                this.setPass(pass);
+
+                                gl.drawArrays(primitive, firstIndex, count);
+                            }
+
+                            t += 1;
                         }
+                        while (t < endInstances);
+                    }
+                    else
+                    {
+                        for (p = 0; p < numPasses; p += 1)
+                        {
+                            pass = passes[p];
 
-                        this.setPass(pass);
+                            mask = (pass.semanticsMask & attributeMask);
+                            if (mask !== this.clientStateMask)
+                            {
+                                enableClientState.call(this, mask);
+                            }
 
-                        drawArrays.call(gl, primitive, firstIndex, count);
+                            this.setPass(pass);
+
+                            gl.drawArrays(primitive, firstIndex, count);
+                        }
                     }
                 }
             }
@@ -4438,6 +4664,7 @@ WebGLGraphicsDevice.prototype =
                     }
                 }
             }
+            return false;
         }
         else if ("TEXTURE_ETC1" === name)
         {

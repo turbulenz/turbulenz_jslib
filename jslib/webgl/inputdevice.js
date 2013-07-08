@@ -1,5 +1,9 @@
 // Copyright (c) 2011-2012 Turbulenz Limited
+
 /*global window*/
+/*global Touch: false*/
+/*global TouchEvent: false*/
+/*global TurbulenzEngine: false*/
 
 //
 // WebGLInputDevice
@@ -8,6 +12,18 @@ function WebGLInputDevice() {}
 WebGLInputDevice.prototype = {
 
     version : 1,
+
+    // Public API
+
+    update : function inputDeviceUpdateFn()
+    {
+        if (!this.isWindowFocused)
+        {
+            return;
+        }
+
+        this.updateGamePad();
+    },
 
     addEventListener : function addEventListenerFn(eventType, eventListener)
     {
@@ -62,162 +78,63 @@ WebGLInputDevice.prototype = {
         }
     },
 
-    sendEventToHandlers : function sendEventToHandlersFn(eventHandlers, arg0, arg1, arg2, arg3, arg4, arg5)
+    lockMouse : function lockMouseFn()
     {
-        var i;
-        var length = eventHandlers.length;
-
-        if (length)
+        if (this.isHovering &&
+            this.isWindowFocused)
         {
-            for (i = 0; i < length; i += 1)
-            {
-                eventHandlers[i](arg0, arg1, arg2, arg3, arg4, arg5);
-            }
+            this.isMouseLocked = true;
+            this.hideMouse();
+
+            this.requestBrowserLock();
+
+            this.setEventHandlersLock();
+
+            return true;
+        }
+        else
+        {
+            return false;
         }
     },
 
-    updateGamePad : function updateGamePadFn()
+    unlockMouse : function unlockMouseFn()
     {
-        var magnitude;
-        var normalizedMagnitude;
-
-        var gamepads = (navigator.gamepads || navigator.webkitGamepads);
-
-        if (gamepads)
+        if (this.isMouseLocked)
         {
-            var deadZone = this.padAxisDeadZone;
-            var maxAxisRange = this.maxAxisRange;
-            var sendEventToHandlers = this.sendEventToHandlers;
-            var handlers = this.handlers;
-            var padButtons = this.padButtons;
-            var padMap = this.padMap;
-            var leftThumbX = 0;
-            var leftThumbY = 0;
-            var rightThumbX = 0;
-            var rightThumbY = 0;
+            this.isMouseLocked = false;
+            this.showMouse();
 
-            var numGamePads = gamepads.length;
-            for (var i = 0; i < numGamePads; i += 1)
+            this.requestBrowserUnlock();
+
+            this.setEventHandlersUnlock();
+
+            if (this.isOutsideEngine)
             {
-                var gamepad = gamepads[i];
-                if (gamepad)
-                {
-                    // Update button states
+                this.isOutsideEngine = false;
 
-                    var buttons = gamepad.buttons;
+                this.isHovering = false;
 
-                    if (this.padTimestampUpdate < gamepad.timestamp)
-                    {
-                        this.padTimestampUpdate = gamepad.timestamp;
+                this.setEventHandlersMouseLeave();
 
-                        var numButtons = buttons.length;
-                        for (var n = 0; n < numButtons; n += 1)
-                        {
-                            var value = buttons[n];
-                            if (padButtons[n] !== value)
-                            {
-                                padButtons[n] = value;
-
-                                var padCode = padMap[n];
-                                if (padCode !== undefined)
-                                {
-                                    if (value)
-                                    {
-                                        sendEventToHandlers(handlers.paddown, padCode);
-                                    }
-                                    else
-                                    {
-                                        sendEventToHandlers(handlers.padup, padCode);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Update axes states
-
-                    var axes = gamepad.axes;
-                    if (axes.length <= 4)
-                    {
-                        // Axis 1 & 2
-                        var lX = axes[0];
-                        var lY = -axes[1];
-                        magnitude = ((lX * lX) + (lY * lY));
-
-                        if (magnitude > (deadZone * deadZone))
-                        {
-                            magnitude = Math.sqrt(magnitude);
-
-                            // Normalize lX and lY
-                            lX = (lX / magnitude);
-                            lY = (lY / magnitude);
-
-                            // Clip the magnitude at its max possible value
-                            if (magnitude > maxAxisRange)
-                            {
-                                magnitude = maxAxisRange;
-                            }
-
-                            // Adjust magnitude relative to the end of the dead zone
-                            magnitude -= deadZone;
-
-                            // Normalize the magnitude
-                            normalizedMagnitude = (magnitude / (maxAxisRange - deadZone));
-
-                            leftThumbX = (lX * normalizedMagnitude);
-                            leftThumbY = (lY * normalizedMagnitude);
-                        }
-
-                        // Axis 3 & 4
-                        var rX = axes[2];
-                        var rY = -axes[3];
-                        magnitude = ((rX * rX) + (rY * rY));
-
-                        if (magnitude > (deadZone * deadZone))
-                        {
-                            magnitude = Math.sqrt(magnitude);
-
-                            // Normalize lX and lY
-                            rX = (rX / magnitude);
-                            rY = (rY / magnitude);
-
-                            // Clip the magnitude at its max possible value
-                            if (magnitude > maxAxisRange)
-                            {
-                                magnitude = maxAxisRange;
-                            }
-
-                            // Adjust magnitude relative to the end of the dead zone
-                            magnitude -= deadZone;
-
-                            // Normalize the magnitude
-                            normalizedMagnitude = (magnitude / (maxAxisRange - deadZone));
-
-                            rightThumbX = (rX * normalizedMagnitude);
-                            rightThumbY = (rY * normalizedMagnitude);
-                        }
-
-
-                        sendEventToHandlers(handlers.padmove,
-                                            leftThumbX, leftThumbY, buttons[6],
-                                            rightThumbX, rightThumbY, buttons[7]);
-                    }
-
-                    // Our API only supports one active pad...
-                    break;
-                }
+                // Send mouseout event
+                this.sendEventToHandlers(this.handlers.mouseleave);
             }
+
+            // Send mouselocklost event
+            this.sendEventToHandlers(this.handlers.mouselocklost);
+
+            return true;
+        }
+        else
+        {
+            return false;
         }
     },
 
-    update : function inputDeviceUpdateFn()
+    isLocked : function isLockedFn()
     {
-        if (!this.isWindowFocused)
-        {
-            return;
-        }
-
-        this.updateGamePad();
+        return this.isMouseLocked;
     },
 
     hideMouse : function hideMouseFn()
@@ -264,65 +181,6 @@ WebGLInputDevice.prototype = {
         return this.isWindowFocused;
     },
 
-    lockMouse : function lockMouseFn()
-    {
-        if (this.isHovering &&
-            this.isWindowFocused)
-        {
-            this.isMouseLocked = true;
-            this.hideMouse();
-
-            this.requestBrowserLock();
-
-            this.setEventHandlersLock();
-
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    },
-
-    unlockMouse : function unlockMouseFn()
-    {
-        if (this.isMouseLocked)
-        {
-            this.isMouseLocked = false;
-            this.showMouse();
-
-            this.requestBrowserUnlock();
-
-            this.setEventHandlersUnlock();
-
-            if (this.isOutsideEngine)
-            {
-                this.isOutsideEngine = false;
-
-                this.isHovering = false;
-
-                this.setEventHandlersMouseLeave();
-
-                // Send mouseout event
-                this.sendEventToHandlers(this.handlers.mouseleave);
-
-                // Send mouselocklost event
-                this.sendEventToHandlers(this.handlers.mouselocklost);
-            }
-
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    },
-
-    isLocked : function isLockedFn()
-    {
-        return this.isMouseLocked;
-    },
-
     // Cannot convert keycodes to unicode in javascript so return empty strings
     convertToUnicode : function convertToUnicodeFn(keyCodeArray)
     {
@@ -341,124 +199,9 @@ WebGLInputDevice.prototype = {
         return result;
     },
 
-    // Cannot detect locale in canvas mode
-    getLocale : function getLocaleFn()
-    {
-        return "";
-    },
-
-    // Returns the local coordinates of the event (i.e. position in Canvas coords)
-    getCanvasPosition : function getCanvasPositionFn(event, position)
-    {
-        if (event.offsetX !== undefined)
-        {
-            position.x = event.offsetX;
-            position.y = event.offsetY;
-        }
-        else if (event.layerX !== undefined)
-        {
-            position.x = event.layerX;
-            position.y = event.layerY;
-        }
-    },
-
-    // Called when blurring
-    resetKeyStates : function resetKeyStatesFn()
-    {
-        var keyName;
-        var pressedKeys = this.pressedKeys;
-
-        for (keyName in pressedKeys)
-        {
-            if (pressedKeys.hasOwnProperty(keyName))
-            {
-                pressedKeys[keyName] = false;
-            }
-        }
-    },
-
-    destroy : function destroyFn()
-    {
-        // Remove all event listeners
-        if (this.isLocked())
-        {
-            this.setEventHandlersUnlock();
-        }
-
-        if (this.isHovering)
-        {
-            this.setEventHandlersMouseLeave();
-        }
-
-        if (this.isWindowFocused)
-        {
-            this.setEventHandlersBlur();
-        }
-
-        var canvas = this.canvas;
-        canvas.onmouseover = null;
-        canvas.onmouseout = null;
-        canvas.onmousedown = null;
-    }
-};
-
-// Constructor function
-WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
-{
-    var id = new WebGLInputDevice();
-
-    var lastX = 0;
-    var lastY = 0;
-    var onMouseDown;
-    var onMouseUp;
-    var onMouseOver;
-    var onMouseMove;
-    var onWheel;
-    var onKeyDown;
-    var onKeyUp;
-    var emptyEvent;
-    var onFullscreenChanged;
-
-    id.canvas = canvas;
-    id.isMouseLocked = false;
-    id.isHovering = false;
-    id.isWindowFocused = false;
-    id.isCursorHidden = false;
-    id.isOutsideEngine = false; // Used for determining where we are when unlocking
-    id.previousCursor = '';
-    id.ignoreNextMouseMoves = 0;
-
-    // Used to screen out auto-repeats, dictionary from keycode to bool,
-    // true for each key currently pressed down
-    var pressedKeys = {};
-    id.pressedKeys = pressedKeys;
-
-    // Game event handlers
-    var handlers = {};
-    id.handlers = handlers;
-
-    handlers.keydown = [];
-    handlers.keyup = [];
-
-    handlers.mousedown = [];
-    handlers.mouseup = [];
-    handlers.mousewheel = [];
-    handlers.mouseover = [];
-    handlers.mousemove = [];
-
-    handlers.paddown = [];
-    handlers.padup = [];
-    handlers.padmove = [];
-
-    handlers.mouseenter = [];
-    handlers.mouseleave = [];
-    handlers.focus = [];
-    handlers.blur = [];
-    handlers.mouselocklost = [];
-
     // KeyCodes: List of key codes and their values
 
-    var keyCodes =
+    keyCodes :
     {
         A : 0,
         B : 1,
@@ -560,12 +303,1014 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         END : 635,
         PAGE_UP: 636,
         PAGE_DOWN: 637
+    },
+
+    mouseCodes :
+    {
+        BUTTON_0 : 0,
+        BUTTON_1 : 1,
+        BUTTON_2 : 2,
+        DELTA_X : 100,
+        DELTA_Y : 101,
+        MOUSE_WHEEL : 102
+    },
+
+    padCodes :
+    {
+        UP : 0,
+        LEFT : 1,
+        DOWN : 2,
+        RIGHT : 3,
+        A : 4,
+        B : 5,
+        X : 6,
+        Y : 7,
+        LEFT_TRIGGER : 8,
+        RIGHT_TRIGGER : 9,
+        LEFT_SHOULDER : 10,
+        RIGHT_SHOULDER : 11,
+        LEFT_THUMB : 12,
+        LEFT_THUMB_X : 13,
+        LEFT_THUMB_Y : 14,
+        RIGHT_THUMB : 15,
+        RIGHT_THUMB_X : 16,
+        RIGHT_THUMB_Y : 17,
+        START : 18,
+        BACK : 19
+    },
+
+    // Private API
+
+    sendEventToHandlers :
+    function sendEventToHandlersFn(eventHandlers, arg0, arg1, arg2, arg3,
+                                   arg4, arg5)
+    {
+        var i;
+        var length = eventHandlers.length;
+
+        if (length)
+        {
+            for (i = 0; i < length; i += 1)
+            {
+                eventHandlers[i](arg0, arg1, arg2, arg3, arg4, arg5);
+            }
+        }
+    },
+
+    sendEventToHandlersASync :
+    function sendEventToHandlersASyncFn(handlers, a0, a1, a2, a3, a4, a5)
+    {
+        var sendEvent = WebGLInputDevice.prototype.sendEventToHandlers;
+        TurbulenzEngine.setTimeout(function callSendEventToHandlersFn() {
+            sendEvent(handlers, a0, a1, a2, a3, a4, a5);
+        }, 0);
+    },
+
+    updateGamePad : function updateGamePadFn()
+    {
+        var magnitude;
+        var normalizedMagnitude;
+
+        var gamepads = (navigator.gamepads ||
+                        navigator.webkitGamepads ||
+                        (navigator.webkitGetGamepads && navigator.webkitGetGamepads()));
+
+        if (gamepads)
+        {
+            var deadZone = this.padAxisDeadZone;
+            var maxAxisRange = this.maxAxisRange;
+            var sendEvent = this.sendEventToHandlersASync;
+            var handlers = this.handlers;
+            var padButtons = this.padButtons;
+            var padMap = this.padMap;
+            var leftThumbX = 0;
+            var leftThumbY = 0;
+            var rightThumbX = 0;
+            var rightThumbY = 0;
+
+            var numGamePads = gamepads.length;
+            for (var i = 0; i < numGamePads; i += 1)
+            {
+                var gamepad = gamepads[i];
+                if (gamepad)
+                {
+                    // Update button states
+
+                    var buttons = gamepad.buttons;
+
+                    if (this.padTimestampUpdate < gamepad.timestamp)
+                    {
+                        this.padTimestampUpdate = gamepad.timestamp;
+
+                        var numButtons = buttons.length;
+                        for (var n = 0; n < numButtons; n += 1)
+                        {
+                            var value = buttons[n];
+                            if (padButtons[n] !== value)
+                            {
+                                padButtons[n] = value;
+
+                                var padCode = padMap[n];
+                                if (padCode !== undefined)
+                                {
+                                    if (value)
+                                    {
+                                        sendEvent(handlers.paddown, padCode);
+                                    }
+                                    else
+                                    {
+                                        sendEvent(handlers.padup, padCode);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Update axes states
+
+                    var axes = gamepad.axes;
+                    if (axes.length <= 4)
+                    {
+                        // Axis 1 & 2
+                        var lX = axes[0];
+                        var lY = -axes[1];
+                        magnitude = ((lX * lX) + (lY * lY));
+
+                        if (magnitude > (deadZone * deadZone))
+                        {
+                            magnitude = Math.sqrt(magnitude);
+
+                            // Normalize lX and lY
+                            lX = (lX / magnitude);
+                            lY = (lY / magnitude);
+
+                            // Clip the magnitude at its max possible value
+                            if (magnitude > maxAxisRange)
+                            {
+                                magnitude = maxAxisRange;
+                            }
+
+                            // Adjust magnitude relative to the end of the dead zone
+                            magnitude -= deadZone;
+
+                            // Normalize the magnitude
+                            normalizedMagnitude = (magnitude / (maxAxisRange - deadZone));
+
+                            leftThumbX = (lX * normalizedMagnitude);
+                            leftThumbY = (lY * normalizedMagnitude);
+                        }
+
+                        // Axis 3 & 4
+                        var rX = axes[2];
+                        var rY = -axes[3];
+                        magnitude = ((rX * rX) + (rY * rY));
+
+                        if (magnitude > (deadZone * deadZone))
+                        {
+                            magnitude = Math.sqrt(magnitude);
+
+                            // Normalize lX and lY
+                            rX = (rX / magnitude);
+                            rY = (rY / magnitude);
+
+                            // Clip the magnitude at its max possible value
+                            if (magnitude > maxAxisRange)
+                            {
+                                magnitude = maxAxisRange;
+                            }
+
+                            // Adjust magnitude relative to the end of the dead zone
+                            magnitude -= deadZone;
+
+                            // Normalize the magnitude
+                            normalizedMagnitude = (magnitude / (maxAxisRange - deadZone));
+
+                            rightThumbX = (rX * normalizedMagnitude);
+                            rightThumbY = (rY * normalizedMagnitude);
+                        }
+
+
+                        sendEvent(handlers.padmove,
+                                  leftThumbX, leftThumbY, buttons[6],
+                                  rightThumbX, rightThumbY, buttons[7]);
+                    }
+
+                    // Our API only supports one active pad...
+                    break;
+                }
+            }
+        }
+    },
+
+    // Cannot detect locale in canvas mode
+    getLocale : function getLocaleFn()
+    {
+        return "";
+    },
+
+    // Returns the local coordinates of the event (i.e. position in Canvas coords)
+    getCanvasPosition : function getCanvasPositionFn(event, position)
+    {
+        if (event.offsetX !== undefined)
+        {
+            position.x = event.offsetX;
+            position.y = event.offsetY;
+        }
+        else if (event.layerX !== undefined)
+        {
+            position.x = event.layerX;
+            position.y = event.layerY;
+        }
+    },
+
+    // Called when blurring
+    resetKeyStates : function resetKeyStatesFn()
+    {
+        var keyName;
+        var pressedKeys = this.pressedKeys;
+
+        for (keyName in pressedKeys)
+        {
+            if (pressedKeys.hasOwnProperty(keyName))
+            {
+                pressedKeys[keyName] = false;
+            }
+        }
+    },
+
+    // Private mouse event methods
+
+    onMouseOver : function onMouseOverFn(event)
+    {
+        var position = {};
+        var mouseOverHandlers = this.handlers.mouseover;
+
+        event.stopPropagation();
+        event.preventDefault();
+
+        this.getCanvasPosition(event, position);
+
+        this.lastX = event.screenX;
+        this.lastY = event.screenY;
+
+        this.sendEventToHandlers(mouseOverHandlers, position.x, position.y);
+    },
+
+    onMouseMove : function onMouseMoveFn(event)
+    {
+        var mouseMoveHandlers = this.handlers.mousemove;
+
+        var deltaX, deltaY;
+
+        event.stopPropagation();
+        event.preventDefault();
+
+        if (this.ignoreNextMouseMoves)
+        {
+            this.ignoreNextMouseMoves -= 1;
+            return;
+        }
+
+        if (event.movementX !== undefined)
+        {
+            deltaX = event.movementX;
+            deltaY = event.movementY;
+        }
+        else if (event.mozMovementX !== undefined)
+        {
+            deltaX = event.mozMovementX;
+            deltaY = event.mozMovementY;
+        }
+        else if (event.webkitMovementX !== undefined)
+        {
+            deltaX = event.webkitMovementX;
+            deltaY = event.webkitMovementY;
+        }
+        else
+        {
+            deltaX = (event.screenX - this.lastX);
+            deltaY = (event.screenY - this.lastY);
+            if (0 === deltaX && 0 === deltaY)
+            {
+                return;
+            }
+        }
+
+        this.lastX = event.screenX;
+        this.lastY = event.screenY;
+
+        this.sendEventToHandlers(mouseMoveHandlers, deltaX, deltaY);
+    },
+
+    onWheel : function onWheelFn(event)
+    {
+        var mouseWheelHandlers = this.handlers.mousewheel;
+
+        var scrollDelta;
+
+        event.stopPropagation();
+        event.preventDefault();
+
+        if (event.wheelDelta)
+        {
+            if (window.opera)
+            {
+                scrollDelta = event.wheelDelta < 0 ? 1 : -1;
+            }
+            else
+            {
+                scrollDelta = event.wheelDelta > 0 ? 1 : -1;
+            }
+        }
+        else
+        {
+            scrollDelta = event.detail < 0 ? 1 : -1;
+        }
+
+        this.sendEventToHandlers(mouseWheelHandlers, scrollDelta);
+    },
+
+    emptyEvent : function emptyEventFn(event)
+    {
+        event.stopPropagation();
+        event.preventDefault();
+    },
+
+    onWindowFocus : function onWindowFocusFn()
+    {
+        if (this.isHovering &&
+            window.document.activeElement === this.canvas)
+        {
+            this.addInternalEventListener(window, 'mousedown', this.onMouseDown, this);
+        }
+    },
+
+    onFocus : function onFocusFn()
+    {
+        var canvas = this.canvas;
+        var handlers = this.handlers;
+        var focusHandlers = handlers.focus;
+
+        if (!this.isWindowFocused)
+        {
+            this.isWindowFocused = true;
+
+            window.focus();
+            canvas.focus();
+
+            this.setEventHandlersFocus();
+
+            canvas.oncontextmenu = function () {
+                return false;
+            };
+
+            this.sendEventToHandlers(focusHandlers);
+        }
+    },
+
+    onBlur : function onBlurFn()
+    {
+        var canvas = this.canvas;
+        var handlers = this.handlers;
+        var blurHandlers = handlers.blur;
+
+        if (this.isMouseLocked)
+        {
+            this.unlockMouse();
+        }
+
+        if (this.isWindowFocused)
+        {
+            this.isWindowFocused = false;
+
+            this.resetKeyStates();
+            this.setEventHandlersBlur();
+            canvas.oncontextmenu = null;
+
+            this.sendEventToHandlers(blurHandlers);
+        }
+    },
+
+    onMouseDown : function onMouseDownFn(event)
+    {
+        var handlers = this.handlers;
+
+        if (this.isHovering)
+        {
+            var mouseDownHandlers = handlers.mousedown;
+            var button = event.button;
+            var position = {};
+
+            this.onFocus();
+
+            event.stopPropagation();
+            event.preventDefault();
+
+            if (button < 3)
+            {
+                button = this.mouseMap[button];
+            }
+
+            this.getCanvasPosition(event, position);
+
+            this.sendEventToHandlers(mouseDownHandlers, button, position.x, position.y);
+        }
+        else
+        {
+            this.onBlur();
+        }
+    },
+
+    onMouseUp : function onMouseUpFn(event)
+    {
+        var mouseUpHandlers = this.handlers.mouseup;
+
+        if (this.isHovering)
+        {
+            var button = event.button;
+            var position = {};
+
+            event.stopPropagation();
+            event.preventDefault();
+
+            if (button < 3)
+            {
+                button = this.mouseMap[button];
+            }
+
+            this.getCanvasPosition(event, position);
+
+            this.sendEventToHandlers(mouseUpHandlers, button, position.x, position.y);
+        }
+    },
+
+    // Private key event methods
+
+    onKeyDown : function onKeyDownFn(event)
+    {
+        var keyDownHandlers = this.handlers.keydown;
+        var pressedKeys = this.pressedKeys;
+        var keyCodes = this.keyCodes;
+
+        event.stopPropagation();
+        event.preventDefault();
+
+        var keyCode = event.keyCode;
+        keyCode = this.keyMap[keyCode];
+
+        var keyLocation = event.keyLocation || event.location;
+
+        if (undefined !== keyCode &&
+           (keyCodes.ESCAPE !== keyCode))
+        {
+            // Handle left / right key locations
+            //   DOM_KEY_LOCATION_STANDARD = 0x00;
+            //   DOM_KEY_LOCATION_LEFT     = 0x01;
+            //   DOM_KEY_LOCATION_RIGHT    = 0x02;
+            //   DOM_KEY_LOCATION_NUMPAD   = 0x03;
+            //   DOM_KEY_LOCATION_MOBILE   = 0x04;
+            //   DOM_KEY_LOCATION_JOYSTICK = 0x05;
+
+            if (2 === keyLocation)
+            {
+                // The Turbulenz KeyCodes are such that CTRL, SHIFT
+                // and ALT have their RIGHT versions exactly one above
+                // the LEFT versions.
+                keyCode = keyCode + 1;
+            }
+            if (!pressedKeys[keyCode])
+            {
+                pressedKeys[keyCode] = true;
+                this.sendEventToHandlers(keyDownHandlers, keyCode);
+            }
+        }
+    },
+
+    onKeyUp : function onKeyUpFn(event)
+    {
+        var keyUpHandlers = this.handlers.keyup;
+        var pressedKeys = this.pressedKeys;
+        var keyCodes = this.keyCodes;
+
+        event.stopPropagation();
+        event.preventDefault();
+
+        var keyCode = event.keyCode;
+        keyCode = this.keyMap[keyCode];
+
+        var keyLocation = event.keyLocation || event.location;
+
+        if (keyCode === keyCodes.ESCAPE)
+        {
+            this.unlockMouse();
+        }
+        else if (undefined !== keyCode)
+        {
+            // Handle LEFT / RIGHT.  (See OnKeyDown)
+
+            if (2 === keyLocation)
+            {
+                keyCode = keyCode + 1;
+            }
+            if (pressedKeys[keyCode])
+            {
+                pressedKeys[keyCode] = false;
+                this.sendEventToHandlers(keyUpHandlers, keyCode);
+            }
+        }
+    },
+
+    // Private touch event methods
+
+    onTouchStart : function onTouchStartFn(event)
+    {
+        var eventHandlers = this.handlers.touchstart;
+
+        event.preventDefault();
+
+        // Store new touches
+        this.addTouches(event.changedTouches);
+
+        event = this.convertW3TouchEventToTurbulenzTouchEvent(event);
+
+        this.sendEventToHandlers(eventHandlers, event);
+    },
+
+    onTouchEnd : function onTouchEndFn(event)
+    {
+        var eventHandlers = this.handlers.touchend;
+
+        event.preventDefault();
+
+        event = this.convertW3TouchEventToTurbulenzTouchEvent(event);
+
+        // Remove ended touches
+        this.removeTouches(event.changedTouches);
+
+        this.sendEventToHandlers(eventHandlers, event);
+    },
+
+    onTouchMove : function onTouchMoveFn(event)
+    {
+        var eventHandlers = this.handlers.touchmove;
+
+        event.preventDefault();
+
+        this.addTouches(event.changedTouches);
+
+        event = this.convertW3TouchEventToTurbulenzTouchEvent(event);
+
+        this.sendEventToHandlers(eventHandlers, event);
+    },
+
+    onTouchEnter : function onTouchEnterFn(event)
+    {
+        var eventHandlers = this.handlers.touchenter;
+
+        event.preventDefault();
+
+        event = this.convertW3TouchEventToTurbulenzTouchEvent(event);
+
+        this.sendEventToHandlers(eventHandlers, event);
+    },
+
+    onTouchLeave : function onTouchLeaveFn(event)
+    {
+        var eventHandlers = this.handlers.touchleave;
+
+        event.preventDefault();
+
+        event = this.convertW3TouchEventToTurbulenzTouchEvent(event);
+
+        this.sendEventToHandlers(eventHandlers, event);
+    },
+
+    onTouchCancel : function onTouchCancelFn(event)
+    {
+        var eventHandlers = this.handlers.touchcancel;
+
+        event.preventDefault();
+
+        event = this.convertW3TouchEventToTurbulenzTouchEvent(event);
+
+        // Remove canceled touches
+        this.removeTouches(event.changedTouches);
+
+        this.sendEventToHandlers(eventHandlers, event);
+    },
+
+    convertW3TouchEventToTurbulenzTouchEvent : function convertW3TouchEventToTurbulenzTouchEventFn(w3TouchEvent)
+    {
+        // Initialize changedTouches
+        var changedTouches = this.convertW3TouchListToTurbulenzTouchList(w3TouchEvent.changedTouches);
+
+        // Initialize gameTouches
+        var gameTouches = this.convertW3TouchListToTurbulenzTouchList(w3TouchEvent.targetTouches);
+
+        // Initialize touches
+        var touches = this.convertW3TouchListToTurbulenzTouchList(w3TouchEvent.touches);
+
+        var touchEventParams =
+        {
+            changedTouches  : changedTouches,
+            gameTouches     : gameTouches,
+            touches         : touches
+        };
+
+        return TouchEvent.create(touchEventParams);
+    },
+
+    convertW3TouchListToTurbulenzTouchList : function convertW3TouchListToTurbulenzTouchListFn(w3TouchList)
+    {
+        // Set changedTouches
+        var w3TouchListLength = w3TouchList.length;
+        var touchList = [];
+
+        var touch;
+        var touchIndex;
+
+        touchList.length = w3TouchListLength;
+
+        for (touchIndex = 0; touchIndex < w3TouchListLength; touchIndex += 1)
+        {
+            touch = this.getTouchById(w3TouchList[touchIndex].identifier);
+            touchList[touchIndex] = touch;
+        }
+
+        return touchList;
+    },
+
+    convertW3TouchToTurbulenzTouch : function convertW3TouchToTurbulenzTouchFn(w3Touch)
+    {
+        var canvasElement   = this.canvas;
+        var canvasRect      = canvasElement.getBoundingClientRect();
+
+        var touchParams =
+        {
+            force           : (w3Touch.force || w3Touch.webkitForce || 0),
+            identifier      : w3Touch.identifier,
+            isGameTouch     : (w3Touch.target === canvasElement),
+            positionX       : (w3Touch.pageX - canvasRect.left),
+            positionY       : (w3Touch.pageY - canvasRect.top),
+            radiusX         : (w3Touch.radiusX || w3Touch.webkitRadiusX || 1),
+            radiusY         : (w3Touch.radiusY || w3Touch.webkitRadiusY || 1),
+            rotationAngle   : (w3Touch.rotationAngle || w3Touch.webkitRotationAngle || 0)
+        };
+
+        return Touch.create(touchParams);
+    },
+
+    addTouches : function addTouchesFn(w3TouchList)
+    {
+        var w3TouchListLength = w3TouchList.length;
+
+        var touchIndex;
+        var touch;
+
+        for (touchIndex = 0; touchIndex < w3TouchListLength; touchIndex += 1)
+        {
+            touch = this.convertW3TouchToTurbulenzTouch(w3TouchList[touchIndex]);
+            this.addTouch(touch);
+        }
+    },
+
+    removeTouches : function removeTouchesFn(w3TouchList)
+    {
+        var w3TouchListLength = w3TouchList.length;
+
+        var touchIndex;
+        var touchId;
+
+        for (touchIndex = 0; touchIndex < w3TouchListLength; touchIndex += 1)
+        {
+            touchId = w3TouchList[touchIndex].identifier;
+            this.removeTouchById(touchId);
+        }
+    },
+
+    addTouch : function addTouchFn(touch)
+    {
+        this.touches[touch.identifier] = touch;
+    },
+
+    getTouchById : function getTouchByIdFn(id)
+    {
+        return this.touches[id];
+    },
+
+    removeTouchById : function removeTouchByIdFn(id)
+    {
+        delete this.touches[id];
+    },
+
+    // Canvas event handlers
+
+    canvasOnMouseOver : function canvasOnMouseOverFn(event)
+    {
+        var mouseEnterHandlers = this.handlers.mouseenter;
+
+        if (!this.isMouseLocked)
+        {
+            this.isHovering = true;
+
+            this.lastX = event.screenX;
+            this.lastY = event.screenY;
+
+            this.setEventHandlersMouseEnter();
+
+            // Send mouseover event
+            this.sendEventToHandlers(mouseEnterHandlers);
+        }
+        else
+        {
+            this.isOutsideEngine = false;
+        }
+    },
+
+    canvasOnMouseOut : function canvasOnMouseOutFn(event)
+    {
+        var mouseLeaveHandlers = this.handlers.mouseleave;
+
+        if (!this.isMouseLocked)
+        {
+            this.isHovering = false;
+
+            if (this.isCursorHidden)
+            {
+                this.showMouse();
+            }
+
+            this.setEventHandlersMouseLeave();
+
+            // Send mouseout event
+            this.sendEventToHandlers(mouseLeaveHandlers);
+        }
+        else
+        {
+            this.isOutsideEngine = true;
+        }
+    },
+
+    // This is required in order to detect hovering when we missed the initial mouseover event
+    canvasOnMouseDown : function canvasOnMouseDownFn(event)
+    {
+        var mouseEnterHandlers = this.handlers.mouseenter;
+
+        this.canvas.onmousedown = null;
+
+        if (!this.isHovering)
+        {
+            this.isHovering = true;
+
+            this.lastX = event.screenX;
+            this.lastY = event.screenY;
+
+            this.setEventHandlersMouseEnter();
+
+            this.sendEventToHandlers(mouseEnterHandlers);
+
+            this.onMouseDown(event);
+        }
+
+        return false;
+    },
+
+    // Window event handlers
+
+    onFullscreenChanged : function onFullscreenChangedFn(event)
+    {
+        if (this.isMouseLocked)
+        {
+            if (document.fullscreenEnabled || document.mozFullScreen || document.webkitIsFullScreen)
+            {
+                this.ignoreNextMouseMoves = 2; // Some browsers will send 2 mouse events with a massive delta
+                this.requestBrowserLock();
+            }
+            else
+            {
+                // Browsers capture the escape key whilst in fullscreen
+                this.unlockMouse();
+            }
+        }
+    },
+
+    // Set event handler methods
+
+    setEventHandlersMouseEnter : function setEventHandlersMouseEnterFn()
+    {
+        // Add event listener to get focus event
+        if (!this.isFocused())
+        {
+            this.addInternalEventListener(window, 'mousedown', this.onMouseDown, this);
+        }
+
+        this.addInternalEventListener(window, 'mouseup', this.onMouseUp, this);
+        this.addInternalEventListener(window, 'mousemove', this.onMouseOver, this);
+        this.addInternalEventListener(window, 'DOMMouseScroll', this.onWheel, this);
+        this.addInternalEventListener(window, 'mousewheel', this.onWheel, this);
+        this.addInternalEventListener(window, 'click', this.emptyEvent, this);
+    },
+
+    setEventHandlersMouseLeave : function setEventHandlersMouseLeaveFn()
+    {
+        // We do not need a mousedown listener if not focused
+        if (!this.isFocused())
+        {
+            this.removeInternalEventListener(window, 'mousedown', this.onMouseDown, this);
+        }
+
+        // Remove mouse event listeners
+        this.removeInternalEventListener(window, 'mouseup', this.onMouseUp, this);
+        this.removeInternalEventListener(window, 'mousemove', this.onMouseOver, this);
+        this.removeInternalEventListener(window, 'DOMMouseScroll', this.onWheel, this);
+        this.removeInternalEventListener(window, 'mousewheel', this.onWheel, this);
+        this.removeInternalEventListener(window, 'click', this.emptyEvent, this);
+    },
+
+    setEventHandlersFocus : function setEventHandlersFocusFn()
+    {
+        this.addInternalEventListener(window, 'keydown', this.onKeyDown, this);
+        this.addInternalEventListener(window, 'keyup', this.onKeyUp, this);
+    },
+
+    setEventHandlersBlur : function setEventHandlersBlurFn()
+    {
+        this.removeInternalEventListener(window, 'keydown', this.onKeyDown, this);
+        this.removeInternalEventListener(window, 'keyup', this.onKeyUp, this);
+        this.removeInternalEventListener(window, 'mousedown', this.onMouseDown, this);
+    },
+
+    setEventHandlersLock : function setEventHandlersLockFn()
+    {
+        this.removeInternalEventListener(window, 'mousemove', this.onMouseOver, this);
+
+        this.addInternalEventListener(window, 'mousemove', this.onMouseMove, this);
+        this.addInternalEventListener(window, 'fullscreenchange', this.onFullscreenChanged, this);
+        this.addInternalEventListener(window, 'mozfullscreenchange', this.onFullscreenChanged, this);
+        this.addInternalEventListener(window, 'webkitfullscreenchange', this.onFullscreenChanged, this);
+    },
+
+    setEventHandlersUnlock : function setEventHandlersUnlockFn()
+    {
+        this.removeInternalEventListener(window, 'webkitfullscreenchange', this.onFullscreenChanged, this);
+        this.removeInternalEventListener(window, 'mozfullscreenchange', this.onFullscreenChanged, this);
+        this.removeInternalEventListener(window, 'fullscreenchange', this.onFullscreenChanged, this);
+        this.removeInternalEventListener(window, 'mousemove', this.onMouseMove, this);
+
+        this.addInternalEventListener(window, 'mousemove', this.onMouseOver, this);
+    },
+
+    setEventHandlersCanvas : function setEventHandlersCanvasFn()
+    {
+        var canvas = this.canvas;
+
+        this.addInternalEventListener(canvas, 'mouseover', this.canvasOnMouseOver, this);
+        this.addInternalEventListener(canvas, 'mouseout', this.canvasOnMouseOut, this);
+        this.addInternalEventListener(canvas, 'mousedown', this.canvasOnMouseDown, this);
+    },
+
+    setEventHandlersWindow : function setEventHandlersWindowFn()
+    {
+        this.addInternalEventListener(window, 'blur', this.onBlur, this);
+        this.addInternalEventListener(window, 'focus', this.onWindowFocus, this);
+    },
+
+    removeEventHandlersWindow : function removeEventHandlersWindowFn()
+    {
+        this.removeInternalEventListener(window, 'blur', this.onBlur, this);
+        this.removeInternalEventListener(window, 'focus', this.onWindowFocus, this);
+    },
+
+    setEventHandlersTouch : function setEventHandlersTouchFn()
+    {
+        var canvas = this.canvas;
+
+        this.addInternalEventListener(canvas, 'touchstart', this.onTouchStart, this);
+        this.addInternalEventListener(canvas, 'touchend', this.onTouchEnd, this);
+        this.addInternalEventListener(canvas, 'touchenter', this.onTouchEnter, this);
+        this.addInternalEventListener(canvas, 'touchleave', this.onTouchLeave, this);
+        this.addInternalEventListener(canvas, 'touchmove', this.onTouchMove, this);
+        this.addInternalEventListener(canvas, 'touchcancel', this.onTouchCancel, this);
+    },
+
+    // Helper methods
+
+    addInternalEventListener : function addInternalEventListenerFn(element, eventName, eventHandler, scope)
+    {
+        var eventHandlers = this.eventHandlers;
+        var boundEventHandler = scope ? eventHandler.bind(scope) : eventHandler;
+
+        if (typeof eventHandlers[eventName] === 'undefined')
+        {
+            eventHandlers[eventName] = {};
+        }
+
+        eventHandlers[eventName][eventHandler] = boundEventHandler;
+
+        element.addEventListener(eventName, boundEventHandler, false);
+    },
+
+    removeInternalEventListener : function removeInternalEventListenerFn(element, eventName, eventHandler, scope)
+    {
+        var eventHandlers = this.eventHandlers;
+        var boundEventHandler = eventHandlers[eventName][eventHandler];
+        delete eventHandlers[eventName][eventHandler];
+
+        if (element !== this.canvas)
+        {
+            eventHandlers[eventName][element] = false;
+        }
+
+        element.removeEventListener(eventName, boundEventHandler, false);
+    },
+
+    destroy : function destroyFn()
+    {
+        // Remove all event listeners
+        if (this.isLocked())
+        {
+            this.setEventHandlersUnlock();
+        }
+
+        if (this.isHovering)
+        {
+            this.setEventHandlersMouseLeave();
+        }
+
+        if (this.isWindowFocused)
+        {
+            this.setEventHandlersBlur();
+        }
+
+        this.removeEventHandlersWindow();
+
+        var canvas = this.canvas;
+        canvas.onmouseover = null;
+        canvas.onmouseout = null;
+        canvas.onmousedown = null;
+    }
+};
+
+// Constructor function
+WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
+{
+    var id = new WebGLInputDevice();
+
+    id.lastX = 0;
+    id.lastY = 0;
+
+    id.touches = {};
+
+    id.eventHandlers = {};
+
+    id.canvas = canvas;
+    id.isMouseLocked = false;
+    id.isHovering = false;
+    id.isWindowFocused = false;
+    id.isCursorHidden = false;
+    id.isOutsideEngine = false; // Used for determining where we are when unlocking
+    id.previousCursor = '';
+    id.ignoreNextMouseMoves = 0;
+
+    // Used to screen out auto-repeats, dictionary from keycode to bool,
+    // true for each key currently pressed down
+    id.pressedKeys = {};
+
+    // Game event handlers
+    id.handlers =
+    {
+        keydown : [],
+        keyup : [],
+
+        mousedown : [],
+        mouseup : [],
+        mousewheel : [],
+        mouseover : [],
+        mousemove : [],
+
+        paddown : [],
+        padup : [],
+        padmove : [],
+
+        mouseenter : [],
+        mouseleave : [],
+        focus : [],
+        blur : [],
+        mouselocklost : [],
+
+        touchstart : [],
+        touchend : [],
+        touchenter : [],
+        touchleave : [],
+        touchmove : [],
+        touchcancel : []
     };
 
     // Populate the keyCodeToUnicodeTable.  Just use the 'key' part of
     // the keycodes, overriding some special cases.
 
     var keyCodeToUnicodeTable = {};
+    var keyCodes = id.keyCodes;
     for (var k in keyCodes)
     {
         if (keyCodes.hasOwnProperty(k))
@@ -596,40 +1341,6 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
     keyCodeToUnicodeTable[keyCodes.PERIOD] = '.';
     keyCodeToUnicodeTable[keyCodes.SLASH] = '/';
     keyCodeToUnicodeTable[keyCodes.BACKSLASH] = '\\';
-
-    var mouseCodes =
-    {
-        BUTTON_0 : 0,
-        BUTTON_1 : 1,
-        BUTTON_2 : 2,
-        DELTA_X : 100,
-        DELTA_Y : 101,
-        MOUSE_WHEEL : 102
-    };
-
-    var padCodes =
-    {
-        UP : 0,
-        LEFT : 1,
-        DOWN : 2,
-        RIGHT : 3,
-        A : 4,
-        B : 5,
-        X : 6,
-        Y : 7,
-        LEFT_TRIGGER : 8,
-        RIGHT_TRIGGER : 9,
-        LEFT_SHOULDER : 10,
-        RIGHT_SHOULDER : 11,
-        LEFT_THUMB : 12,
-        LEFT_THUMB_X : 13,
-        LEFT_THUMB_Y : 14,
-        RIGHT_THUMB : 15,
-        RIGHT_THUMB_X : 16,
-        RIGHT_THUMB_Y : 17,
-        START : 18,
-        BACK : 19
-    };
 
     // KeyMap: Maps JavaScript keycodes to Turbulenz keycodes - some
     // keycodes are consistent across all browsers and some mappings
@@ -760,8 +1471,9 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
     //keyMap[107] = 625; // NUMPAD_ADD (numlock on/off)
     //keyMap[109] = 626; // NUMPAD_SUBTRACT (numlock on/off)
     keyMap[91] = 627; // LEFT_WIN
+    keyMap[224] = 627; // LEFT_WIN (mac, firefox)
     keyMap[92] = 628; // RIGHT_WIN
-    keyMap[93] = 628; // RIGHT_WIN (mac chrome)
+    keyMap[93] = 628; // RIGHT_WIN (mac, chrome)
     //: 629, // LEFT_OPTION
     //: 630, // RIGHT_OPTION
     keyMap[20] = 631; // CAPS_LOCK
@@ -772,6 +1484,8 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
     keyMap[33] = 636; // PAGE_UP
     keyMap[34] = 637; // PAGE_DOWN
 
+    id.keyMap = keyMap;
+
     // MouseMap: Maps current mouse controls to new controls
     var mouseMap =
     {
@@ -779,6 +1493,8 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         1 : 2,
         2 : 1
     };
+
+    id.mouseMap = mouseMap;
 
     // padMap: Maps current pad buttons to new buttons
     var padMap =
@@ -803,353 +1519,9 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         15 : 3  // RIGHT
     };
 
-    function setEventHandlersMouseEnter()
-    {
-        // Add event listener to get focus event
-        window.addEventListener('mousedown', onMouseDown, true);
-        window.addEventListener('mouseup', onMouseUp, true);
-        window.addEventListener('mousemove', onMouseOver, true);
-        window.addEventListener('DOMMouseScroll', onWheel, true);
-        window.addEventListener('mousewheel', onWheel, true);
-        window.addEventListener('click', emptyEvent, true);
-    }
-    id.setEventHandlersMouseEnter = setEventHandlersMouseEnter;
+    id.padMap = padMap;
 
-    function setEventHandlersMouseLeave()
-    {
-        // Remove mouse event listeners
-        window.removeEventListener('mouseup', onMouseUp, true);
-        window.removeEventListener('mousemove', onMouseOver, true);
-        window.removeEventListener('DOMMouseScroll', onWheel, true);
-        window.removeEventListener('mousewheel', onWheel, true);
-        window.removeEventListener('click', emptyEvent, true);
-    }
-    id.setEventHandlersMouseLeave = setEventHandlersMouseLeave;
-
-    function setEventHandlersFocus()
-    {
-        window.addEventListener('keydown', onKeyDown, true);
-        window.addEventListener('keyup', onKeyUp, true);
-    }
-    id.setEventHandlersFocus = setEventHandlersFocus;
-
-
-    function setEventHandlersBlur()
-    {
-        window.removeEventListener('keydown', onKeyDown, true);
-        window.removeEventListener('keyup', onKeyUp, true);
-        window.removeEventListener('mousedown', onMouseDown, true);
-    }
-    id.setEventHandlersBlur = setEventHandlersBlur;
-
-    function setEventHandlersLock()
-    {
-        window.removeEventListener('mousemove', onMouseOver, true);
-        window.addEventListener('mousemove', onMouseMove, true);
-        window.addEventListener('fullscreenchange', onFullscreenChanged, true);
-        window.addEventListener('mozfullscreenchange', onFullscreenChanged, true);
-        window.addEventListener('webkitfullscreenchange', onFullscreenChanged, true);
-    }
-    id.setEventHandlersLock = setEventHandlersLock;
-
-    function setEventHandlersUnlock()
-    {
-        window.removeEventListener('webkitfullscreenchange', onFullscreenChanged, true);
-        window.removeEventListener('mozfullscreenchange', onFullscreenChanged, true);
-        window.removeEventListener('fullscreenchange', onFullscreenChanged, true);
-        window.removeEventListener('mousemove', onMouseMove, true);
-        window.addEventListener('mousemove', onMouseOver, true);
-    }
-    id.setEventHandlersUnlock = setEventHandlersUnlock;
-
-    onMouseOver = function onMouseOverFn(event)
-    {
-        var position = {};
-
-        event.stopPropagation();
-        event.preventDefault();
-
-        id.getCanvasPosition(event, position);
-
-        lastX = event.screenX;
-        lastY = event.screenY;
-
-        id.sendEventToHandlers(handlers.mouseover, position.x, position.y);
-    };
-
-    onMouseMove = function onMouseMoveFn(event)
-    {
-        event.stopPropagation();
-        event.preventDefault();
-
-        if (id.ignoreNextMouseMoves)
-        {
-            id.ignoreNextMouseMoves -= 1;
-            return;
-        }
-
-        var deltaX, deltaY;
-        if (event.movementX !== undefined)
-        {
-            deltaX = event.movementX;
-            deltaY = event.movementY;
-        }
-        else if (event.mozMovementX !== undefined)
-        {
-            deltaX = event.mozMovementX;
-            deltaY = event.mozMovementY;
-        }
-        else if (event.webkitMovementX !== undefined)
-        {
-            deltaX = event.webkitMovementX;
-            deltaY = event.webkitMovementY;
-        }
-        else
-        {
-            deltaX = (event.screenX - lastX);
-            deltaY = (event.screenY - lastY);
-        }
-
-        lastX = event.screenX;
-        lastY = event.screenY;
-
-        id.sendEventToHandlers(handlers.mousemove, deltaX, deltaY);
-    };
-
-    onWheel = function onWheelFn(event)
-    {
-        var scrollDelta;
-
-        event.stopPropagation();
-        event.preventDefault();
-
-        if (event.wheelDelta)
-        {
-            if (window.opera)
-            {
-                scrollDelta = event.wheelDelta < 0 ? 1 : -1;
-            }
-            else
-            {
-                scrollDelta = event.wheelDelta > 0 ? 1 : -1;
-            }
-        }
-        else
-        {
-            scrollDelta = event.detail < 0 ? 1 : -1;
-        }
-
-        id.sendEventToHandlers(handlers.mousewheel, scrollDelta);
-    };
-
-    onKeyDown = function onKeyDownFn(event)
-    {
-        event.stopPropagation();
-        event.preventDefault();
-
-        var keyCode = event.keyCode;
-        keyCode = keyMap[keyCode];
-
-        if (undefined !== keyCode &&
-           (keyCodes.ESCAPE !== keyCode))
-        {
-            if (!pressedKeys[keyCode])
-            {
-                pressedKeys[keyCode] = true;
-                id.sendEventToHandlers(handlers.keydown, keyCode);
-            }
-        }
-    };
-
-    emptyEvent = function emptyEventFn(event)
-    {
-        event.stopPropagation();
-        event.preventDefault();
-    };
-
-    onKeyUp = function onKeyUpFn(event)
-    {
-        event.stopPropagation();
-        event.preventDefault();
-
-        var keyCode = event.keyCode;
-        keyCode = keyMap[keyCode];
-
-        if (keyCode === keyCodes.ESCAPE)
-        {
-            id.unlockMouse();
-        }
-        else if (undefined !== keyCode)
-        {
-            if (pressedKeys[keyCode])
-            {
-                pressedKeys[keyCode] = false;
-                id.sendEventToHandlers(handlers.keyup, keyCode);
-            }
-        }
-    };
-
-    onMouseDown = function onMouseDownFn(event)
-    {
-        if (id.isHovering)
-        {
-            var button = event.button;
-            var position = {};
-
-            if (!id.isWindowFocused)
-            {
-                // Focus
-
-                id.isWindowFocused = true;
-                window.focus();
-                canvas.focus();
-
-                setEventHandlersFocus();
-
-                canvas.oncontextmenu = function () {
-                    return false;
-                };
-
-                id.sendEventToHandlers(handlers.focus);
-            }
-
-            event.stopPropagation();
-            event.preventDefault();
-
-            if (button < 3)
-            {
-                button = mouseMap[button];
-            }
-
-            id.getCanvasPosition(event, position);
-
-            id.sendEventToHandlers(handlers.mousedown, button, position.x, position.y);
-        }
-        else
-        {
-            if (id.isWindowFocused)
-            {
-                // Blur
-                id.isWindowFocused = false;
-                id.resetKeyStates();
-                setEventHandlersBlur();
-                canvas.oncontextmenu = null;
-
-                id.sendEventToHandlers(handlers.blur);
-            }
-        }
-    };
-
-    onMouseUp = function onMouseUpFn(event)
-    {
-        if (id.isHovering)
-        {
-            var button = event.button;
-            var position = {};
-
-            event.stopPropagation();
-            event.preventDefault();
-
-            if (button < 3)
-            {
-                button = mouseMap[button];
-            }
-
-            id.getCanvasPosition(event, position);
-
-            id.sendEventToHandlers(handlers.mouseup, button, position.x, position.y);
-        }
-    };
-
-    onFullscreenChanged = function onFullscreenChangedFn(event)
-    {
-        if (id.isMouseLocked)
-        {
-            if (document.fullscreenEnabled || document.mozFullScreen || document.webkitIsFullScreen)
-            {
-                id.ignoreNextMouseMoves = 2; // Some browsers will send 2 mouse events with a massive delta
-                id.requestBrowserLock();
-            }
-            else
-            {
-                // Browsers capture the escape key whilst in fullscreen
-                id.unlockMouse();
-            }
-        }
-    };
-
-    canvas.onmouseover = function (event)
-    {
-        if (!id.isMouseLocked)
-        {
-            id.isHovering = true;
-
-            lastX = event.screenX;
-            lastY = event.screenY;
-
-            setEventHandlersMouseEnter();
-
-            // Send mouseover event
-            id.sendEventToHandlers(handlers.mouseenter);
-        }
-        else
-        {
-            id.isOutsideEngine = false;
-        }
-    };
-
-    canvas.onmouseout = function (event)
-    {
-        if (!id.isMouseLocked)
-        {
-            id.isHovering = false;
-
-            if (id.isCursorHidden)
-            {
-                id.showMouse();
-            }
-
-            setEventHandlersMouseLeave();
-
-            // Send mouseout event
-            id.sendEventToHandlers(handlers.mouseleave);
-        }
-        else
-        {
-            id.isOutsideEngine = true;
-        }
-    };
-
-    // This is required in order to detect hovering when we missed the initial mouseover event
-    canvas.onmousedown = function (event)
-    {
-        canvas.onmousedown = null;
-
-        if (!id.isHovering)
-        {
-            id.isHovering = true;
-
-            lastX = event.screenX;
-            lastY = event.screenY;
-
-            setEventHandlersMouseEnter();
-
-            id.sendEventToHandlers(handlers.mouseenter);
-
-            onMouseDown(event);
-        }
-
-        return false;
-    };
-
-    id.keyCodes = keyCodes;
     id.keyCodeToUnicode = keyCodeToUnicodeTable;
-    id.mouseCodes = mouseCodes;
-    id.padCodes = padCodes;
-    id.onKeyUp = onKeyUp;
-    id.onKeyDown = onKeyDown;
-    id.onMouseMove = onMouseMove;
-    id.onMouseOver = onMouseOver;
 
     id.padButtons = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     id.padMap = padMap;
@@ -1216,6 +1588,15 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
             id.requestBrowserUnlock = function requestBrowserUnlockFn() {};
         }
     }
+
+    // Add canvas mouse event listeners
+    id.setEventHandlersCanvas();
+
+    // Add window blur event listener
+    id.setEventHandlersWindow();
+
+    // Add canvas touch event listeners
+    id.setEventHandlersTouch();
 
     return id;
 };

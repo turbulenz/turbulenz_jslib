@@ -62,7 +62,8 @@ MappingTable.create = function MappingTableCreateFn(params)
         var mappingTablePrefix = mappingTable.mappingTablePrefix;
         if (mappingTablePrefix)
         {
-            for (var source in urlMapping)
+            var source;
+            for (source in urlMapping)
             {
                 if (urlMapping.hasOwnProperty(source))
                 {

@@ -20,6 +20,8 @@ LeaderboardManager.prototype =
         below: 'below'
     },
 
+    maxGetSize: 32,
+
     getOverview: function leaderboardManagerGetOverviewFn(spec, callbackFn, errorCallbackFn)
     {
         var errorCallback = errorCallbackFn || this.errorCallbackFn;
@@ -136,6 +138,10 @@ LeaderboardManager.prototype =
         {
             // default value
             dataSpec.size = 9;
+        }
+        if (dataSpec.size > this.maxGetSize)
+        {
+            throw new Error('Leaderboard get request size must be smaller than ' + this.maxGetSize);
         }
 
         if (spec.friendsOnly)
@@ -355,7 +361,7 @@ LeaderboardResult.prototype =
         var offsetScore = this.results.ranking[offsetIndex];
         if (!offsetScore)
         {
-            setTimeout(callbackFn, 0);
+            TurbulenzEngine.setTimeout(callbackFn, 0);
             return false;
         }
 
@@ -404,7 +410,7 @@ LeaderboardResult.prototype =
 
         if (callbackFn)
         {
-            setTimeout(callbackWrapperFn, 0);
+            TurbulenzEngine.setTimeout(callbackWrapperFn, 0);
         }
     },
 

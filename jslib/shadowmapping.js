@@ -27,42 +27,24 @@ ShadowMapping.prototype =
         }
     },
 
-    update: function shadowMappingUpdateFn(frameIndex)
+    update: function shadowMappingUpdateFn(camera, md)
     {
-        if (this.frameUpdated !== frameIndex)
-        {
-            this.frameUpdated = frameIndex;
-            var node = this.node;
-            var techniqueParameters = this.techniqueParameters;
-            var worldUpdate = node.worldUpdate;
-            if (this.techniqueParametersUpdated !== worldUpdate)
-            {
-                this.techniqueParametersUpdated = worldUpdate;
-                techniqueParameters.world = node.world;
-            }
-        }
+        var node = this.node;
+        var techniqueParameters = this.shadowTechniqueParameters;
+        techniqueParameters.worldView = md.m43Mul(node.world, camera.viewMatrix, techniqueParameters.worldView);
     },
 
-    skinnedUpdate: function shadowMappingSkinnedUpdateFn(frameIndex)
+    skinnedUpdate: function shadowMappingSkinnedUpdateFn(camera, md)
     {
-        if (this.frameUpdated !== frameIndex)
-        {
-            this.frameUpdated = frameIndex;
-            var node = this.node;
-            var techniqueParameters = this.techniqueParameters;
-            var worldUpdate = node.worldUpdate;
-            if (this.techniqueParametersUpdated !== worldUpdate)
-            {
-                this.techniqueParametersUpdated = worldUpdate;
-                techniqueParameters.world = node.world;
-            }
+        var node = this.node;
+        var techniqueParameters = this.shadowTechniqueParameters;
+        techniqueParameters.worldView = md.m43Mul(node.world, camera.viewMatrix, techniqueParameters.worldView);
 
-            var skinController = this.skinController;
-            if (skinController)
-            {
-                techniqueParameters.skinBones = skinController.output;
-                skinController.update();
-            }
+        var skinController = this.skinController;
+        if (skinController)
+        {
+            techniqueParameters.skinBones = skinController.output;
+            skinController.update();
         }
     },
 
@@ -283,12 +265,6 @@ ShadowMapping.prototype =
         camera.updateViewMatrix();
         var viewMatrix = camera.viewMatrix;
 
-        // Near plane handled independently
-        shadowMapInfo.d0 = -viewMatrix[2];
-        shadowMapInfo.d1 = -viewMatrix[5];
-        shadowMapInfo.d2 = -viewMatrix[8];
-        shadowMapInfo.offset = viewMatrix[11];
-
         if (!shadowRenderables)
         {
             shadowRenderables = [];
@@ -327,11 +303,6 @@ ShadowMapping.prototype =
         var halfExtents1 = halfExtents[1];
         var halfExtents2 = halfExtents[2];
         var lightOrigin;
-
-        var d0 = shadowMapInfo.d0;
-        var d1 = shadowMapInfo.d1;
-        var d2 = shadowMapInfo.d2;
-        var offset = shadowMapInfo.offset;
 
         var shadowRenderables = lightInstance.shadowRenderables;
         var numShadowRenderables;
@@ -669,13 +640,18 @@ ShadowMapping.prototype =
 
         var shadowMapTechniqueParameters = this.techniqueParameters;
         var renderable, rendererInfo;
-
+/*
+        var d0 = -viewMatrix[2];
+        var d1 = -viewMatrix[5];
+        var d2 = -viewMatrix[8];
+        var offset = -viewMatrix[11];
+*/
         var drawParametersArray, numDrawParameters, drawParametersIndex;
-        shadowMapTechniqueParameters.shadowProjection = shadowProjection;
-        shadowMapTechniqueParameters.shadowDepth = md.v4Build(d0 * maxDepthReciprocal,
-                                                              d1 * maxDepthReciprocal,
-                                                              d2 * maxDepthReciprocal,
-                                                              (-offset - minLightDistance) * maxDepthReciprocal,
+        shadowMapTechniqueParameters.shadowProjection = camera.projectionMatrix;
+        shadowMapTechniqueParameters.shadowDepth = md.v4Build(0,
+                                                              0,
+                                                              -maxDepthReciprocal,
+                                                              -minLightDistance * maxDepthReciprocal,
                                                               shadowMapTechniqueParameters.shadowDepth);
 
         var drawQueue = this.drawQueue;
@@ -698,7 +674,7 @@ ShadowMapping.prototype =
 
             if (rendererInfo.shadowMappingUpdate && renderable.shadowMappingDrawParameters)
             {
-                rendererInfo.shadowMappingUpdate.call(renderable, frameUpdated);
+                rendererInfo.shadowMappingUpdate.call(renderable, camera, md);
 
                 drawParametersArray = renderable.shadowMappingDrawParameters;
                 numDrawParameters = drawParametersArray.length;

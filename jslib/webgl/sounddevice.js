@@ -298,7 +298,7 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
                 }
 
                 // Mangle data into a data URI
-                soundPath = soundPath + TurbulenzEngine.base64encode(dataArray);
+                soundPath = soundPath + TurbulenzEngine.base64Encode(dataArray);
             }
 
             if (!(extension in sd.supportedExtensions))
@@ -433,8 +433,6 @@ WebGLSoundSource.prototype =
 {
     version : 1,
 
-    stopSrcURL : (navigator.userAgent.match(/firefox/i) ? null : 'about:blank'),
-
     // Public API
     play : function sourcePlayFn(sound, seek)
     {
@@ -498,7 +496,15 @@ WebGLSoundSource.prototype =
             {
                 this.stop();
 
-                audio = sound.audio.cloneNode(true);
+                if (sound.data)
+                {
+                    audio = new Audio();
+                    audio.mozSetup(sound.channels, sound.frequency);
+                }
+                else
+                {
+                    audio = sound.audio.cloneNode(true);
+                }
 
                 this.sound = sound;
                 this.audio = audio;
@@ -547,9 +553,9 @@ WebGLSoundSource.prototype =
                 }
             }
 
-            if (this.data)
+            if (sound.data)
             {
-                audio.mozWriteAudio(this.data);
+                audio.mozWriteAudio(sound.data);
             }
             else
             {
@@ -588,9 +594,11 @@ WebGLSoundSource.prototype =
                     this.sound = null;
                     this.audio = null;
 
-                    audio.src = this.stopSrcURL;
+                    audio.pause();
 
                     audio.removeEventListener('ended', this.loopAudio, false);
+
+                    audio = null;
                 }
             }
 
@@ -974,7 +982,16 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params)
             var audio = this.audio;
             if (audio)
             {
-                audio.volume = Math.min((this.gainFactor * gain), 1);
+                var volume = Math.min((this.gainFactor * gain), 1);
+                audio.volume = volume;
+                if (0 >= volume)
+                {
+                    audio.muted = true;
+                }
+                else
+                {
+                    audio.muted = false;
+                }
             }
         };
 
@@ -1016,14 +1033,17 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params)
                     return gain;
                 },
                 set : function setGainFn(newGain) {
-                    gain = newGain;
-                    source.updateAudioVolume();
+                    if (gain !== newGain)
+                    {
+                        gain = newGain;
+                        source.updateAudioVolume();
+                    }
                 },
                 enumerable : true,
                 configurable : false
             });
 
-        if (typeof new Audio().loop === 'boolean')
+        if (sd.loopingSupported)
         {
             Object.defineProperty(source, "looping", {
                     get : function getLoopingFn() {
@@ -1492,9 +1512,14 @@ WebGLSoundDevice.create = function webGLSoundDeviceFn(params)
     sd.listenerVelocity = (params.listenerVelocity || VMath.v3BuildZero());
     sd.listenerGain = (params.listenerGain || 1);
 
+    // Need a temporary Audio element to test capabilities
+    var audio = new Audio();
+
+    // Check for looping support
+    sd.loopingSupported = (typeof audio.loop === 'boolean');
+
     // Check for supported extensions
     var supportedExtensions = {};
-    var audio = new Audio();
     if (audio.canPlayType('application/ogg'))
     {
         supportedExtensions.ogg = true;
@@ -1507,8 +1532,9 @@ WebGLSoundDevice.create = function webGLSoundDeviceFn(params)
     {
         supportedExtensions.wav = true;
     }
-    audio = null;
     sd.supportedExtensions = supportedExtensions;
+
+    audio = null;
 
     return sd;
 };

@@ -95,9 +95,461 @@ var VMath =
     /*jshint bitwise: true*/
 
     //
+    // Vector2
+    //
+    v2BuildZero : function v2BuildZeroFn(dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = 0.0;
+        dst[1] = 0.0;
+        return dst;
+    },
+
+    v2BuildOne : function v2BuildOneFn(dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = 1.0;
+        dst[1] = 1.0;
+        return dst;
+    },
+
+    v2BuildXAxis : function v2BuildXAxisFn(dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = 1.0;
+        dst[1] = 0.0;
+        return dst;
+    },
+
+    v2BuildYAxis : function v2BuildYAxisFn(dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = 0.0;
+        dst[1] = 1.0;
+        return dst;
+    },
+
+    v2Build : function v2Fn(a, b, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = a;
+        dst[1] = b;
+        return dst;
+    },
+
+    v2Copy : function v2CopyFn(src, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = src[0];
+        dst[1] = src[1];
+        return dst;
+    },
+
+    v2Set : function v2SetFn(v, a)
+    {
+        v[0] = a[0];
+        v[1] = a[1];
+    },
+
+    v2Neg : function v2NegFn(a, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = -a[0];
+        dst[1] = -a[1];
+        return dst;
+    },
+
+    v2Add : function v2AddFn(a, b, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = a[0] + b[0];
+        dst[1] = a[1] + b[1];
+        return dst;
+    },
+
+    v2Add3 : function v2Add3Fn(a, b, c, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = a[0] + b[0] + c[0];
+        dst[1] = a[1] + b[1] + c[1];
+        return dst;
+    },
+
+    v2Add4 : function v2Add4Fn(a, b, c, d, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = a[0] + b[0] + c[0] + d[0];
+        dst[1] = a[1] + b[1] + c[1] + d[1];
+        return dst;
+    },
+
+    v2Sub : function v2SubFn(a, b, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = (a[0] - b[0]);
+        dst[1] = (a[1] - b[1]);
+        return dst;
+    },
+
+    v2Mul : function v2MulFn(a, b, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = (a[0] * b[0]);
+        dst[1] = (a[1] * b[1]);
+        return dst;
+    },
+
+    v2MulAdd : function v2MulAddFn(a, b, c, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = (a[0] * b[0]) + c[0];
+        dst[1] = (a[1] * b[1]) + c[1];
+        return dst;
+    },
+
+    v2Dot : function v2DotFn(a, b)
+    {
+        return ((a[0] * b[0]) + (a[1] * b[1]));
+    },
+
+    v2PerpDot : function v2PerpDot(a, b)
+    {
+        return ((a[0] * b[1]) - (a[1] * b[0]));
+    },
+
+    v2LengthSq : function v2LengthSqFn(a)
+    {
+        var a0 = a[0];
+        var a1 = a[1];
+        return ((a0 * a0) + (a1 * a1));
+    },
+
+    v2Length : function v2LengthFn(a)
+    {
+        var a0 = a[0];
+        var a1 = a[1];
+        return Math.sqrt((a0 * a0) + (a1 * a1));
+    },
+
+    v2Reciprocal : function v2ReciprocalFn(a, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+
+        var rcp = VMath.reciprocal;
+        dst[0] = rcp(a[0]);
+        dst[1] = rcp(a[1]);
+        return dst;
+    },
+
+    v2Normalize : function v2NormalizeFn(a, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        var a0 = a[0];
+        var a1 = a[1];
+        var lsq = ((a0 * a0) + (a1 * a1));
+        if (lsq > 0.0)
+        {
+            var lr = 1.0 / Math.sqrt(lsq);
+            dst[0] = (a0 * lr);
+            dst[1] = (a1 * lr);
+        }
+        else
+        {
+            dst[0] = 0;
+            dst[1] = 0;
+        }
+        return dst;
+    },
+
+    v2Abs : function v2AbsFn(a, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        var abs = Math.abs;
+        dst[0] = abs(a[0]);
+        dst[1] = abs(a[1]);
+        return dst;
+    },
+
+    v2Max : function v2MaxFn(a, b, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        var max = Math.max;
+        dst[0] = max(a[0], b[0]);
+        dst[1] = max(a[1], b[1]);
+        return dst;
+    },
+
+    v2Min : function v2MinFn(a, b, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        var min = Math.min;
+        dst[0] = min(a[0], b[0]);
+        dst[1] = min(a[1], b[1]);
+        return dst;
+    },
+
+    v2Equal : function v2EqualFn(a, b, precision)
+    {
+        var abs = Math.abs;
+        if (precision === undefined)
+        {
+            precision = this.precision;
+        }
+        return (abs(a[0] - b[0]) <= precision &&
+                abs(a[1] - b[1]) <= precision);
+    },
+
+    // Vector2 'masks'
+    v2MaskEqual : function v2MaskEqualFn(a, b)
+    {
+        var abs = Math.abs;
+        var precision = VMath.precision;
+        return [(abs(a[0] - b[0]) <= precision),
+                (abs(a[1] - b[1]) <= precision)];
+    },
+
+    v2MaskLess : function v2MaskLessFn(a, b)
+    {
+        return [(a[0] < b[0]),
+                (a[1] < b[1])];
+    },
+
+    v2MaskGreater : function v2MaskGreaterFn(a, b)
+    {
+        return [(a[0] > b[0]),
+                (a[1] > b[1])];
+    },
+
+    v2MaskGreaterEq : function v2MaskGreaterEqFn(a, b)
+    {
+        return [(a[0] >= b[0]),
+                (a[1] >= b[1])];
+    },
+
+    v2MaskNot : function v2MaskNotFn(a)
+    {
+        return [!a[0],
+                !a[1]];
+    },
+
+    v2MaskOr : function v2MaskOrFn(a, b)
+    {
+        return [(a[0] || b[0]),
+                (a[1] || b[1])];
+    },
+
+    v2MaskAnd : function v2MaskAndFn(a, b)
+    {
+        return [(a[0] && b[0]),
+                (a[1] && b[1])];
+    },
+
+    v2Select : function v2SelectFn(m, a, b, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = m[0] ? a[0] : b[0];
+        dst[1] = m[1] ? a[1] : b[1];
+        return dst;
+    },
+
+    // Vector2 operations with scalar
+    v2ScalarBuild : function v2ScalarBuildFn(a, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+
+        dst[0] = a;
+        dst[1] = a;
+
+        return dst;
+    },
+
+    v2ScalarMax : function v2ScalarMaxFn(a, b, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+
+        var max = Math.max;
+        dst[0] = max(a[0], b);
+        dst[1] = max(a[1], b);
+
+        return dst;
+    },
+
+    v2ScalarMin : function v2ScalarMinFn(a, b, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+
+        var min = Math.min;
+        dst[0] = min(a[0], b);
+        dst[1] = min(a[1], b);
+
+        return dst;
+    },
+
+    v2ScalarAdd : function v2ScalarAddFn(a, b, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+
+        dst[0] = (a[0] + b);
+        dst[1] = (a[1] + b);
+
+        return dst;
+    },
+
+    v2ScalarSub : function v2ScalarSubFn(a, b, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+
+        dst[0] = (a[0] - b);
+        dst[1] = (a[1] - b);
+
+        return dst;
+    },
+
+    v2ScalarMul : function v2ScalarMulFn(a, b, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        if (b === 0)
+        {
+            dst[0] = 0;
+            dst[1] = 0;
+        }
+        else
+        {
+            dst[0] = a[0] * b;
+            dst[1] = a[1] * b;
+        }
+        return dst;
+    },
+
+    v2AddScalarMul : function v2AddScalarMulFn(a, b, c, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = a[0] + b[0] * c;
+        dst[1] = a[1] + b[1] * c;
+        return dst;
+    },
+
+    // Vector2 'masks' with scalars
+    v2EqualScalarMask : function v2EqualScalarMaskFn(a, b)
+    {
+        var abs = Math.abs;
+        var precision = VMath.precision;
+        return [(abs(a[0] - b) <= precision),
+                (abs(a[1] - b) <= precision)];
+    },
+
+    v2LessScalarMask : function v2LessScalarMaskFn(a, b)
+    {
+        return [(a[0] > b),
+                (a[1] > b)];
+    },
+
+    v2GreaterScalarMask : function v2GreaterScalarMaskFn(a, b)
+    {
+        return [(a[0] > b),
+                (a[1] > b)];
+    },
+
+    v2GreaterEqScalarMask : function v2GreaterEqScalarMaskFn(a, b)
+    {
+        return [(a[0] >= b),
+                (a[1] >= b)];
+    },
+
+    v2Lerp : function v2LerpFn(a, b, t, dst)
+    {
+        if (dst === undefined)
+        {
+            dst = new VMathArrayConstructor(2);
+        }
+        dst[0] = (a[0] + ((b[0] - a[0]) * t));
+        dst[1] = (a[1] + ((b[1] - a[1]) * t));
+        return dst;
+    },
+
+    //
     // Vector3
     //
-    v3BuildZero : function v3BuildZeroFn(dst) {
+    v3BuildZero : function v3BuildZeroFn(dst)
+    {
         if (dst === undefined)
         {
             dst = new VMathArrayConstructor(3);
@@ -108,7 +560,8 @@ var VMath =
         return dst;
     },
 
-    v3BuildOne  : function v3BuildOneFn(dst) {
+    v3BuildOne  : function v3BuildOneFn(dst)
+    {
         if (dst === undefined)
         {
             dst = new VMathArrayConstructor(3);
@@ -119,7 +572,8 @@ var VMath =
         return dst;
     },
 
-    v3BuildXAxis : function v3BuildXAxisFn(dst) {
+    v3BuildXAxis : function v3BuildXAxisFn(dst)
+    {
         if (dst === undefined)
         {
             dst = new VMathArrayConstructor(3);
@@ -130,7 +584,8 @@ var VMath =
         return dst;
     },
 
-    v3BuildYAxis : function v3BuildYAxisFn(dst) {
+    v3BuildYAxis : function v3BuildYAxisFn(dst)
+    {
         if (dst === undefined)
         {
             dst = new VMathArrayConstructor(3);
@@ -141,7 +596,8 @@ var VMath =
         return dst;
     },
 
-    v3BuildZAxis : function v3BuildZAxisFn(dst) {
+    v3BuildZAxis : function v3BuildZAxisFn(dst)
+    {
         if (dst === undefined)
         {
             dst = new VMathArrayConstructor(3);

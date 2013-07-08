@@ -4626,6 +4626,9 @@ Scene.prototype =
         }
 
         // Keep bsp tree
+        var ArrayConstructor = (this.float32ArrayConstructor ?
+                                this.float32ArrayConstructor :
+                                Array);
         var fileBspNodes = sceneData.bspnodes;
         var numBspNodes = fileBspNodes.length;
         var bspNodes = [];
@@ -4635,8 +4638,13 @@ Scene.prototype =
         {
             var fileBspNode = fileBspNodes[bn];
             var plane = fileBspNode.plane;
+            var nodePlane = new ArrayConstructor(4);
+            nodePlane[0] = plane[0];
+            nodePlane[1] = plane[1];
+            nodePlane[2] = plane[2];
+            nodePlane[3] = -plane[3];
             bspNodes[bn] = {
-                    plane: [plane[0], plane[1], plane[2], -plane[3]],
+                    plane: nodePlane,
                     pos: fileBspNode.pos,
                     neg: fileBspNode.neg
                 };

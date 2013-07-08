@@ -32,8 +32,14 @@ var TurbulenzBridge = {
             this._bridge = bridge;
 
             this.emit = bridge.emit;
-            this.addListener = bridge.addListener;
-            this.setListener = bridge.setListener;
+            // TODO can remove all of these or's after gamesite and hub updates
+            this.on = bridge.gameListenerOn || bridge.addListener || bridge.setListener;
+
+            // we cant use off yet becuase the function recieved on the other VM is re-wrapped each time
+            //this.off = bridge.gameListenerOff;
+            // Legacy functions addListener/setListener
+            this.addListener = bridge.gameListenerOn || bridge.addListener || bridge.setListener;
+            this.setListener = bridge.gameListenerOn || bridge.setListener;
         }
 
         if (typeof TurbulenzServices !== 'undefined')
@@ -47,6 +53,10 @@ var TurbulenzBridge = {
     },
 
     emit: function emitFn() {},
+
+    on: function onFn() {},
+
+    //off: function offFn() {},
 
     addListener: function addListenerFn() {},
 
@@ -90,6 +100,10 @@ var TurbulenzBridge = {
         this.emit('game.session.status', gameSessionId, status);
     },
 
+    setGameSessionInfo: function setGameSessionInfoFn(info) {
+        this.emit('game.session.info', info);
+    },
+
     /**
      * Update a userbadge. Used by the BadgeManager
      */
@@ -101,9 +115,9 @@ var TurbulenzBridge = {
     /**
      * Update a leaderboard. Used by the LeaderboardManager
      */
-    updateLeaderBoard: function updateLeaderBoardFn(score)
+    updateLeaderBoard: function updateLeaderBoardFn(scoreData)
     {
-        this.emit('leaderboards.update', score);
+        this.emit('leaderboards.update', scoreData);
     },
 
 
@@ -111,7 +125,7 @@ var TurbulenzBridge = {
      * Handle multiplayer join events
      */
     setOnMultiplayerSessionToJoin: function setOnMultiplayerSessionToJoinFn(callback) {
-        this.setListener('multiplayer.session.join', callback);
+        this.on('multiplayer.session.join', callback);
     },
 
     triggerJoinedMultiplayerSession: function triggerJoinedMultiplayerSessionFn(session) {
@@ -122,6 +136,41 @@ var TurbulenzBridge = {
         this.emit('multiplayer.session.leave', sessionId);
     },
 
+    triggerMultiplayerSessionMakePublic: function triggerMultiplayerSessionMakePublicFn(sessionId) {
+        this.emit('multiplayer.session.makepublic');
+    },
+
+    /**
+     * Handle store basket events
+     */
+    setOnBasketUpdate: function setOnBasketUpdateFn(callback) {
+        this.on('basket.site.update', callback);
+    },
+
+    triggerBasketUpdate: function triggerBasketUpdateFn(basket) {
+        this.emit('basket.game.update', basket);
+    },
+
+    setOnPurchaseConfirmed: function setOnPurchaseConfirmedFn(callback) {
+        this.on('purchase.confirmed', callback);
+    },
+
+    setOnPurchaseRejected: function setOnPurchaseRejectedFn(callback) {
+        this.on('purchase.rejected', callback);
+    },
+
+    triggerShowConfirmPurchase: function triggerShowConfirmPurchaseFn() {
+        this.emit('purchase.show.confirm');
+    },
+
+    triggerFetchStoreMeta: function triggerFetchStoreMetaFn() {
+        this.emit('fetch.store.meta');
+    },
+
+    setOnStoreMeta: function setOnStoreMetaFn(callback) {
+        this.on('store.meta.v2', callback);
+    },
+
     /**
      * Methods to signal changes of the viewport's aspect ratio to the page.
      */
@@ -129,32 +178,31 @@ var TurbulenzBridge = {
         this.emit('change.viewport.ratio', ratio);
     },
 
-
     /**
      * Methods to set callbacks to react to events happening on the page.
      */
     setOnViewportHide: function setOnViewportHideFn(callback) {
-        this.setListener('change.viewport.hide', callback);
+        this.on('change.viewport.hide', callback);
     },
 
     setOnViewportShow: function setOnViewportShowFn(callback) {
-        this.setListener('change.viewport.show', callback);
+        this.on('change.viewport.show', callback);
     },
 
     setOnFullscreenOn: function setOnFullscreenOnFn(callback) {
-        this.setListener('change.viewport.fullscreen.on', callback);
+        this.on('change.viewport.fullscreen.on', callback);
     },
 
     setOnFullscreenOff: function setOnFullscreenOffFn(callback) {
-        this.setListener('change.viewport.fullscreen.off', callback);
+        this.on('change.viewport.fullscreen.off', callback);
     },
 
     setOnMenuStateChange: function setOnMenuStateChangeFn(callback) {
-        this.setListener('change.menu.state', callback);
+        this.on('change.menu.state', callback);
     },
 
     setOnUserStateChange: function setOnUserStateChangeFn(callback) {
-        this.setListener('change.user.state', callback);
+        this.on('change.user.state', callback);
     },
 
     /**

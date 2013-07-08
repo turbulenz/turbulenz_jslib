@@ -1,20 +1,20 @@
-// Copyright (c) 2009-2012 Turbulenz Limited
+// Copyright (c) 2012 Turbulenz Limited
 /*global Float32Array: false*/
 
 //
-// AABBTreeNode
+// BoxTreeNode
 //
-function AABBTreeNode() {}
-AABBTreeNode.prototype =
+function BoxTreeNode() {}
+BoxTreeNode.prototype =
 {
     version : 1,
 
-    isLeaf : function aabbtreeNodeIsLeafFn()
+    isLeaf : function boxtreeNodeIsLeafFn()
     {
         return !!this.externalNode;
     },
 
-    reset : function aabbtreeNodeResetFn(minX, minY, minZ, maxX, maxY, maxZ,
+    reset : function boxtreeNodeResetFn(minX, minY, maxX, maxY,
                                          escapeNodeOffset,
                                          externalNode)
     {
@@ -23,13 +23,11 @@ AABBTreeNode.prototype =
         var oldExtents = this.extents;
         oldExtents[0] = minX;
         oldExtents[1] = minY;
-        oldExtents[2] = minZ;
-        oldExtents[3] = maxX;
-        oldExtents[4] = maxY;
-        oldExtents[5] = maxZ;
+        oldExtents[2] = maxX;
+        oldExtents[3] = maxY;
     },
 
-    clear : function aabbtreeNodeClearFn()
+    clear : function boxtreeNodeClearFn()
     {
         this.escapeNodeOffset = 1;
         this.externalNode = undefined;
@@ -37,17 +35,15 @@ AABBTreeNode.prototype =
         var maxNumber = Number.MAX_VALUE;
         oldExtents[0] = maxNumber;
         oldExtents[1] = maxNumber;
-        oldExtents[2] = maxNumber;
+        oldExtents[2] = -maxNumber;
         oldExtents[3] = -maxNumber;
-        oldExtents[4] = -maxNumber;
-        oldExtents[5] = -maxNumber;
     }
 };
 
 // Constructor function
-AABBTreeNode.create = function aabbtreeNodeCreateFn(extents, escapeNodeOffset, externalNode)
+BoxTreeNode.create = function boxtreeNodeCreateFn(extents, escapeNodeOffset, externalNode)
 {
-    var n = new AABBTreeNode();
+    var n = new BoxTreeNode();
     n.escapeNodeOffset = escapeNodeOffset;
     n.externalNode = externalNode;
     n.extents = extents;
@@ -56,10 +52,10 @@ AABBTreeNode.create = function aabbtreeNodeCreateFn(extents, escapeNodeOffset, e
 
 
 //
-// AABBTree
+// BoxTree
 //
-function AABBTree() {}
-AABBTree.prototype =
+function BoxTree() {}
+BoxTree.prototype =
 {
     version : 1,
     numNodesLeaf : 4,
@@ -67,15 +63,13 @@ AABBTree.prototype =
     add : function addFn(externalNode, extents)
     {
         var endNode = this.endNode;
-        externalNode.aabbTreeIndex = endNode;
-        var copyExtents = new this.arrayConstructor(6);
+        externalNode.boxTreeIndex = endNode;
+        var copyExtents = new this.arrayConstructor(4);
         copyExtents[0] = extents[0];
         copyExtents[1] = extents[1];
         copyExtents[2] = extents[2];
         copyExtents[3] = extents[3];
-        copyExtents[4] = extents[4];
-        copyExtents[5] = extents[5];
-        this.nodes[endNode] = AABBTreeNode.create(copyExtents, 1, externalNode);
+        this.nodes[endNode] = BoxTreeNode.create(copyExtents, 1, externalNode);
         this.endNode = (endNode + 1);
         this.needsRebuild = true;
         this.numAdds += 1;
@@ -84,7 +78,7 @@ AABBTree.prototype =
 
     remove : function removeFn(externalNode)
     {
-        var index = externalNode.aabbTreeIndex;
+        var index = externalNode.boxTreeIndex;
         if (index !== undefined)
         {
             if (this.numExternalNodes > 1)
@@ -113,7 +107,7 @@ AABBTree.prototype =
                 this.clear();
             }
 
-            delete externalNode.aabbTreeIndex;
+            delete externalNode.boxTreeIndex;
         }
     },
 
@@ -133,17 +127,15 @@ AABBTree.prototype =
         return parent;
     },
 
-    update : function aabbTreeUpdateFn(externalNode, extents)
+    update : function boxTreeUpdateFn(externalNode, extents)
     {
-        var index = externalNode.aabbTreeIndex;
+        var index = externalNode.boxTreeIndex;
         if (index !== undefined)
         {
             var min0 = extents[0];
             var min1 = extents[1];
-            var min2 = extents[2];
-            var max0 = extents[3];
-            var max1 = extents[4];
-            var max2 = extents[5];
+            var max0 = extents[2];
+            var max1 = extents[3];
 
             var needsRebuild = this.needsRebuild;
             var needsRebound = this.needsRebound;
@@ -155,17 +147,13 @@ AABBTree.prototype =
                             needsRebound ||
                             nodeExtents[0] > min0 ||
                             nodeExtents[1] > min1 ||
-                            nodeExtents[2] > min2 ||
-                            nodeExtents[3] < max0 ||
-                            nodeExtents[4] < max1 ||
-                            nodeExtents[5] < max2);
+                            nodeExtents[2] < max0 ||
+                            nodeExtents[3] < max1);
 
             nodeExtents[0] = min0;
             nodeExtents[1] = min1;
-            nodeExtents[2] = min2;
-            nodeExtents[3] = max0;
-            nodeExtents[4] = max1;
-            nodeExtents[5] = max2;
+            nodeExtents[2] = max0;
+            nodeExtents[3] = max1;
 
             if (doUpdate)
             {
@@ -193,10 +181,8 @@ AABBTree.prototype =
                             var parentExtents = parent.extents;
                             if (parentExtents[0] > min0 ||
                                 parentExtents[1] > min1 ||
-                                parentExtents[2] > min2 ||
-                                parentExtents[3] < max0 ||
-                                parentExtents[4] < max1 ||
-                                parentExtents[5] < max2)
+                                parentExtents[2] < max0 ||
+                                parentExtents[3] < max1)
                             {
                                 this.needsRebound = true;
                             }
@@ -287,10 +273,8 @@ AABBTree.prototype =
                     var extents = node.extents;
                     var minX = extents[0];
                     var minY = extents[1];
-                    var minZ = extents[2];
-                    var maxX = extents[3];
-                    var maxY = extents[4];
-                    var maxZ = extents[5];
+                    var maxX = extents[2];
+                    var maxY = extents[3];
 
                     nodeIndex = (nodeIndex + node.escapeNodeOffset);
                     while (nodeIndex < currentEscapeNodeIndex)
@@ -300,10 +284,8 @@ AABBTree.prototype =
                         /*jshint white: false*/
                         if (minX > extents[0]) { minX = extents[0]; }
                         if (minY > extents[1]) { minY = extents[1]; }
-                        if (minZ > extents[2]) { minZ = extents[2]; }
-                        if (maxX < extents[3]) { maxX = extents[3]; }
-                        if (maxY < extents[4]) { maxY = extents[4]; }
-                        if (maxZ < extents[5]) { maxZ = extents[5]; }
+                        if (maxX < extents[2]) { maxX = extents[2]; }
+                        if (maxY < extents[3]) { maxY = extents[3]; }
                         /*jshint white: true*/
                         nodeIndex = (nodeIndex + node.escapeNodeOffset);
                     }
@@ -311,10 +293,8 @@ AABBTree.prototype =
                     extents = topNode.extents;
                     extents[0] = minX;
                     extents[1] = minY;
-                    extents[2] = minZ;
-                    extents[3] = maxX;
-                    extents[4] = maxY;
-                    extents[5] = maxZ;
+                    extents[2] = maxX;
+                    extents[3] = maxY;
 
                     endUpdateNodeIndex = topNodeIndex;
 
@@ -376,7 +356,6 @@ AABBTree.prototype =
                 }
             }
 
-            var rootNode;
             if (numBuildNodes > 1)
             {
                 if (numBuildNodes > this.numNodesLeaf &&
@@ -385,10 +364,6 @@ AABBTree.prototype =
                     if (this.highQuality)
                     {
                         this.sortNodesHighQuality(buildNodes);
-                    }
-                    else if (this.ignoreY)
-                    {
-                        this.sortNodesNoY(buildNodes);
                     }
                     else
                     {
@@ -404,19 +379,11 @@ AABBTree.prototype =
                     nodes.length = endNodeIndex;
                 }
                 this.endNode = endNodeIndex;
-
-                // Check if we should take into account the Y coordinate
-                rootNode = nodes[0];
-                var extents = rootNode.extents;
-                var deltaX = (extents[3] - extents[0]);
-                var deltaY = (extents[4] - extents[1]);
-                var deltaZ = (extents[5] - extents[2]);
-                this.ignoreY = ((4 * deltaY) < (deltaX <= deltaZ ? deltaX : deltaZ));
             }
             else
             {
-                rootNode = buildNodes[0];
-                rootNode.externalNode.aabbTreeIndex = 0;
+                var rootNode = buildNodes[0];
+                rootNode.externalNode.boxTreeIndex = 0;
                 nodes.length = 1;
                 nodes[0] = rootNode;
                 this.endNode = 1;
@@ -440,37 +407,25 @@ AABBTree.prototype =
         function getkeyXfn(node)
         {
             var extents = node.extents;
-            return (extents[0] + extents[3]);
+            return (extents[0] + extents[2]);
         }
 
         function getkeyYfn(node)
         {
             var extents = node.extents;
-            return (extents[1] + extents[4]);
-        }
-
-        function getkeyZfn(node)
-        {
-            var extents = node.extents;
-            return (extents[2] + extents[5]);
+            return (extents[1] + extents[3]);
         }
 
         function getreversekeyXfn(node)
         {
             var extents = node.extents;
-            return -(extents[0] + extents[3]);
+            return -(extents[0] + extents[2]);
         }
 
         function getreversekeyYfn(node)
         {
             var extents = node.extents;
-            return -(extents[1] + extents[4]);
-        }
-
-        function getreversekeyZfn(node)
-        {
-            var extents = node.extents;
-            return -(extents[2] + extents[5]);
+            return -(extents[1] + extents[3]);
         }
 
         var nthElement = this.nthElement;
@@ -492,17 +447,6 @@ AABBTree.prototype =
                 else
                 {
                     nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyXfn);
-                }
-            }
-            else if (axis === 2)
-            {
-                if (reverse)
-                {
-                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getreversekeyZfn);
-                }
-                else
-                {
-                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyZfn);
                 }
             }
             else //if (axis === 1)
@@ -546,93 +490,6 @@ AABBTree.prototype =
         sortNodesRecursive(nodes, 0, numNodes);
     },
 
-    sortNodesNoY : function sortNodesNoYFn(nodes)
-    {
-        var numNodesLeaf = this.numNodesLeaf;
-        var numNodes = nodes.length;
-
-        function getkeyXfn(node)
-        {
-            var extents = node.extents;
-            return (extents[0] + extents[3]);
-        }
-
-        function getkeyZfn(node)
-        {
-            var extents = node.extents;
-            return (extents[2] + extents[5]);
-        }
-
-        function getreversekeyXfn(node)
-        {
-            var extents = node.extents;
-            return -(extents[0] + extents[3]);
-        }
-
-        function getreversekeyZfn(node)
-        {
-            var extents = node.extents;
-            return -(extents[2] + extents[5]);
-        }
-
-        var nthElement = this.nthElement;
-        var reverse = false;
-        var axis = 0;
-
-        function sortNodesNoYRecursive(nodes, startIndex, endIndex)
-        {
-            /*jshint bitwise: false*/
-            var splitNodeIndex = ((startIndex + endIndex) >> 1);
-            /*jshint bitwise: true*/
-
-            if (axis === 0)
-            {
-                if (reverse)
-                {
-                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getreversekeyXfn);
-                }
-                else
-                {
-                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyXfn);
-                }
-            }
-            else //if (axis === 2)
-            {
-                if (reverse)
-                {
-                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getreversekeyZfn);
-                }
-                else
-                {
-                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyZfn);
-                }
-            }
-
-            if (axis === 0)
-            {
-                axis = 2;
-            }
-            else //if (axis === 2)
-            {
-                axis = 0;
-            }
-
-            reverse = !reverse;
-
-            if ((startIndex + numNodesLeaf) < splitNodeIndex)
-            {
-                sortNodesNoYRecursive(nodes, startIndex, splitNodeIndex);
-            }
-
-            if ((splitNodeIndex + numNodesLeaf) < endIndex)
-            {
-                sortNodesNoYRecursive(nodes, splitNodeIndex, endIndex);
-            }
-        }
-
-        sortNodesNoYRecursive(nodes, 0, numNodes);
-    },
-
     sortNodesHighQuality : function sortNodesHighQualityFn(nodes)
     {
         var numNodesLeaf = this.numNodesLeaf;
@@ -641,61 +498,49 @@ AABBTree.prototype =
         function getkeyXfn(node)
         {
             var extents = node.extents;
-            return (extents[0] + extents[3]);
+            return (extents[0] + extents[2]);
         }
 
         function getkeyYfn(node)
         {
             var extents = node.extents;
-            return (extents[1] + extents[4]);
+            return (extents[1] + extents[3]);
         }
 
-        function getkeyZfn(node)
+        function getkeyXYfn(node)
         {
             var extents = node.extents;
-            return (extents[2] + extents[5]);
+            return (extents[0] + extents[1] + extents[2] + extents[3]);
         }
 
-        function getkeyXZfn(node)
+        function getkeyYXfn(node)
         {
             var extents = node.extents;
-            return (extents[0] + extents[2] + extents[3] + extents[5]);
-        }
-
-        function getkeyZXfn(node)
-        {
-            var extents = node.extents;
-            return (extents[0] - extents[2] + extents[3] - extents[5]);
+            return (extents[0] - extents[1] + extents[2] - extents[3]);
         }
 
         function getreversekeyXfn(node)
         {
             var extents = node.extents;
-            return -(extents[0] + extents[3]);
+            return -(extents[0] + extents[2]);
         }
 
         function getreversekeyYfn(node)
         {
             var extents = node.extents;
-            return -(extents[1] + extents[4]);
+            return -(extents[1] + extents[3]);
         }
 
-        function getreversekeyZfn(node)
+        function getreversekeyXYfn(node)
         {
             var extents = node.extents;
-            return -(extents[2] + extents[5]);
+            return -(extents[0] + extents[1] + extents[2] + extents[3]);
         }
 
-        function getreversekeyXZfn(node)
+        function getreversekeyYXfn(node)
         {
             var extents = node.extents;
-            return -(extents[0] + extents[2] + extents[3] + extents[5]);
-        }
-
-        function getreversekeyZXfn(node)
-        {
-            var extents = node.extents;
-            return -(extents[0] - extents[2] + extents[3] - extents[5]);
+            return -(extents[0] - extents[1] + extents[2] - extents[3]);
         }
 
         var nthElement = this.nthElement;
@@ -714,19 +559,15 @@ AABBTree.prototype =
             nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyYfn);
             var sahY = (calculateSAH(nodes, startIndex, splitNodeIndex) + calculateSAH(nodes, splitNodeIndex, endIndex));
 
-            nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyZfn);
-            var sahZ = (calculateSAH(nodes, startIndex, splitNodeIndex) + calculateSAH(nodes, splitNodeIndex, endIndex));
+            nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyXYfn);
+            var sahXY = (calculateSAH(nodes, startIndex, splitNodeIndex) + calculateSAH(nodes, splitNodeIndex, endIndex));
 
-            nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyXZfn);
-            var sahXZ = (calculateSAH(nodes, startIndex, splitNodeIndex) + calculateSAH(nodes, splitNodeIndex, endIndex));
-
-            nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyZXfn);
-            var sahZX = (calculateSAH(nodes, startIndex, splitNodeIndex) + calculateSAH(nodes, splitNodeIndex, endIndex));
+            nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyYXfn);
+            var sahYX = (calculateSAH(nodes, startIndex, splitNodeIndex) + calculateSAH(nodes, splitNodeIndex, endIndex));
 
             if (sahX <= sahY &&
-                sahX <= sahZ &&
-                sahX <= sahXZ &&
-                sahX <= sahZX)
+                sahX <= sahXY &&
+                sahX <= sahYX)
             {
                 if (reverse)
                 {
@@ -737,21 +578,8 @@ AABBTree.prototype =
                     nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyXfn);
                 }
             }
-            else if (sahZ <= sahY &&
-                     sahZ <= sahXZ &&
-                     sahZ <= sahZX)
-            {
-                if (reverse)
-                {
-                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getreversekeyZfn);
-                }
-                else
-                {
-                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyZfn);
-                }
-            }
-            else if (sahY <= sahXZ &&
-                     sahY <= sahZX)
+            else if (sahY <= sahXY &&
+                     sahY <= sahYX)
             {
                 if (reverse)
                 {
@@ -762,26 +590,26 @@ AABBTree.prototype =
                     nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyYfn);
                 }
             }
-            else if (sahXZ <= sahZX)
+            else if (sahXY <= sahYX)
             {
                 if (reverse)
                 {
-                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getreversekeyXZfn);
+                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getreversekeyXYfn);
                 }
                 else
                 {
-                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyXZfn);
+                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyXYfn);
                 }
             }
-            else //if (sahZX <= sahXZ)
+            else //if (sahYX <= sahXY)
             {
                 if (reverse)
                 {
-                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getreversekeyZXfn);
+                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getreversekeyYXfn);
                 }
                 else
                 {
-                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyZXfn);
+                    nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyYXfn);
                 }
             }
 
@@ -803,16 +631,14 @@ AABBTree.prototype =
 
     calculateSAH : function calculateSAHFn(buildNodes, startIndex, endIndex)
     {
-        var buildNode, extents, minX, minY, minZ, maxX, maxY, maxZ;
+        var buildNode, extents, minX, minY, maxX, maxY;
 
         buildNode = buildNodes[startIndex];
         extents = buildNode.extents;
         minX = extents[0];
         minY = extents[1];
-        minZ = extents[2];
-        maxX = extents[3];
-        maxY = extents[4];
-        maxZ = extents[5];
+        maxX = extents[2];
+        maxY = extents[3];
 
         for (var n = (startIndex + 1); n < endIndex; n += 1)
         {
@@ -821,14 +647,12 @@ AABBTree.prototype =
             /*jshint white: false*/
             if (minX > extents[0]) { minX = extents[0]; }
             if (minY > extents[1]) { minY = extents[1]; }
-            if (minZ > extents[2]) { minZ = extents[2]; }
-            if (maxX < extents[3]) { maxX = extents[3]; }
-            if (maxY < extents[4]) { maxY = extents[4]; }
-            if (maxZ < extents[5]) { maxZ = extents[5]; }
+            if (maxX < extents[2]) { maxX = extents[2]; }
+            if (maxY < extents[3]) { maxY = extents[3]; }
             /*jshint white: true*/
         }
 
-        return ((maxX - minX) + (maxY - minY) + (maxZ - minZ));
+        return ((maxX - minX) + (maxY - minY));
     },
 
     nthElement : function nthElementFn(nodes, first, nth, last, getkey)
@@ -944,7 +768,7 @@ AABBTree.prototype =
         var nodeIndex = lastNodeIndex;
         lastNodeIndex += 1;
 
-        var minX, minY, minZ, maxX, maxY, maxZ, extents;
+        var minX, minY, maxX, maxY, extents;
         var buildNode, lastNode;
 
         if ((startIndex + this.numNodesLeaf) >= endIndex)
@@ -953,12 +777,10 @@ AABBTree.prototype =
             extents = buildNode.extents;
             minX = extents[0];
             minY = extents[1];
-            minZ = extents[2];
-            maxX = extents[3];
-            maxY = extents[4];
-            maxZ = extents[5];
+            maxX = extents[2];
+            maxY = extents[3];
 
-            buildNode.externalNode.aabbTreeIndex = lastNodeIndex;
+            buildNode.externalNode.boxTreeIndex = lastNodeIndex;
             nodes[lastNodeIndex] = buildNode;
 
             for (var n = (startIndex + 1); n < endIndex; n += 1)
@@ -968,13 +790,11 @@ AABBTree.prototype =
                 /*jshint white: false*/
                 if (minX > extents[0]) { minX = extents[0]; }
                 if (minY > extents[1]) { minY = extents[1]; }
-                if (minZ > extents[2]) { minZ = extents[2]; }
-                if (maxX < extents[3]) { maxX = extents[3]; }
-                if (maxY < extents[4]) { maxY = extents[4]; }
-                if (maxZ < extents[5]) { maxZ = extents[5]; }
+                if (maxX < extents[2]) { maxX = extents[2]; }
+                if (maxY < extents[3]) { maxY = extents[3]; }
                 /*jshint white: true*/
                 lastNodeIndex += 1;
-                buildNode.externalNode.aabbTreeIndex = lastNodeIndex;
+                buildNode.externalNode.boxTreeIndex = lastNodeIndex;
                 nodes[lastNodeIndex] = buildNode;
             }
 
@@ -989,7 +809,7 @@ AABBTree.prototype =
             if ((startIndex + 1) >= splitPosIndex)
             {
                 buildNode = buildNodes[startIndex];
-                buildNode.externalNode.aabbTreeIndex = lastNodeIndex;
+                buildNode.externalNode.boxTreeIndex = lastNodeIndex;
                 nodes[lastNodeIndex] = buildNode;
             }
             else
@@ -1001,17 +821,15 @@ AABBTree.prototype =
             extents = lastNode.extents;
             minX = extents[0];
             minY = extents[1];
-            minZ = extents[2];
-            maxX = extents[3];
-            maxY = extents[4];
-            maxZ = extents[5];
+            maxX = extents[2];
+            maxY = extents[3];
 
             lastNodeIndex = (lastNodeIndex + lastNode.escapeNodeOffset);
 
             if ((splitPosIndex + 1) >= endIndex)
             {
                 buildNode = buildNodes[splitPosIndex];
-                buildNode.externalNode.aabbTreeIndex = lastNodeIndex;
+                buildNode.externalNode.boxTreeIndex = lastNodeIndex;
                 nodes[lastNodeIndex] = buildNode;
             }
             else
@@ -1024,31 +842,27 @@ AABBTree.prototype =
             /*jshint white: false*/
             if (minX > extents[0]) { minX = extents[0]; }
             if (minY > extents[1]) { minY = extents[1]; }
-            if (minZ > extents[2]) { minZ = extents[2]; }
-            if (maxX < extents[3]) { maxX = extents[3]; }
-            if (maxY < extents[4]) { maxY = extents[4]; }
-            if (maxZ < extents[5]) { maxZ = extents[5]; }
+            if (maxX < extents[2]) { maxX = extents[2]; }
+            if (maxY < extents[3]) { maxY = extents[3]; }
             /*jshint white: true*/
         }
 
         var node = nodes[nodeIndex];
         if (node !== undefined)
         {
-            node.reset(minX, minY, minZ, maxX, maxY, maxZ,
+            node.reset(minX, minY, maxX, maxY,
                        (lastNodeIndex + lastNode.escapeNodeOffset - nodeIndex));
         }
         else
         {
-            var parentExtents = new this.arrayConstructor(6);
+            var parentExtents = new this.arrayConstructor(4);
             parentExtents[0] = minX;
             parentExtents[1] = minY;
-            parentExtents[2] = minZ;
-            parentExtents[3] = maxX;
-            parentExtents[4] = maxY;
-            parentExtents[5] = maxZ;
+            parentExtents[2] = maxX;
+            parentExtents[3] = maxY;
 
-            nodes[nodeIndex] = AABBTreeNode.create(parentExtents,
-                                                   (lastNodeIndex + lastNode.escapeNodeOffset - nodeIndex));
+            nodes[nodeIndex] = BoxTreeNode.create(parentExtents,
+                                                  (lastNodeIndex + lastNode.escapeNodeOffset - nodeIndex));
         }
     },
 
@@ -1061,8 +875,8 @@ AABBTree.prototype =
             var numPlanes = planes.length;
             var numVisibleNodes = visibleNodes.length;
             var node, extents, endChildren;
-            var n0, n1, n2, p0, p1, p2;
-            var isInside, n, plane, d0, d1, d2;
+            var n0, n1, p0, p1;
+            var isInside, n, plane, d0, d1;
             var nodeIndex = 0;
 
             for (;;)
@@ -1071,11 +885,9 @@ AABBTree.prototype =
                 extents = node.extents;
                 n0 = extents[0];
                 n1 = extents[1];
-                n2 = extents[2];
-                p0 = extents[3];
-                p1 = extents[4];
-                p2 = extents[5];
-                //isInsidePlanesAABB
+                p0 = extents[2];
+                p1 = extents[3];
+                //isInsidePlanesBox
                 isInside = true;
                 n = 0;
                 do
@@ -1083,8 +895,7 @@ AABBTree.prototype =
                     plane = planes[n];
                     d0 = plane[0];
                     d1 = plane[1];
-                    d2 = plane[2];
-                    if ((d0 * (d0 < 0 ? n0 : p0) + d1 * (d1 < 0 ? n1 : p1) + d2 * (d2 < 0 ? n2 : p2)) < plane[3])
+                    if ((d0 * (d0 < 0 ? n0 : p0) + d1 * (d1 < 0 ? n1 : p1)) < plane[2])
                     {
                         isInside = false;
                         break;
@@ -1106,7 +917,7 @@ AABBTree.prototype =
                     }
                     else
                     {
-                        //isFullyInsidePlanesAABB
+                        //isFullyInsidePlanesBox
                         isInside = true;
                         n = 0;
                         do
@@ -1114,8 +925,7 @@ AABBTree.prototype =
                             plane = planes[n];
                             d0 = plane[0];
                             d1 = plane[1];
-                            d2 = plane[2];
-                            if ((d0 * (d0 > 0 ? n0 : p0) + d1 * (d1 > 0 ? n1 : p1) + d2 * (d2 > 0 ? n2 : p2)) < plane[3])
+                            if ((d0 * (d0 > 0 ? n0 : p0) + d1 * (d1 > 0 ? n1 : p1)) < plane[2])
                             {
                                 isInside = false;
                                 break;
@@ -1167,10 +977,8 @@ AABBTree.prototype =
         {
             var queryMinX = queryExtents[0];
             var queryMinY = queryExtents[1];
-            var queryMinZ = queryExtents[2];
-            var queryMaxX = queryExtents[3];
-            var queryMaxY = queryExtents[4];
-            var queryMaxZ = queryExtents[5];
+            var queryMaxX = queryExtents[2];
+            var queryMaxY = queryExtents[3];
             var nodes = this.nodes;
             var endNodeIndex = this.endNode;
             var node, extents, endChildren;
@@ -1183,16 +991,12 @@ AABBTree.prototype =
                 extents = node.extents;
                 var minX = extents[0];
                 var minY = extents[1];
-                var minZ = extents[2];
-                var maxX = extents[3];
-                var maxY = extents[4];
-                var maxZ = extents[5];
+                var maxX = extents[2];
+                var maxY = extents[3];
                 if (queryMinX <= maxX &&
                     queryMinY <= maxY &&
-                    queryMinZ <= maxZ &&
                     queryMaxX >= minX &&
-                    queryMaxY >= minY &&
-                    queryMaxZ >= minZ)
+                    queryMaxY >= minY)
                 {
                     if (node.externalNode) // Is leaf
                     {
@@ -1209,10 +1013,8 @@ AABBTree.prototype =
                     {
                         if (queryMaxX >= maxX &&
                             queryMaxY >= maxY &&
-                            queryMaxZ >= maxZ &&
                             queryMinX <= minX &&
-                            queryMinY <= minY &&
-                            queryMinZ <= minZ)
+                            queryMinY <= minY)
                         {
                             endChildren = (nodeIndex + node.escapeNodeOffset);
                             nodeIndex += 1;
@@ -1256,14 +1058,13 @@ AABBTree.prototype =
         }
     },
 
-    getSphereOverlappingNodes : function getSphereOverlappingNodesFn(center, radius, overlappingNodes)
+    getCircleOverlappingNodes : function getCircleOverlappingNodesFn(center, radius, overlappingNodes)
     {
         if (this.numExternalNodes > 0)
         {
             var radiusSquared = (radius * radius);
             var centerX = center[0];
             var centerY = center[1];
-            var centerZ = center[2];
             var nodes = this.nodes;
             var endNodeIndex = this.endNode;
             var node, extents;
@@ -1275,10 +1076,8 @@ AABBTree.prototype =
                 extents = node.extents;
                 var minX = extents[0];
                 var minY = extents[1];
-                var minZ = extents[2];
-                var maxX = extents[3];
-                var maxY = extents[4];
-                var maxZ = extents[5];
+                var maxX = extents[2];
+                var maxY = extents[3];
                 var totalDistance = 0, sideDistance;
                 if (centerX < minX)
                 {
@@ -1298,16 +1097,6 @@ AABBTree.prototype =
                 else if (centerY > maxY)
                 {
                     sideDistance = (centerY - maxY);
-                    totalDistance += (sideDistance * sideDistance);
-                }
-                if (centerZ < minZ)
-                {
-                    sideDistance = (minZ - centerZ);
-                    totalDistance += (sideDistance * sideDistance);
-                }
-                else if (centerZ > maxZ)
-                {
-                    sideDistance = (centerZ - maxZ);
                     totalDistance += (sideDistance * sideDistance);
                 }
                 if (totalDistance <= radiusSquared)
@@ -1361,22 +1150,18 @@ AABBTree.prototype =
                     extents = currentNode.extents;
                     var minX = extents[0];
                     var minY = extents[1];
-                    var minZ = extents[2];
-                    var maxX = extents[3];
-                    var maxY = extents[4];
-                    var maxZ = extents[5];
+                    var maxX = extents[2];
+                    var maxY = extents[3];
 
                     nodeIndex = currentNodeIndex;
                     for (;;)
                     {
                         node = nodes[nodeIndex];
                         extents = node.extents;
-                        if (minX <= extents[3] &&
-                            minY <= extents[4] &&
-                            minZ <= extents[5] &&
+                        if (minX <= extents[2] &&
+                            minY <= extents[3] &&
                             maxX >= extents[0] &&
-                            maxY >= extents[1] &&
-                            maxZ >= extents[2])
+                            maxY >= extents[1])
                         {
                             nodeIndex += 1;
                             if (node.externalNode) // Is leaf
@@ -1443,7 +1228,7 @@ AABBTree.prototype =
     }
 };
 
-AABBTree.rayTest = function aabbtreeRayTestFn(trees, ray, callback)
+BoxTree.rayTest = function boxtreeRayTestFn(trees, ray, callback)
 {
     // convert ray to parametric form
     var origin = ray.origin;
@@ -1452,13 +1237,10 @@ AABBTree.rayTest = function aabbtreeRayTestFn(trees, ray, callback)
     // values used throughout calculations.
     var o0 = origin[0];
     var o1 = origin[1];
-    var o2 = origin[2];
     var d0 = direction[0];
     var d1 = direction[1];
-    var d2 = direction[2];
     var id0 = 1 / d0;
     var id1 = 1 / d1;
-    var id2 = 1 / d2;
 
     // evaluate distance factor to a node's extents from ray origin, along direction
     // use this to induce an ordering on which nodes to check.
@@ -1466,15 +1248,12 @@ AABBTree.rayTest = function aabbtreeRayTestFn(trees, ray, callback)
     {
         var min0 = extents[0];
         var min1 = extents[1];
-        var min2 = extents[2];
-        var max0 = extents[3];
-        var max1 = extents[4];
-        var max2 = extents[5];
+        var max0 = extents[2];
+        var max1 = extents[3];
 
         // treat origin internal to extents as 0 distance.
         if (min0 <= o0 && o0 <= max0 &&
-            min1 <= o1 && o1 <= max1 &&
-            min2 <= o2 && o2 <= max2)
+            min1 <= o1 && o1 <= max1)
         {
             return 0.0;
         }
@@ -1523,36 +1302,6 @@ AABBTree.rayTest = function aabbtreeRayTestFn(trees, ray, callback)
         if (tymax < tmax)
         {
             tmax = tymax;
-        }
-
-        var tzmin, tzmax;
-        if (d2 >= 0)
-        {
-            // Deal with cases where d2 == 0
-            del = (min2 - o2);
-            tzmin = ((del === 0) ? 0 : (del * id2));
-            del = (max2 - o2);
-            tzmax = ((del === 0) ? 0 : (del * id2));
-        }
-        else
-        {
-            tzmin = ((max2 - o2) * id2);
-            tzmax = ((min2 - o2) * id2);
-        }
-
-        if ((tmin > tzmax) || (tzmin > tmax))
-        {
-            return undefined;
-        }
-
-        if (tzmin > tmin)
-        {
-            tmin = tzmin;
-        }
-
-        if (tzmax < tmax)
-        {
-            tmax = tzmax;
         }
 
         if (tmin < 0)
@@ -1662,9 +1411,9 @@ AABBTree.rayTest = function aabbtreeRayTestFn(trees, ray, callback)
 };
 
 // Constructor function
-AABBTree.create = function aabbtreeCreateFn(highQuality)
+BoxTree.create = function boxtreeCreateFn(highQuality)
 {
-    var t = new AABBTree();
+    var t = new BoxTree();
     t.clear();
     if (highQuality)
     {
@@ -1675,14 +1424,14 @@ AABBTree.create = function aabbtreeCreateFn(highQuality)
 
 // Detect correct typed arrays
 (function () {
-    AABBTree.prototype.arrayConstructor = Array;
+    BoxTree.prototype.arrayConstructor = Array;
     if (typeof Float32Array !== "undefined")
     {
         var testArray = new Float32Array(4);
         var textDescriptor = Object.prototype.toString.call(testArray);
         if (textDescriptor === '[object Float32Array]')
         {
-            AABBTree.prototype.arrayConstructor = Float32Array;
+            BoxTree.prototype.arrayConstructor = Float32Array;
         }
     }
 }());

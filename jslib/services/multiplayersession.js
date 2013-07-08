@@ -77,7 +77,10 @@ MultiPlayerSession.prototype =
             url: '/api/v1/multiplayer/session/make-public',
             method: 'POST',
             data: {'session': this.sessionId},
-            callback: callbackFn,
+            callback: function () {
+                TurbulenzBridge.triggerMultiplayerSessionMakePublic();
+                callbackFn();
+            },
             requestHandler: this.requestHandler
         });
     },
@@ -91,6 +94,9 @@ MultiPlayerSession.prototype =
 
             var playerId = this.playerId;
             this.playerId = null;
+
+            var gameSessionId = this.gameSessionId;
+            this.gameSessionId = null;
 
             var socket = this.socket;
             if (socket)
@@ -118,7 +124,11 @@ MultiPlayerSession.prototype =
             Utilities.ajax({
                 url: '/api/v1/multiplayer/session/leave',
                 method: 'POST',
-                data: {'session': sessionId, 'player': playerId},
+                data: {
+                    'session': sessionId,
+                    'player': playerId,
+                    'gameSessionId': gameSessionId
+                },
                 callback: callbackFn,
                 requestHandler: this.requestHandler
             });
@@ -158,6 +168,7 @@ MultiPlayerSession.create = function multiPlayerCreate(sessionData, createdCB, e
     var ms = new MultiPlayerSession();
     ms.sessionId = sessionData.sessionid;
     ms.playerId = sessionData.playerid;
+    ms.gameSessionId = sessionData.gameSessionId;
     ms.socket = null;
     ms.queue = [];
     ms.onmessage = null;
@@ -247,7 +258,8 @@ MultiPlayerSession.create = function multiPlayerCreate(sessionData, createdCB, e
             ms.service.request({
                 url: '/api/v1/multiplayer/session/join',
                 method: 'POST',
-                data: {'session': ms.sessionId, 'player': ms.playerId},
+                data: {'session': ms.sessionId,
+                    'gameSessionId': ms.gameSessionId},
                 callback: requestCallback,
                 requestHandler: ms.requestHandler
             });

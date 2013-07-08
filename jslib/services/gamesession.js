@@ -27,6 +27,8 @@ GameSession.prototype =
     // It will not be called if destroy is called in TurbulenzEngine.onUnload
     destroy: function gameSessionDestroyFn(callbackFn)
     {
+        TurbulenzEngine.clearInterval(this.intervalID);
+
         if (this.gameSessionId)
         {
             // we can't wait for the callback as the browser doesn't
@@ -49,5 +51,74 @@ GameSession.prototype =
                 TurbulenzEngine.setTimeout(callbackFn, 0);
             }
         }
+    },
+    
+    /**
+     * Handle player metadata
+     */
+    setTeamInfo : function gameSessionSetTeamInfoFn(teamList)
+    {
+        this.info.sessionData.teamList = teamList;
+    },
+    
+    setPlayerInfo : function gameSessionSetPlayerInfoFn(playerId, data)
+    {
+        var playerData = this.info.playerSessionData[playerId];
+        if (!playerData)
+        {
+            playerData = this.info.playerSessionData[playerId] = {};
+        }
+        
+        for (var type in data)
+        {
+            if (data.hasOwnProperty(type))
+            {
+                if (!this.templatePlayerData.hasOwnProperty(type))
+                {
+                    throw "unknown session data property " + type;
+                }
+                playerData[type] = data[type];
+            }
+        }
+    },
+    
+    removePlayerInfo : function gameSessionRemovePlayerInfoFn(playerId)
+    {
+        delete this.info.playerSessionData[playerId];
+    },
+    
+    clearAllPlayerInfo : function clearAllPlayerInfoFn()
+    {
+        this.info.playerSessionData = {};
+    },
+    
+    update: function updateFn()
+    {
+        this.info.sessionData.gameSessionId = this.gameSessionId;
+        TurbulenzBridge.setGameSessionInfo(JSON.stringify(this.info));
     }
+};
+
+GameSession.create = function gameSessionCreateFn()
+{
+    var game = new GameSession();
+    
+    game.info = {
+        sessionData: {},
+        playerSessionData: {}
+    };
+    
+    game.templatePlayerData = {
+        team: null,
+        color: null,
+        status: null,
+        rank: null,
+        score: null,
+        sortkey: null
+    };
+
+    game.intervalID = TurbulenzEngine.setInterval(function () {
+        game.update();
+    }, 500);
+    return game;
 };

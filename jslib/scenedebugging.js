@@ -3442,9 +3442,9 @@ Scene.prototype.getVisibilityMetrics = function getVisibilityMetricsFn()
     for (n = 0; n < numLights; n += 1)
     {
         var lightInstance = visibleLights[n];
-        if (lightInstance.diffuseDrawParametersQueue) // Forward rendering
+        if (lightInstance.numVisibleDrawParameters) // Forward rendering
         {
-            numRenderables += lightInstance.diffuseDrawParametersQueue.length;
+            numRenderables += lightInstance.numVisibleDrawParameters;
         }
         var shadowMap = lightInstance.shadowMap;
         if (shadowMap)
