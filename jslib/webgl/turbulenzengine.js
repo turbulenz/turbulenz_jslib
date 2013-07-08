@@ -12,7 +12,7 @@
 function WebGLTurbulenzEngine() {}
 WebGLTurbulenzEngine.prototype = {
 
-    version : '0.16.0',
+    version : '0.17.0',
 
     setInterval: function (f, t)
     {
@@ -277,7 +277,8 @@ WebGLTurbulenzEngine.prototype = {
 
     getPluginObject : function ()
     {
-        if (!this.plugin)
+        if (!this.plugin &&
+            this.pluginId)
         {
             this.plugin = document.getElementById(this.pluginId);
         }
@@ -439,12 +440,7 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
         };
     }
 
-    var requestAnimationFrame = (window.requestAnimationFrame       ||
-                                 window.webkitRequestAnimationFrame ||
-                                 window.mozRequestAnimationFrame    ||
-                                 window.oRequestAnimationFrame      ||
-                                 window.msRequestAnimationFrame);
-    if (requestAnimationFrame)
+    if (window.mozRequestAnimationFrame)
     {
         tz.setInterval = function (f, t)
         {
@@ -454,7 +450,7 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
                 var interval = {
                     enabled: true
                 };
-                var wrap1 = function wrap1()
+                var wrap1 = function wrap1Fn()
                 {
                     if (interval.enabled)
                     {
@@ -463,10 +459,12 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
                         {
                             f();
                         }
-                        requestAnimationFrame(wrap1, that.canvas);
+                        window.mozRequestAnimationFrame();
                     }
                 };
-                requestAnimationFrame(wrap1, that.canvas);
+                interval.callback = wrap1;
+                window.addEventListener("MozBeforePaint", wrap1, false);
+                window.mozRequestAnimationFrame();
                 return interval;
             }
             else
@@ -488,12 +486,72 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
             if (typeof i === 'object')
             {
                 i.enabled = false;
+                window.removeEventListener("MozBeforePaint", i.callback, false);
+                i.callback = null;
             }
             else
             {
                 window.clearInterval(i);
             }
         };
+    }
+    else
+    {
+        var requestAnimationFrame = (window.requestAnimationFrame       ||
+                                     window.webkitRequestAnimationFrame ||
+                                     window.oRequestAnimationFrame      ||
+                                     window.msRequestAnimationFrame);
+        if (requestAnimationFrame)
+        {
+            tz.setInterval = function (f, t)
+            {
+                var that = this;
+                if (Math.abs(t - (1000 / 60)) <= 1)
+                {
+                    var interval = {
+                        enabled: true
+                    };
+                    var wrap1 = function wrap1()
+                    {
+                        if (interval.enabled)
+                        {
+                            that.updateTime();
+                            if (!that.isUnloading())
+                            {
+                                f();
+                            }
+                            requestAnimationFrame(wrap1, that.canvas);
+                        }
+                    };
+                    requestAnimationFrame(wrap1, that.canvas);
+                    return interval;
+                }
+                else
+                {
+                    var wrap2 = function wrap2()
+                    {
+                        that.updateTime();
+                        if (!that.isUnloading())
+                        {
+                            f();
+                        }
+                    };
+                    return window.setInterval(wrap2, t);
+                }
+            };
+
+            tz.clearInterval = function (i)
+            {
+                if (typeof i === 'object')
+                {
+                    i.enabled = false;
+                }
+                else
+                {
+                    window.clearInterval(i);
+                }
+            };
+        }
     }
 
     tz.canvas = canvas;

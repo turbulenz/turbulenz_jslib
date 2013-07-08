@@ -1,4 +1,5 @@
 // Copyright (c) 2009-2011 Turbulenz Limited
+/*global Utilities: false*/
 
 "use strict";
 

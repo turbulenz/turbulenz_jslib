@@ -576,45 +576,57 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
     c.padforward = 0.0;
     c.padbackward = 0.0;
 
-    var oldOnKeyDown, oldOnKeyUp, oldOnMouseMove, oldOnPadMove;
+    var oldOnKeyDown, oldOnKeyUp, oldOnMouseMove, oldOnPadMove,
+        keyCodes;
+
     if (id)
     {
         oldOnKeyDown = id.onkeydown;
         oldOnKeyUp = id.onkeyup;
         oldOnMouseMove = id.onmousemove;
         oldOnPadMove = id.onpadmove;
+
+        keyCodes = id.keyCodes;
     }
 
     // keyboard handling
     function onkeydownFn(keynum)
     {
-        if (keynum === 65 || keynum === 37)
+        switch (keynum)
         {
+        case keyCodes.A:
+        case keyCodes.LEFT:
+        case keyCodes.NUMPAD_4:
             c.left = 1.0;
-        }
-        else if (keynum === 68 || keynum === 39)
-        {
+            break;
+
+        case keyCodes.D:
+        case keyCodes.RIGHT:
+        case keyCodes.NUMPAD_6:
             c.right = 1.0;
-        }
-        else if (keynum === 87 || keynum === 38)
-        {
+            break;
+
+        case keyCodes.W:
+        case keyCodes.UP:
+        case keyCodes.NUMPAD_8:
             c.forward = 1.0;
-        }
-        else if (keynum === 83 || keynum === 40)
-        {
+            break;
+
+        case keyCodes.S:
+        case keyCodes.DOWN:
+        case keyCodes.NUMPAD_2:
             c.backward = 1.0;
-        }
-        else if (keynum === 69 || keynum === 33)
-        {
+            break;
+
+        case keyCodes.E:
+        case keyCodes.NUMPAD_9:
             c.up = 1.0;
-        }
-        else if (keynum === 81 || keynum === 36)
-        {
+            break;
+
+        case keyCodes.Q:
+        case keyCodes.NUMPAD_7:
             c.up = -1.0;
-        }
-        else if (keynum === 13)
-        {
-            gd.fullscreen = !gd.fullscreen;
+            break;
         }
 
         if (oldOnKeyDown)
@@ -625,25 +637,42 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
 
     function onkeyupFn(keynum)
     {
-        if (keynum === 65 || keynum === 37)
+        switch (keynum)
         {
+        case keyCodes.A:
+        case keyCodes.LEFT:
+        case keyCodes.NUMPAD_4:
             c.left = 0.0;
-        }
-        else if (keynum === 68 || keynum === 39)
-        {
+            break;
+
+        case keyCodes.D:
+        case keyCodes.RIGHT:
+        case keyCodes.NUMPAD_6:
             c.right = 0.0;
-        }
-        else if (keynum === 87 || keynum === 38)
-        {
+            break;
+
+        case keyCodes.W:
+        case keyCodes.UP:
+        case keyCodes.NUMPAD_8:
             c.forward = 0.0;
-        }
-        else if (keynum === 83 || keynum === 40)
-        {
+            break;
+
+        case keyCodes.S:
+        case keyCodes.DOWN:
+        case keyCodes.NUMPAD_2:
             c.backward = 0.0;
-        }
-        else if (keynum === 69 || keynum === 81 || keynum === 33 || keynum === 36)
-        {
+            break;
+
+        case keyCodes.E:
+        case keyCodes.NUMPAD_9:
+        case keyCodes.Q:
+        case keyCodes.NUMPAD_7:
             c.up = 0.0;
+            break;
+
+        case keyCodes.RETURN:
+            gd.fullscreen = !gd.fullscreen;
+            break;
         }
 
         if (oldOnKeyUp)
@@ -662,7 +691,7 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
 
         c.onkeyup = function onkeyupLogFn(keynum)
         {
-            if (keynum === 46)
+            if (keynum === keyCodes.BACKSPACE)
             {
                 log.innerHTML = "";
             }
@@ -683,11 +712,11 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
     c.onmousemove = function onmousemoveFn(deltaX, deltaY, deltaZ)
     {
         c.turn  += deltaX;
-        c.pitch += deltaY;
+        c.pitch -= deltaY;
 
         if (deltaZ !== 0.0)
         {
-            c.step = (deltaZ / 10.0);
+            c.step = deltaZ * 5;
         }
 
         if (oldOnMouseMove)
@@ -697,7 +726,7 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
     };
 
     // Pad handling
-    c.onpadmove = function onpadmoveFn(lX, lY, lZ, rX, rY, rZ)
+    c.onpadmove = function onpadmoveFn(lX, lY, lZ, rX, rY, rZ, dpadState)
     {
         c.turn  += lX * 10.0;
         c.pitch += lY * 10.0;
@@ -726,7 +755,7 @@ CameraController.create = function cameraControllerCreateFn(gd, id, camera, log)
 
         if (oldOnPadMove)
         {
-            oldOnPadMove(lX, lY, lZ, rX, rY, rZ);
+            oldOnPadMove(lX, lY, lZ, rX, rY, rZ, dpadState);
         }
     };
 

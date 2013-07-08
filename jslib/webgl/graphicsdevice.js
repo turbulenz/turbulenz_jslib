@@ -3648,6 +3648,30 @@ WebGLGraphicsDevice.prototype =
             return false;
         }
     },
+	
+	getSupportedDisplayModes : function getSupportedDisplayModesFn()
+	{
+		var args = Array.prototype.slice.call(arguments);
+		
+		if (args[0] && args[1])
+		{
+			var width = args[0];
+			var height = args[1];
+			
+			if (screen.width >= width && screen.height >= height)
+			{
+				return [{ width: screen.width, height: screen.height }];
+			}
+			else
+			{
+				return [];
+			}
+		}
+		else
+		{
+			return [{ width: screen.width, height: screen.height }];
+		}
+	},
 
     getScreenshot : function getScreenshotFn()
     {

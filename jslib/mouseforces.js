@@ -145,7 +145,7 @@ MouseForces.create = function mouseForcesCreateFn(gd, id, md, pd, dragExtentsMin
     c.onmousemove = function onmousemoveFn(deltaX, deltaY, deltaZ)
     {
         c.mouseX += (deltaX / gd.width);
-        c.mouseY += (deltaY / gd.height);
+        c.mouseY -= (deltaY / gd.height);
         c.mouseZ += deltaZ;
 
         if (oldmousemove)

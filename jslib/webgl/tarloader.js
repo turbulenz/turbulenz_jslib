@@ -186,7 +186,7 @@ TARLoader.create = function tgaLoaderFn(params)
                         {
                             buffer = xhr.response;
                         }
-                        else if (xhr.mozResponseArrayBuffer !== null)
+                        else if (xhr.mozResponseArrayBuffer)
                         {
                             buffer = xhr.mozResponseArrayBuffer;
                         }
