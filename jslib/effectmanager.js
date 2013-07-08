@@ -1,6 +1,6 @@
 /* This file was generated from TypeScript source tslib/effectmanager.ts */
 
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2013 Turbulenz Limited
 /*global Utilities: false*/
 /// <reference path="turbulenz.d.ts" />
 /// <reference path="shadermanager.ts" />
@@ -67,7 +67,7 @@ var Effect = (function () {
         if(prepareObject) {
             prepareObject.prepare(renderable);
         } else {
-            Utilities.assert(false, "Unsupported or missing geometryType");
+            debug.abort("Unsupported or missing geometryType");
         }
     };
     return Effect;
@@ -87,7 +87,7 @@ var EffectManager = (function () {
         return effectManager;
     };
     EffectManager.prototype.add = function (effect) {
-        Utilities.assert(this.effects[effect.name] === undefined);
+        debug.assert(this.effects[effect.name] === undefined);
         this.effects[effect.name] = effect;
     };
     EffectManager.prototype.remove = function (name) {

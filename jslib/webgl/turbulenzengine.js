@@ -9,7 +9,7 @@
 //
 var WebGLTurbulenzEngine = (function () {
     function WebGLTurbulenzEngine() {
-        this.version = '0.25.1.0';
+        this.version = '0.26.0.0';
     }
     WebGLTurbulenzEngine.prototype.setInterval = function (f, t) {
         var that = this;
@@ -174,7 +174,10 @@ var WebGLTurbulenzEngine = (function () {
                     if("" === xhrResponseText) {
                         xhrResponseText = null;
                     }
-                    if(null === xhr.getResponseHeader("Content-Type") && "" === xhr.getAllResponseHeaders()) {
+                    // Fix for loading from file
+                    if(xhrStatus === 0 && xhrResponseText && window.location.protocol === "file:") {
+                        xhrStatus = 200;
+                    } else if(null === xhr.getResponseHeader("Content-Type") && "" === xhr.getAllResponseHeaders()) {
                         // Sometimes the browser sets status to 200 OK
                         // when the connection is closed before the
                         // message is sent (weird!).  In order to address
@@ -185,10 +188,6 @@ var WebGLTurbulenzEngine = (function () {
                         // even for valid responses...
                         callback(null, 0);
                         return;
-                    }
-                    // Fix for loading from file
-                    if(xhrStatus === 0 && xhrResponseText && window.location.protocol === "file:") {
-                        xhrStatus = 200;
                     }
                     // Invoke the callback
                     if(xhrStatus !== 0) {

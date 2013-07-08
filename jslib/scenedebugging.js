@@ -1283,7 +1283,7 @@ Scene.prototype.createRoundedPrimitive = function sceneCreateRoundedPrimitiveFn(
         // There are infinitely many of these, we have just chosen to build one with the X-axis
         // If the normal is aligned to the X-axis then calculate again with the Y-axis
         var vX = md.v3Cross(normal, md.v3BuildXAxis());
-        if(md.v3LengthSq(vX) < 1e-7) {
+        if(md.v3LengthSq(vX) < 0.0000001) {
             md.v3Cross(normal, md.v3BuildYAxis(), vX);
         }
         md.v3Normalize(vX, vX);
@@ -1547,7 +1547,7 @@ Scene.prototype.createConvexHull = function sceneCreateConvexHull(dw, body, numR
         // There are infinitely many of these, we have just chosen to build one with the X-axis
         // If the normal is aligned to the X-axis then calculate again with the Y-axis
         var vX = md.v3Cross(normal, md.v3BuildXAxis());
-        if(md.v3LengthSq(vX) < 1e-7) {
+        if(md.v3LengthSq(vX) < 0.0000001) {
             md.v3Cross(normal, md.v3BuildYAxis(), vX);
         }
         md.v3Normalize(vX, vX);
@@ -2292,7 +2292,7 @@ Scene.prototype.updateNormals = function updateNormalsFn(gd, scale, drawNormals,
                         binormalRenderable = null;
                         var offset = 0;
                         var semantic, attribute;
-                        Utilities.assert(numAttributes === numSemantics);
+                        debug.assert(numAttributes === numSemantics);
                         for(var n = 0; n < numSemantics; n += 1) {
                             semantic = semantics[n];
                             attribute = attributes[n];
@@ -2314,7 +2314,7 @@ Scene.prototype.updateNormals = function updateNormalsFn(gd, scale, drawNormals,
                             var numComponents = this.attributeComponents(attribute);
                             offset += numComponents;
                         }
-                        Utilities.assert(positionOffset !== -1);
+                        debug.assert(positionOffset !== -1);
                         renderable.normalsInfo = {
                             stride: stride,
                             positionOffset: positionOffset,
@@ -2400,7 +2400,7 @@ Scene.prototype.attributeComponents = function attributeComponentsFn(attribute) 
         this.vertexAttrToNumComponents = attrToComponents;
     }
     var numComponents = attrToComponents[attribute];
-    Utilities.assert(numComponents, "Unknown attribute type");
+    debug.assert(numComponents, "Unknown attribute type");
     return numComponents;
 };
 //

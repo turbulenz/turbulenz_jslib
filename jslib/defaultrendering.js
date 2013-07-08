@@ -57,7 +57,7 @@ var DefaultRendering = (function () {
                     passIndex = drawParameters.userData.passIndex;
                     if(passIndex === transparent) {
                         if(renderable.sharedMaterial.meta.far) {
-                            drawParameters.sortKey = 1e+38;
+                            drawParameters.sortKey = 1.e38;
                         } else {
                             drawParameters.sortKey = renderable.distance;
                         }
@@ -90,10 +90,7 @@ var DefaultRendering = (function () {
         /* gd, deviceWidth, deviceHeight */ return true;
     };
     DefaultRendering.prototype.draw = function (gd, clearColor, drawDecalsFn, drawTransparentFn, drawDebugFn) {
-        var globalTechniqueParameters = this.globalTechniqueParameters;
-        var globalTechniqueParametersArray = [
-            globalTechniqueParameters
-        ];
+        var globalTechniqueParametersArray = this.globalTechniqueParametersArray;
         gd.clear(clearColor, 1.0, 0);
         if(this.wireframe) {
             this.scene.drawWireframe(gd, this.sm, this.camera, this.wireframeInfo);
@@ -142,6 +139,7 @@ var DefaultRendering = (function () {
         return this.defaultSkinBufferSize;
     };
     DefaultRendering.prototype.destroy = function () {
+        delete this.globalTechniqueParametersArray;
         delete this.globalTechniqueParameters;
         delete this.lightPosition;
         delete this.eyePosition;
@@ -190,8 +188,11 @@ var DefaultRendering = (function () {
         // do this once instead of for every update
         var rendererInfo = node.rendererInfo;
         techniqueParameters.worldViewProjection = rendererInfo.worldViewProjection;
-        techniqueParameters.eyePosition = rendererInfo.eyePosition;
         techniqueParameters.lightPosition = rendererInfo.lightPosition;
+        var techniqueName = this.technique.name;
+        if(techniqueName.indexOf("flat") === -1 && techniqueName.indexOf("lambert") === -1) {
+            techniqueParameters.eyePosition = rendererInfo.eyePosition;
+        }
         var skinController = geometryInstance.skinController;
         if(skinController) {
             techniqueParameters.skinBones = skinController.output;
@@ -221,6 +222,9 @@ var DefaultRendering = (function () {
             ambientColor: md.v3Build(0.2, 0.2, 0.3),
             time: 0.0
         });
+        dr.globalTechniqueParametersArray = [
+            dr.globalTechniqueParameters
+        ];
         dr.passes = [
             [], 
             [], 
@@ -233,10 +237,6 @@ var DefaultRendering = (function () {
         shaderManager.load("shaders/defaultrendering.cgfx", onShaderLoaded);
         shaderManager.load("shaders/debug.cgfx");
         // Update effects
-        var m43MulM44 = md.m43MulM44;
-        var m43Inverse = md.m43Inverse;
-        var m33InverseTranspose = md.m33InverseTranspose;
-        var m43TransformPoint = md.m43TransformPoint;
         var updateNodeRendererInfo = function updateNodeRendererInfoFn(node, rendererInfo, camera) {
             var lightPositionUpdated = dr.lightPositionUpdated;
             var eyePositionUpdated = dr.eyePositionUpdated;
@@ -245,15 +245,15 @@ var DefaultRendering = (function () {
                 rendererInfo.worldUpdate = node.worldUpdate;
                 lightPositionUpdated = true;
                 eyePositionUpdated = true;
-                rendererInfo.worldInverse = m43Inverse.call(md, matrix, rendererInfo.worldInverse);
+                rendererInfo.worldInverse = md.m43Inverse(matrix, rendererInfo.worldInverse);
             }
             if(lightPositionUpdated) {
-                rendererInfo.lightPosition = m43TransformPoint.call(md, rendererInfo.worldInverse, dr.lightPosition, rendererInfo.lightPosition);
+                rendererInfo.lightPosition = md.m43TransformPoint(rendererInfo.worldInverse, dr.lightPosition, rendererInfo.lightPosition);
             }
             if(eyePositionUpdated) {
-                rendererInfo.eyePosition = m43TransformPoint.call(md, rendererInfo.worldInverse, dr.eyePosition, rendererInfo.eyePosition);
+                rendererInfo.eyePosition = md.m43TransformPoint(rendererInfo.worldInverse, dr.eyePosition, rendererInfo.eyePosition);
             }
-            rendererInfo.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, rendererInfo.worldViewProjection);
+            rendererInfo.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, rendererInfo.worldViewProjection);
         };
         var defaultUpdate = function defaultUpdateFn(camera) {
             var node = this.node;
@@ -278,14 +278,14 @@ var DefaultRendering = (function () {
         var debugUpdate = function debugUpdateFn(camera) {
             var matrix = this.node.world;
             var techniqueParameters = this.techniqueParameters;
-            techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
-            techniqueParameters.worldInverseTranspose = m33InverseTranspose.call(md, matrix, techniqueParameters.worldInverseTranspose);
+            techniqueParameters.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
+            techniqueParameters.worldInverseTranspose = md.m33InverseTranspose(matrix, techniqueParameters.worldInverseTranspose);
         };
         var debugSkinnedUpdate = function debugSkinnedUpdateFn(camera) {
             var matrix = this.node.world;
             var techniqueParameters = this.techniqueParameters;
-            techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
-            techniqueParameters.worldInverseTranspose = m33InverseTranspose.call(md, matrix, techniqueParameters.worldInverseTranspose);
+            techniqueParameters.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
+            techniqueParameters.worldInverseTranspose = md.m33InverseTranspose(matrix, techniqueParameters.worldInverseTranspose);
             var skinController = this.skinController;
             if(skinController) {
                 skinController.update();
@@ -301,7 +301,7 @@ var DefaultRendering = (function () {
             if(rendererInfo.worldUpdateEnv !== node.worldUpdate) {
                 rendererInfo.worldUpdateEnv = node.worldUpdate;
                 var matrix = node.world;
-                rendererInfo.worldInverseTranspose = m33InverseTranspose.call(md, matrix, rendererInfo.worldInverseTranspose);
+                rendererInfo.worldInverseTranspose = md.m33InverseTranspose(matrix, rendererInfo.worldInverseTranspose);
             }
             var techniqueParameters = this.techniqueParameters;
             techniqueParameters.worldInverseTranspose = rendererInfo.worldInverseTranspose;
@@ -329,21 +329,30 @@ var DefaultRendering = (function () {
                     techniqueParameters.materialColor = md.v4BuildOne();
                 }
             } else if(diffuse.length === 4) {
-                techniqueParameters.diffuse = techniqueParameters.diffuse_map;
                 techniqueParameters.materialColor = md.v4Build.apply(md, diffuse);
+                diffuse = techniqueParameters.diffuse_map;
+                techniqueParameters.diffuse = diffuse;
             }
-        };
-        var flatPrepare = function flatPrepareFn(geometryInstance) {
-            defaultPrepare.call(this, geometryInstance);
-            //For untextured objects we need to switch techniques.
-            var techniqueParameters = geometryInstance.sharedMaterial.techniqueParameters;
-            if(!techniqueParameters.diffuse) {
+            if(!diffuse) {
                 var shader = shaderManager.get("shaders/defaultrendering.cgfx");
                 if(geometryInstance.geometryType === "skinned") {
                     geometryInstance.drawParameters[0].technique = shader.getTechnique("flat_skinned");
                 } else {
                     geometryInstance.drawParameters[0].technique = shader.getTechnique("flat");
                 }
+            }
+        };
+        var noDiffusePrepare = function noDiffusePrepareFn(geometryInstance) {
+            DefaultRendering.defaultPrepareFn.call(this, geometryInstance);
+            //For untextured objects we need to choose a technique that uses materialColor instead.
+            var techniqueParameters = geometryInstance.sharedMaterial.techniqueParameters;
+            var diffuse = techniqueParameters.diffuse;
+            if(diffuse === undefined) {
+                if(!techniqueParameters.materialColor) {
+                    techniqueParameters.materialColor = md.v4BuildOne();
+                }
+            } else if(diffuse.length === 4) {
+                techniqueParameters.materialColor = md.v4Build.apply(md, diffuse);
             }
         };
         var loadTechniques = function loadTechniquesFn(shaderManager) {
@@ -368,7 +377,7 @@ var DefaultRendering = (function () {
         effect = Effect.create("constant");
         effectsManager.add(effect);
         effectTypeData = {
-            prepare: flatPrepare,
+            prepare: defaultPrepare,
             shaderName: "shaders/defaultrendering.cgfx",
             techniqueName: "flat",
             update: defaultUpdate,
@@ -377,7 +386,7 @@ var DefaultRendering = (function () {
         effectTypeData.loadTechniques(shaderManager);
         effect.add(rigid, effectTypeData);
         effectTypeData = {
-            prepare: flatPrepare,
+            prepare: defaultPrepare,
             shaderName: "shaders/defaultrendering.cgfx",
             techniqueName: "flat_skinned",
             update: defaultSkinnedUpdate,
@@ -391,7 +400,7 @@ var DefaultRendering = (function () {
         effect = Effect.create("lambert");
         effectsManager.add(effect);
         effectTypeData = {
-            prepare: flatPrepare,
+            prepare: defaultPrepare,
             shaderName: "shaders/defaultrendering.cgfx",
             techniqueName: "lambert",
             update: defaultUpdate,
@@ -400,7 +409,7 @@ var DefaultRendering = (function () {
         effectTypeData.loadTechniques(shaderManager);
         effect.add(rigid, effectTypeData);
         effectTypeData = {
-            prepare: flatPrepare,
+            prepare: defaultPrepare,
             shaderName: "shaders/defaultrendering.cgfx",
             techniqueName: "lambert_skinned",
             update: defaultSkinnedUpdate,
@@ -460,7 +469,7 @@ var DefaultRendering = (function () {
         effect = Effect.create("phong");
         effectsManager.add(effect);
         effectTypeData = {
-            prepare: flatPrepare,
+            prepare: defaultPrepare,
             shaderName: "shaders/defaultrendering.cgfx",
             techniqueName: "phong",
             update: defaultUpdate,
@@ -469,7 +478,7 @@ var DefaultRendering = (function () {
         effectTypeData.loadTechniques(shaderManager);
         effect.add(rigid, effectTypeData);
         effectTypeData = {
-            prepare: flatPrepare,
+            prepare: defaultPrepare,
             shaderName: "shaders/defaultrendering.cgfx",
             techniqueName: "phong_skinned",
             update: defaultSkinnedUpdate,
@@ -497,7 +506,7 @@ var DefaultRendering = (function () {
         effect = Effect.create("debug_normals");
         effectsManager.add(effect);
         effectTypeData = {
-            prepare: defaultPrepare,
+            prepare: DefaultRendering.defaultPrepareFn,
             shaderName: "shaders/debug.cgfx",
             techniqueName: "debug_normals",
             update: debugUpdate,
@@ -506,7 +515,7 @@ var DefaultRendering = (function () {
         effectTypeData.loadTechniques(shaderManager);
         effect.add(rigid, effectTypeData);
         effectTypeData = {
-            prepare: defaultPrepare,
+            prepare: DefaultRendering.defaultPrepareFn,
             shaderName: "shaders/debug.cgfx",
             techniqueName: "debug_normals_skinned",
             update: debugSkinnedUpdate,
@@ -520,7 +529,7 @@ var DefaultRendering = (function () {
         effect = Effect.create("debug_tangents");
         effectsManager.add(effect);
         effectTypeData = {
-            prepare: defaultPrepare,
+            prepare: DefaultRendering.defaultPrepareFn,
             shaderName: "shaders/debug.cgfx",
             techniqueName: "debug_tangents",
             update: debugUpdate,
@@ -529,7 +538,7 @@ var DefaultRendering = (function () {
         effectTypeData.loadTechniques(shaderManager);
         effect.add(rigid, effectTypeData);
         effectTypeData = {
-            prepare: defaultPrepare,
+            prepare: DefaultRendering.defaultPrepareFn,
             shaderName: "shaders/debug.cgfx",
             techniqueName: "debug_tangents_skinned",
             update: debugSkinnedUpdate,
@@ -543,7 +552,7 @@ var DefaultRendering = (function () {
         effect = Effect.create("debug_binormals");
         effectsManager.add(effect);
         effectTypeData = {
-            prepare: defaultPrepare,
+            prepare: DefaultRendering.defaultPrepareFn,
             shaderName: "shaders/debug.cgfx",
             techniqueName: "debug_binormals",
             update: debugUpdate,
@@ -552,7 +561,7 @@ var DefaultRendering = (function () {
         effectTypeData.loadTechniques(shaderManager);
         effect.add(rigid, effectTypeData);
         effectTypeData = {
-            prepare: defaultPrepare,
+            prepare: DefaultRendering.defaultPrepareFn,
             shaderName: "shaders/debug.cgfx",
             techniqueName: "debug_binormals_skinned",
             update: debugSkinnedUpdate,
@@ -1032,7 +1041,7 @@ var DefaultRendering = (function () {
         effect = Effect.create("glass_env");
         effectsManager.add(effect);
         effectTypeData = {
-            prepare: defaultPrepare,
+            prepare: noDiffusePrepare,
             shaderName: "shaders/defaultrendering.cgfx",
             techniqueName: "glass_env",
             update: defaultEnvUpdate,
@@ -1069,7 +1078,7 @@ var DefaultRendering = (function () {
         effect = Effect.create("skybox");
         effectsManager.add(effect);
         effectTypeData = {
-            prepare: defaultPrepare,
+            prepare: noDiffusePrepare,
             shaderName: "shaders/defaultrendering.cgfx",
             techniqueName: "skybox",
             update: defaultEnvUpdate,
@@ -1083,7 +1092,7 @@ var DefaultRendering = (function () {
         effect = Effect.create("env");
         effectsManager.add(effect);
         effectTypeData = {
-            prepare: defaultPrepare,
+            prepare: noDiffusePrepare,
             shaderName: "shaders/defaultrendering.cgfx",
             techniqueName: "env",
             update: defaultEnvUpdate,
@@ -1092,7 +1101,7 @@ var DefaultRendering = (function () {
         effectTypeData.loadTechniques(shaderManager);
         effect.add(rigid, effectTypeData);
         effectTypeData = {
-            prepare: defaultPrepare,
+            prepare: noDiffusePrepare,
             shaderName: "shaders/defaultrendering.cgfx",
             techniqueName: "env_skinned",
             update: defaultEnvSkinnedUpdate,
@@ -1121,7 +1130,7 @@ var DefaultRendering = (function () {
         effect = Effect.create("glowmap");
         effectsManager.add(effect);
         effectTypeData = {
-            prepare: defaultPrepare,
+            prepare: noDiffusePrepare,
             shaderName: "shaders/defaultrendering.cgfx",
             techniqueName: "glowmap",
             update: defaultUpdate,
@@ -1130,7 +1139,7 @@ var DefaultRendering = (function () {
         effectTypeData.loadTechniques(shaderManager);
         effect.add(rigid, effectTypeData);
         effectTypeData = {
-            prepare: defaultPrepare,
+            prepare: noDiffusePrepare,
             shaderName: "shaders/defaultrendering.cgfx",
             techniqueName: "glowmap_skinned",
             update: defaultSkinnedUpdate,
@@ -1138,6 +1147,20 @@ var DefaultRendering = (function () {
         };
         effectTypeData.loadTechniques(shaderManager);
         effect.add(skinned, effectTypeData);
+        //
+        // lightmap
+        //
+        effect = Effect.create("lightmap");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "lightmap",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
         return dr;
     };
     return DefaultRendering;

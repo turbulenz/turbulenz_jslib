@@ -1547,7 +1547,7 @@ var Draw2D = (function () {
             renderable: false,
             dynamic: false,
             data: [
-                255
+                0xff
             ]
         });
         // Draw call methods.

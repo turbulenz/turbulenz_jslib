@@ -36,6 +36,7 @@ var Light = (function () {
         clone.shadows = this.shadows;
         clone.dynamicshadows = this.dynamicshadows;
         clone.disabled = this.disabled;
+        clone.dynamic = this.dynamic;
         clone.techniqueParameters = this.techniqueParameters;
         return clone;
     };
@@ -51,7 +52,6 @@ var Light = (function () {
     function create(params) {
         var light = new Light();
         var mathDevice = TurbulenzEngine.getMathDevice();
-        var v3Build = mathDevice.v3Build;
         var abs = Math.abs;
         var max = Math.max;
         if(params.name) {
@@ -71,10 +71,14 @@ var Light = (function () {
         var target = params.target;
         if(target || light.spot) {
             if(!target) {
-                target = v3Build.call(mathDevice, 0, 0, -(params.radius || 1));
+                target = mathDevice.v3Build(0, 0, -(params.radius || 1));
             }
-            var right = params.right || mathDevice.v3BuildXAxis();
-            var up = params.up || mathDevice.v3BuildYAxis();
+            // "falloff_angle" is the total angle in degrees
+            // calculate half angle in radians: angle * 0.5 / 180 * PI
+            var angle = (params.falloff_angle || 90) / 360 * Math.PI;
+            var tangent = Math.abs(target[2]) * Math.tan(angle);
+            var right = params.right || mathDevice.v3Build(tangent, 0, 0);
+            var up = params.up || mathDevice.v3Build(0, tangent, 0);
             var end = params.end || target;
             light.frustum = mathDevice.m33Build(right, up, end);
             var d0 = (abs(right[0]) + abs(up[0]));
@@ -114,7 +118,10 @@ var Light = (function () {
             }
         }
         light.direction = params.direction;
-        if((light.spot || light.point) && (params.shadows || params.dynamicshadows)) {
+        if(!params.halfExtents && !params.radius && !params.target) {
+            light.global = true;
+        }
+        if(!light.global && (params.shadows || params.dynamicshadows)) {
             light.shadows = true;
             if(params.dynamicshadows) {
                 light.dynamicshadows = true;
@@ -122,6 +129,9 @@ var Light = (function () {
         }
         if(params.disabled) {
             light.disabled = true;
+        }
+        if(params.dynamic) {
+            light.dynamic = true;
         }
         var material = params.material;
         if(material) {
@@ -138,9 +148,6 @@ var Light = (function () {
                     light.fog = true;
                 }
             }
-        }
-        if(!params.halfExtents && !params.radius && !params.target) {
-            light.global = true;
         }
         return light;
     };

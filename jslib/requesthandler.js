@@ -2,6 +2,7 @@
 
 
 
+
 var RequestHandler = (function () {
     function RequestHandler() {
         this.reasonConnectionLost = 0;
@@ -73,19 +74,8 @@ var RequestHandler = (function () {
             if(that.destroyed) {
                 return;
             }
-            var xhr = callContext.xhr;
             var sendEventToHandlers = that.sendEventToHandlers;
             var handlers = that.handlers;
-            if(xhr) {
-                var retryAfterHeader = xhr.getResponseHeader("Retry-After");
-                if(retryAfterHeader) {
-                    var retryAfter = parseInt(retryAfterHeader, 10);
-                    if(retryAfter > 0) {
-                        that.retryAfter(callContext, retryAfter, makeRequest, status);
-                        return;
-                    }
-                }
-            }
             // 0 Connection Lost
             // 408 Request Timeout
             // 429 Too Many Requests
@@ -103,10 +93,10 @@ var RequestHandler = (function () {
                 that.reconnectTest = null;
                 that.reconnectedObserver.notify();
             }
-            if(callContext.customErrorHandler && !callContext.customErrorHandler.call(this, callContext, makeRequest, responseAsset, status)) {
+            if(callContext.responseFilter && !callContext.responseFilter.call(this, callContext, makeRequest, responseAsset, status)) {
                 return;
             }
-            if(that.customErrorHandler && !that.customErrorHandler(callContext, makeRequest, responseAsset, status)) {
+            if(that.responseFilter && !that.responseFilter(callContext, makeRequest, responseAsset, status)) {
                 return;
             }
             if(callContext.onload) {

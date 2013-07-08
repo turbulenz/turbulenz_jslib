@@ -16,33 +16,33 @@ function DDSLoader() {
 DDSLoader.prototype = {
     version: 1,
     DDSF_CAPS: // surface description flags
-    1,
-    DDSF_HEIGHT: 2,
-    DDSF_WIDTH: 4,
-    DDSF_PITCH: 8,
-    DDSF_PIXELFORMAT: 4096,
-    DDSF_MIPMAPCOUNT: 131072,
-    DDSF_LINEARSIZE: 524288,
-    DDSF_DEPTH: 8388608,
+    0x00000001,
+    DDSF_HEIGHT: 0x00000002,
+    DDSF_WIDTH: 0x00000004,
+    DDSF_PITCH: 0x00000008,
+    DDSF_PIXELFORMAT: 0x00001000,
+    DDSF_MIPMAPCOUNT: 0x00020000,
+    DDSF_LINEARSIZE: 0x00080000,
+    DDSF_DEPTH: 0x00800000,
     DDSF_ALPHAPIXELS: // pixel format flags
-    1,
-    DDSF_FOURCC: 4,
-    DDSF_RGB: 64,
-    DDSF_RGBA: 65,
+    0x00000001,
+    DDSF_FOURCC: 0x00000004,
+    DDSF_RGB: 0x00000040,
+    DDSF_RGBA: 0x00000041,
     DDSF_COMPLEX: // dwCaps1 flags
-    8,
-    DDSF_TEXTURE: 4096,
-    DDSF_MIPMAP: 4194304,
+    0x00000008,
+    DDSF_TEXTURE: 0x00001000,
+    DDSF_MIPMAP: 0x00400000,
     DDSF_CUBEMAP: // dwCaps2 flags
-    512,
-    DDSF_CUBEMAP_POSITIVEX: 1024,
-    DDSF_CUBEMAP_NEGATIVEX: 2048,
-    DDSF_CUBEMAP_POSITIVEY: 4096,
-    DDSF_CUBEMAP_NEGATIVEY: 8192,
-    DDSF_CUBEMAP_POSITIVEZ: 16384,
-    DDSF_CUBEMAP_NEGATIVEZ: 32768,
-    DDSF_CUBEMAP_ALL_FACES: 64512,
-    DDSF_VOLUME: 2097152,
+    0x00000200,
+    DDSF_CUBEMAP_POSITIVEX: 0x00000400,
+    DDSF_CUBEMAP_NEGATIVEX: 0x00000800,
+    DDSF_CUBEMAP_POSITIVEY: 0x00001000,
+    DDSF_CUBEMAP_NEGATIVEY: 0x00002000,
+    DDSF_CUBEMAP_POSITIVEZ: 0x00004000,
+    DDSF_CUBEMAP_NEGATIVEZ: 0x00008000,
+    DDSF_CUBEMAP_ALL_FACES: 0x0000FC00,
+    DDSF_VOLUME: 0x00200000,
     FOURCC_UNKNOWN: // compressed texture types
     0,
     FOURCC_R8G8B8: 20,
@@ -65,15 +65,15 @@ DDSLoader.prototype = {
     FOURCC_L8: 50,
     FOURCC_A8L8: 51,
     FOURCC_A4L4: 52,
-    FOURCC_DXT1: 827611204,
+    FOURCC_DXT1: 0x31545844,
     FOURCC_DXT2: //(MAKEFOURCC('D','X','T','1'))
-    844388420,
+    0x32545844,
     FOURCC_DXT3: //(MAKEFOURCC('D','X','T','1'))
-    861165636,
+    0x33545844,
     FOURCC_DXT4: //(MAKEFOURCC('D','X','T','3'))
-    877942852,
+    0x34545844,
     FOURCC_DXT5: //(MAKEFOURCC('D','X','T','3'))
-    894720068,
+    0x35545844,
     FOURCC_D16_LOCKABLE: //(MAKEFOURCC('D','X','T','5'))
     70,
     FOURCC_D32: 71,
@@ -215,28 +215,28 @@ DDSLoader.prototype = {
                     return;
             }
         } else if(header.ddspf.dwFlags === this.DDSF_RGBA && header.ddspf.dwRGBBitCount === 32) {
-            if(header.ddspf.dwRBitMask === 255 && header.ddspf.dwGBitMask === 65280 && header.ddspf.dwBBitMask === 16711680 && header.ddspf.dwABitMask === 4278190080) {
+            if(header.ddspf.dwRBitMask === 0x000000FF && header.ddspf.dwGBitMask === 0x0000FF00 && header.ddspf.dwBBitMask === 0x00FF0000 && header.ddspf.dwABitMask === 0xFF000000) {
                 this.format = gd.PIXELFORMAT_R8G8B8A8;
             } else {
                 this.bgrFormat = this.BGRPIXELFORMAT_B8G8R8A8;
             }
             bpe = 4;
         } else if(header.ddspf.dwFlags === this.DDSF_RGB && header.ddspf.dwRGBBitCount === 32) {
-            if(header.ddspf.dwRBitMask === 255 && header.ddspf.dwGBitMask === 65280 && header.ddspf.dwBBitMask === 16711680) {
+            if(header.ddspf.dwRBitMask === 0x000000FF && header.ddspf.dwGBitMask === 0x0000FF00 && header.ddspf.dwBBitMask === 0x00FF0000) {
                 this.format = gd.PIXELFORMAT_R8G8B8A8;
             } else {
                 this.bgrFormat = this.BGRPIXELFORMAT_B8G8R8A8;
             }
             bpe = 4;
         } else if(header.ddspf.dwFlags === this.DDSF_RGB && header.ddspf.dwRGBBitCount === 24) {
-            if(header.ddspf.dwRBitMask === 255 && header.ddspf.dwGBitMask === 65280 && header.ddspf.dwBBitMask === 16711680) {
+            if(header.ddspf.dwRBitMask === 0x000000FF && header.ddspf.dwGBitMask === 0x0000FF00 && header.ddspf.dwBBitMask === 0x00FF0000) {
                 this.format = gd.PIXELFORMAT_R8G8B8;
             } else {
                 this.bgrFormat = this.BGRPIXELFORMAT_B8G8R8;
             }
             bpe = 3;
         } else if(header.ddspf.dwFlags === this.DDSF_RGB && header.ddspf.dwRGBBitCount === 16) {
-            if(header.ddspf.dwRBitMask === 63488 && header.ddspf.dwGBitMask === 2016 && header.ddspf.dwBBitMask === 31) {
+            if(header.ddspf.dwRBitMask === 0x0000F800 && header.ddspf.dwGBitMask === 0x000007E0 && header.ddspf.dwBBitMask === 0x0000001F) {
                 this.format = gd.PIXELFORMAT_R5G6B5;
             } else {
                 this.bgrFormat = this.BGRPIXELFORMAT_B5G6R5;
@@ -400,9 +400,12 @@ DDSLoader.prototype = {
     },
     decode565: function decode565Fn(value, color) {
         /*jshint bitwise: false*/
-        color[0] = ((value >> 11) & 31) * (255 / 31);
-        color[1] = ((value >> 5) & 63) * (255 / 63);
-        color[2] = ((value) & 31) * (255 / 31);
+        var r = ((value >> 11) & 31);
+        var g = ((value >> 5) & 63);
+        var b = ((value) & 31);
+        color[0] = ((r << 3) | (r >> 2));
+        color[1] = ((g << 2) | (g >> 4));
+        color[2] = ((b << 3) | (b >> 2));
         color[3] = 255;
         /*jshint bitwise: true*/
         return color;
@@ -421,7 +424,7 @@ DDSLoader.prototype = {
             c1 = decode565(col1, cache[1]);
             c2 = cache[2];
             c3 = cache[3];
-            if(!isDXT1 || col0 > col1) {
+            if(col0 > col1) {
                 for(i = 0; i < 3; i += 1) {
                     var c0i = c0[i];
                     var c1i = c1[i];
@@ -573,10 +576,17 @@ DDSLoader.prototype = {
             ],
             colorArray: new Array(4)
         };
-        data = this.convertToRGBA(data, function decodeDXT1(data, src, out) {
+        var encode;
+        if(this.hasDXT1Alpha(data)) {
+            this.format = this.gd.PIXELFORMAT_R5G5B5A1;
+            encode = this.encodeR5G5B5A1;
+        } else {
+            this.format = this.gd.PIXELFORMAT_R5G6B5;
+            encode = this.encodeR5G6B5;
+        }
+        data = this.convertToRGBA16(data, function decodeDXT1(data, src, out) {
             decodeColor(data, src, true, out, scratchpad);
-        }, 8);
-        this.format = this.gd.PIXELFORMAT_R8G8B8A8;
+        }, encode, 8);
         return data;
     },
     convertDXT3ToRGBA: function convertDXT3ToRGBAFn(data) {
@@ -591,11 +601,11 @@ DDSLoader.prototype = {
             ],
             colorArray: new Array(4)
         };
-        data = this.convertToRGBA(data, function decodeDXT3(data, src, out) {
+        data = this.convertToRGBA16(data, function decodeDXT3(data, src, out) {
             decodeColor(data, (src + 8), false, out, scratchpad);
             decodeDXT3Alpha(data, src, out);
-        }, 16);
-        this.format = this.gd.PIXELFORMAT_R8G8B8A8;
+        }, this.encodeR4G4B4A4, 16);
+        this.format = this.gd.PIXELFORMAT_R4G4B4A4;
         return data;
     },
     convertDXT5ToRGBA: function convertDXT5ToRGBAFn(data) {
@@ -611,14 +621,14 @@ DDSLoader.prototype = {
             colorArray: new Array(4),
             alphaArray: new Uint8Array(8)
         };
-        data = this.convertToRGBA(data, function decodeDXT5(data, src, out) {
+        data = this.convertToRGBA16(data, function decodeDXT5(data, src, out) {
             decodeColor(data, (src + 8), false, out, scratchpad);
             decodeDXT5Alpha(data, src, out, scratchpad);
-        }, 16);
-        this.format = this.gd.PIXELFORMAT_R8G8B8A8;
+        }, this.encodeR4G4B4A4, 16);
+        this.format = this.gd.PIXELFORMAT_R4G4B4A4;
         return data;
     },
-    convertToRGBA: function convertToRGBAFn(data, decode, srcStride) {
+    convertToRGBA32: function convertToRGBA32Fn(data, decode, srcStride) {
         //var bpp = 4;
         var level;
         var width = this.width;
@@ -699,6 +709,114 @@ DDSLoader.prototype = {
         }
         /*jshint bitwise: true*/
         return dst;
+    },
+    hasDXT1Alpha: function hasDXT1AlphaFn(data) {
+        var length = data.length;
+        var n, i, row;
+        for(n = 0; n < length; n += 8) {
+            var col0 = ((data[n + 1] << 8) | data[n]);
+            var col1 = ((data[n + 3] << 8) | data[n + 2]);
+            if(col0 <= col1) {
+                for(i = 0; i < 4; i += 1) {
+                    row = data[n + 4 + i];
+                    if(row === 0) {
+                        continue;
+                    }
+                    if(((row) & 3) === 3 || ((row >> 2) & 3) === 3 || ((row >> 4) & 3) === 3 || ((row >> 6) & 3) === 3) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    },
+    encodeR5G6B5: function encodeR5G6B5Fn(rgba) {
+        return (((rgba[2] & 0xf8) >>> 3) | ((rgba[1] & 0xfc) << 3) | ((rgba[0] & 0xf8) << 8));
+    },
+    encodeR5G5B5A1: function encodeR5G5B5A1Fn(rgba) {
+        return ((rgba[3] >>> 7) | ((rgba[2] & 0xf8) >>> 2) | ((rgba[1] & 0xf8) << 3) | ((rgba[0] & 0xf8) << 8));
+    },
+    encodeR4G4B4A4: function encodeR4G4B4A4Fn(rgba) {
+        return ((rgba[3] >>> 4) | (rgba[2] & 0xf0) | ((rgba[1] & 0xf0) << 4) | ((rgba[0] & 0xf0) << 8));
+    },
+    convertToRGBA16: function convertToRGBA16Fn(data, decode, encode, srcStride) {
+        //var bpp = 2;
+        var level;
+        var width = this.width;
+        var height = this.height;
+        var numLevels = this.numLevels;
+        var numFaces = this.numFaces;
+        /*jshint bitwise: false*/
+        var numPixels = 0;
+        for(level = 0; level < numLevels; level += 1) {
+            numPixels += (width * height);
+            width = (width > 1 ? (width >> 1) : 1);
+            height = (height > 1 ? (height >> 1) : 1);
+        }
+        var dst = new Uint16Array(numPixels * 1 * numFaces);
+        var src = 0, dest = 0;
+        var color = [
+            [
+                new Uint8Array(4), 
+                new Uint8Array(4), 
+                new Uint8Array(4), 
+                new Uint8Array(4)
+            ], 
+            [
+                new Uint8Array(4), 
+                new Uint8Array(4), 
+                new Uint8Array(4), 
+                new Uint8Array(4)
+            ], 
+            [
+                new Uint8Array(4), 
+                new Uint8Array(4), 
+                new Uint8Array(4), 
+                new Uint8Array(4)
+            ], 
+            [
+                new Uint8Array(4), 
+                new Uint8Array(4), 
+                new Uint8Array(4), 
+                new Uint8Array(4)
+            ]
+        ];
+        for(var face = 0; face < numFaces; face += 1) {
+            width = this.width;
+            height = this.height;
+            for(var n = 0; n < numLevels; n += 1) {
+                var numColumns = (width > 4 ? 4 : width);
+                var numLines = (height > 4 ? 4 : height);
+                var heightInBlocks = ((height + 3) >> 2);
+                var widthInBlocks = ((width + 3) >> 2);
+                var desinationStride = (width * 1);
+                var desinationLineStride = (numColumns * 1);
+                var desinationBlockStride = (desinationStride * (numLines - 1));
+                for(var y = 0; y < heightInBlocks; y += 1) {
+                    for(var x = 0; x < widthInBlocks; x += 1) {
+                        decode(data, src, color);
+                        var destLine = dest;
+                        for(var line = 0; line < numLines; line += 1) {
+                            var colorLine = color[line];
+                            var destRGBA = destLine;
+                            for(var i = 0; i < numColumns; i += 1) {
+                                var rgba = colorLine[i];
+                                dst[destRGBA] = encode(rgba);
+                                destRGBA += 1;
+                            }
+                            destLine += desinationStride;
+                        }
+                        src += srcStride;
+                        dest += desinationLineStride;
+                    }
+                    dest += desinationBlockStride;
+                }
+                width = (width > 1 ? (width >> 1) : 1);
+                height = (height > 1 ? (height >> 1) : 1);
+            }
+        }
+        /*jshint bitwise: true*/
+        return dst;
     }
 };
 // Constructor function
@@ -756,7 +874,7 @@ DDSLoader.create = function ddsLoaderFn(params) {
                             buffer = [];
                             buffer.length = numChars;
                             for(var i = 0; i < numChars; i += 1) {
-                                buffer[i] = (text.charCodeAt(i) & 255);
+                                buffer[i] = (text.charCodeAt(i) & 0xff);
                             }
                             /*jshint bitwise: true*/
                                                     }

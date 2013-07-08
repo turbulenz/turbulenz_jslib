@@ -26,7 +26,7 @@ var PhysicsManager = (function () {
                         continue;
                     }
                     if(target.parent) {
-                        Utilities.assert(false, "Rigid bodies with parent nodes are unsupported");
+                        debug.abort("Rigid bodies with parent nodes are unsupported");
                         //Not really possible, since the child can become inactive (frozen) and therefore it will
                         /*var parentWorld = target.parent.getWorldTransform();
                         var inverseParent = mathsDevice.m43Inverse(parentWorld);
@@ -381,7 +381,7 @@ var PhysicsManager = (function () {
                                 var centerPos0 = ((posMax[0] + posMin[0]) * 0.5);
                                 var centerPos1 = ((posMax[1] + posMin[1]) * 0.5);
                                 var centerPos2 = ((posMax[2] + posMin[2]) * 0.5);
-                                if(Math.abs(centerPos0) > 0.000001 || Math.abs(centerPos1) > 0.000001 || Math.abs(centerPos2) > 0.000001) {
+                                if(Math.abs(centerPos0) > 1.e-6 || Math.abs(centerPos1) > 1.e-6 || Math.abs(centerPos2) > 1.e-6) {
                                     var halfPos0 = ((posMax[0] - posMin[0]) * 0.5);
                                     var halfPos1 = ((posMax[1] - posMin[1]) * 0.5);
                                     var halfPos2 = ((posMax[2] - posMin[2]) * 0.5);

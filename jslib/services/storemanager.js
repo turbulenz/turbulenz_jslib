@@ -251,7 +251,7 @@ var StoreManager = (function () {
         storeManager.basket = null;
         storeManager.userItems = null;
         var calledMetaReceived = false;
-        function checkMetaRecieved() {
+        function checkMetaReceived() {
             if(!calledMetaReceived && storeManager.offerings !== null && storeManager.resources !== null && storeManager.basket !== null && storeManager.userItems !== null) {
                 if(storeMetaReceived) {
                     storeMetaReceived(storeManager);
@@ -260,7 +260,7 @@ var StoreManager = (function () {
                 calledMetaReceived = true;
             }
         }
-        storeManager.requestUserItems(checkMetaRecieved);
+        storeManager.requestUserItems(checkMetaReceived);
         storeManager.onBasketUpdate = null;
         storeManager.updateBasketCallbacks = {
         };
@@ -279,7 +279,7 @@ var StoreManager = (function () {
             if(storeManager.onBasketUpdate) {
                 storeManager.onBasketUpdate(basket);
             }
-            checkMetaRecieved();
+            checkMetaReceived();
         };
         TurbulenzBridge.setOnBasketUpdate(onBasketUpdate);
         TurbulenzBridge.triggerBasketUpdate();
@@ -288,7 +288,7 @@ var StoreManager = (function () {
             storeManager.currency = meta.currency;
             storeManager.offerings = meta.items || meta.offerings;
             storeManager.resources = meta.resources;
-            checkMetaRecieved();
+            checkMetaReceived();
         };
         TurbulenzBridge.setOnStoreMeta(onStoreMeta);
         TurbulenzBridge.triggerFetchStoreMeta();

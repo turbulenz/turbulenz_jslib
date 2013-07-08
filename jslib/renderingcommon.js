@@ -17,7 +17,7 @@ renderingCommonGetTechniqueIndexFn.numTechniques = 0;
 // renderingCommonSortKeyFn
 //
 function renderingCommonSortKeyFn(techniqueIndex, materialIndex, nodeIndex) {
-    var sortKey = ((techniqueIndex * 65536) + (materialIndex % 65536));
+    var sortKey = ((techniqueIndex * 0x10000) + (materialIndex % 0x10000));
     if(nodeIndex) {
         sortKey += (1.0 / (1.0 + nodeIndex));
     }

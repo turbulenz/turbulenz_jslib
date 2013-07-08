@@ -108,13 +108,14 @@ var Utilities = {
             }
         }
         var httpResponseCallback = function httpResponseCallbackFn(xhrResponseText, xhrStatus) {
-            var sig = this.xhr.getResponseHeader("X-TZ-Signature");
             // break circular reference
+            var xhr = this.xhr;
             this.xhr.onreadystatechange = null;
             this.xhr = null;
             var response;
             response = JSON.parse(xhrResponseText);
             if(encrypted) {
+                var sig = xhr.getResponseHeader("X-TZ-Signature");
                 var validSignature = TurbulenzEngine.verifySignature(xhrResponseText, sig);
                 xhrResponseText = null;
                 TurbulenzEngine.setTimeout(function () {
@@ -197,7 +198,7 @@ var Utilities = {
             requestHandler.request({
                 src: url,
                 requestFn: httpRequest,
-                customErrorHandler: params.customErrorHandler,
+                responseFilter: params.responseFilter,
                 onload: httpResponseCallback
             });
         } else {

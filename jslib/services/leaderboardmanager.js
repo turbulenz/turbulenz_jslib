@@ -273,7 +273,7 @@ var LeaderboardManager = (function () {
             requestHandler: this.requestHandler
         });
     };
-    LeaderboardManager.create = function create(requestHandler, gameSession, leaderboardMetaRecieved, errorCallbackFn) {
+    LeaderboardManager.create = function create(requestHandler, gameSession, leaderboardMetaReceived, errorCallbackFn) {
         if(!TurbulenzServices.available()) {
             // Call error callback on a timeout to get the same behaviour as the ajax call
             TurbulenzEngine.setTimeout(function () {
@@ -307,8 +307,8 @@ var LeaderboardManager = (function () {
                         }
                     }
                     leaderboardManager.ready = true;
-                    if(leaderboardMetaRecieved) {
-                        leaderboardMetaRecieved(leaderboardManager);
+                    if(leaderboardMetaReceived) {
+                        leaderboardMetaReceived(leaderboardManager);
                     }
                 } else {
                     leaderboardManager.errorCallbackFn("TurbulenzServices.createLeaderboardManager error with HTTP status " + status + ": " + jsonResponse.msg, status);

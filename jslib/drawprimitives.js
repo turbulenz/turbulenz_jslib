@@ -1,10 +1,9 @@
 /* This file was generated from TypeScript source tslib/drawprimitives.ts */
 
-// Copyright (c) 2009-2012 Turbulenz Limited
+// Copyright (c) 2009-2013 Turbulenz Limited
 /*global TurbulenzEngine: false */
-/*global Utilities: false */
 /// <reference path="turbulenz.d.ts" />
-/// <reference path="utilities.ts" />
+/// <reference path="debug.ts" />
 var DrawPrimitives = (function () {
     function DrawPrimitives() {
         this.rectPositionsParameters = {
@@ -55,7 +54,7 @@ var DrawPrimitives = (function () {
         this.rectTexPrimitive = gd.PRIMITIVE_TRIANGLE_STRIP;
         this.rectTexPositions = gd.createVertexBuffer(this.rectTexPositionsParameters);
         this.rectTexSemantics = gd.createSemantics(this.rectTexSemanticsParameters);
-        Utilities.assert((this.boxPositions && this.rectPositions && this.rectTexPositions), "Buffers not created.");
+        debug.assert((this.boxPositions && this.rectPositions && this.rectTexPositions), "Buffers not created.");
         if(this.boxPositions && this.rectPositions && this.rectTexPositions) {
             var that = this;
             var fileName = shaderPath + this.shaderName;

@@ -9,7 +9,7 @@
 //
 var IndexBufferManager = (function () {
     function IndexBufferManager() {
-        this.maxIndicesPerIndexBuffer = 65535;
+        this.maxIndicesPerIndexBuffer = 262144;
         this.numBuckets = 10;
     }
     IndexBufferManager.version = 1;
@@ -137,7 +137,7 @@ var IndexBufferManager = (function () {
                 indexbufferParameters.numIndices = maxIndicesPerIndexBuffer;
                 indexbuffer = this.graphicsDevice.createIndexBuffer(indexbufferParameters);
                 this.debugCreatedIndexBuffers += 1;
-                Utilities.assert(indexbuffer, "IndexBuffer not created.");
+                debug.assert(indexbuffer, "IndexBuffer not created.");
                 if(indexbuffer) {
                     indexBufferData = {
                         indexBuffer: indexbuffer,
@@ -156,7 +156,7 @@ var IndexBufferManager = (function () {
             indexbufferParameters.numIndices = numIndices;
             indexbuffer = this.graphicsDevice.createIndexBuffer(indexbufferParameters);
             this.debugCreatedIndexBuffers += 1;
-            Utilities.assert(indexbuffer, "IndexBuffer not created.");
+            debug.assert(indexbuffer, "IndexBuffer not created.");
             if(indexbuffer) {
                 indexBuffersPool.indexBufferData.push({
                     indexBuffer: indexbuffer,

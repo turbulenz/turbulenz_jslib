@@ -129,6 +129,17 @@ TZWebGLTexture.prototype = {
                     bufferData = new Uint16Array(data);
                 }
             }
+        } else if(format === gd.PIXELFORMAT_R4G4B4A4) {
+            internalFormat = gl.RGBA;
+            gltype = gl.UNSIGNED_SHORT_4_4_4_4;
+            srcStep = 1;
+            if(data && !data.src) {
+                if(data instanceof Uint16Array) {
+                    bufferData = data;
+                } else {
+                    bufferData = new Uint16Array(data);
+                }
+            }
         } else if(format === gd.PIXELFORMAT_R8G8B8A8) {
             internalFormat = gl.RGBA;
             gltype = gl.UNSIGNED_BYTE;
@@ -249,7 +260,12 @@ TZWebGLTexture.prototype = {
                         } else if(data) {
                             gl.texImage2D(faceTarget, n, internalFormat, internalFormat, gltype, data);
                         } else {
-                            gl.texImage2D(faceTarget, n, internalFormat, w, h, 0, internalFormat, gltype, new Uint8Array(levelSize));
+                            if(gltype === gl.UNSIGNED_SHORT_5_6_5 || gltype === gl.UNSIGNED_SHORT_5_5_5_1 || gltype === gl.UNSIGNED_SHORT_4_4_4_4) {
+                                levelData = new Uint16Array(levelSize);
+                            } else {
+                                levelData = new Uint8Array(levelSize);
+                            }
+                            gl.texImage2D(faceTarget, n, internalFormat, w, h, 0, internalFormat, gltype, levelData);
                         }
                     }
                     offset += levelSize;
@@ -293,7 +309,12 @@ TZWebGLTexture.prototype = {
                     } else if(data) {
                         gl.texImage2D(target, n, internalFormat, internalFormat, gltype, data);
                     } else {
-                        gl.texImage2D(target, n, internalFormat, w, h, 0, internalFormat, gltype, new Uint8Array(levelSize));
+                        if(gltype === gl.UNSIGNED_SHORT_5_6_5 || gltype === gl.UNSIGNED_SHORT_5_5_5_1 || gltype === gl.UNSIGNED_SHORT_4_4_4_4) {
+                            levelData = new Uint16Array(levelSize);
+                        } else {
+                            levelData = new Uint8Array(levelSize);
+                        }
+                        gl.texImage2D(target, n, internalFormat, w, h, 0, internalFormat, gltype, levelData);
                     }
                 }
                 offset += levelSize;
@@ -354,7 +375,7 @@ TZWebGLTexture.prototype = {
             if(format === gd.PIXELFORMAT_R8G8B8A8) {
                 return ((typedArray instanceof Uint8Array) || (typeof Uint8ClampedArray !== "undefined" && typedArray instanceof Uint8ClampedArray)) && (typedArray.length === 4 * this.width * this.height * this.depth);
             }
-            if((format === gd.PIXELFORMAT_R5G5B5A1) || (format === gd.PIXELFORMAT_R5G6B5)) {
+            if((format === gd.PIXELFORMAT_R5G5B5A1) || (format === gd.PIXELFORMAT_R5G6B5) || (format === gd.PIXELFORMAT_R4G4B4A4)) {
                 return (typedArray instanceof Uint16Array) && (typedArray.length === this.width * this.height * this.depth);
             }
         }
@@ -544,6 +565,15 @@ TZWebGLTexture.create = function webGLTextureCreateFn(gd, params) {
         if(!result) {
             tex = null;
         }
+        // If this is a depth-texture, note the attachment type
+        // required, based on the format.
+        if(params.renderable) {
+            if(gd.PIXELFORMAT_D16 === format) {
+                tex.glDepthAttachment = gd.gl.DEPTH_ATTACHMENT;
+            } else if(gd.PIXELFORMAT_D24S8 === format) {
+                tex.glDepthAttachment = gd.gl.DEPTH_STENCIL_ATTACHMENT;
+            }
+        }
         if(params.onload) {
             params.onload(tex, 200);
         }
@@ -572,7 +602,8 @@ WebGLVideo.prototype = {
             try  {
                 video.currentTime = seek;
             } catch (e) {
-            }
+                // There does not seem to be any reliable way of seeking
+                            }
         }
         video.play();
         return true;
@@ -607,7 +638,8 @@ WebGLVideo.prototype = {
                     try  {
                         video.currentTime = seek;
                     } catch (e) {
-                    }
+                        // There does not seem to be any reliable way of seeking
+                                            }
                 }
             }
             video.play();
@@ -760,13 +792,27 @@ WebGLRenderBuffer.create = function webGLRenderBufferFn(gd, params) {
     if(typeof format === 'string') {
         format = gd['PIXELFORMAT_' + format];
     }
-    if(format !== gd.PIXELFORMAT_D24S8) {
+    if(format !== gd.PIXELFORMAT_D24S8 && format !== gd.PIXELFORMAT_D16) {
         return null;
     }
     var gl = gd.gl;
     var glBuffer = gl.createRenderbuffer();
     gl.bindRenderbuffer(gl.RENDERBUFFER, glBuffer);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_STENCIL, width, height);
+    var internalFormat;
+    var attachment;
+    if(gd.PIXELFORMAT_D16 === format) {
+        internalFormat = gl.DEPTH_COMPONENT16;
+        attachment = gl.DEPTH_ATTACHMENT;
+    } else//if (gd.PIXELFORMAT_D24S8 === format)
+     {
+        internalFormat = gl.DEPTH_STENCIL;
+        attachment = gl.DEPTH_STENCIL_ATTACHMENT;
+    }
+    // else if (gd.PIXELFORMAT_S8 === format)
+    // {
+    //     internalFormat = gl.STENCIL_INDEX8;
+    // }
+    gl.renderbufferStorage(gl.RENDERBUFFER, internalFormat, width, height);
     renderBuffer.width = gl.getRenderbufferParameter(gl.RENDERBUFFER, gl.RENDERBUFFER_WIDTH);
     renderBuffer.height = gl.getRenderbufferParameter(gl.RENDERBUFFER, gl.RENDERBUFFER_HEIGHT);
     gl.bindRenderbuffer(gl.RENDERBUFFER, null);
@@ -776,6 +822,7 @@ WebGLRenderBuffer.create = function webGLRenderBufferFn(gd, params) {
     }
     renderBuffer.gd = gd;
     renderBuffer.format = format;
+    renderBuffer.glDepthAttachment = attachment;
     renderBuffer.glBuffer = glBuffer;
     return renderBuffer;
 };
@@ -918,9 +965,9 @@ WebGLRenderTarget.create = function webGLRenderTargetFn(gd, params) {
         return null;
     }
     if(depthTexture) {
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.TEXTURE_2D, depthTexture.glTexture, 0);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, depthTexture.glDepthAttachment, gl.TEXTURE_2D, depthTexture.glTexture, 0);
     } else if(depthBuffer) {
-        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, depthBuffer.glBuffer);
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, depthBuffer.glDepthAttachment, gl.RENDERBUFFER, depthBuffer.glBuffer);
     }
     var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -1640,10 +1687,9 @@ WebGLPass.prototype = {
         var gl = gd.gl;
         this.dirty = false;
         // Set parameters
-        var hasProperty = Object.prototype.hasOwnProperty;
         var parameters = this.parameters;
         for(var p in parameters) {
-            if(hasProperty.call(parameters, p)) {
+            if(parameters.hasOwnProperty(p)) {
                 var parameter = parameters[p];
                 if(parameter.dirty) {
                     parameter.dirty = 0;
@@ -1651,14 +1697,37 @@ WebGLPass.prototype = {
                     var location = parameter.location;
                     if(paramInfo && null !== location) {
                         var parameterValues = paramInfo.values;
-                        var sampler = parameter.sampler;
-                        if(sampler) {
-                            gd.setTexture(parameter.textureUnit, parameterValues, sampler);
-                        } else if(1 < paramInfo.numValues) {
-                            parameter.setter.call(gl, location, parameterValues);
-                        } else//if (1 === paramInfo.numValues)
-                         {
-                            parameter.setter.call(gl, location, parameterValues[0]);
+                        var numColumns;
+                        if(paramInfo.type === 'float') {
+                            numColumns = paramInfo.columns;
+                            if(4 === numColumns) {
+                                gl.uniform4fv(location, parameterValues);
+                            } else if(3 === numColumns) {
+                                gl.uniform3fv(location, parameterValues);
+                            } else if(2 === numColumns) {
+                                gl.uniform2fv(location, parameterValues);
+                            } else if(1 === paramInfo.rows) {
+                                gl.uniform1f(location, parameterValues[0]);
+                            } else//if (1 === numColumns)
+                             {
+                                gl.uniform1fv(location, parameterValues);
+                            }
+                        } else if(paramInfo.sampler !== undefined) {
+                            gd.setTexture(parameter.textureUnit, parameterValues, paramInfo.sampler);
+                        } else {
+                            numColumns = paramInfo.columns;
+                            if(4 === numColumns) {
+                                gl.uniform4iv(location, parameterValues);
+                            } else if(3 === numColumns) {
+                                gl.uniform3iv(location, parameterValues);
+                            } else if(2 === numColumns) {
+                                gl.uniform2iv(location, parameterValues);
+                            } else if(1 === paramInfo.rows) {
+                                gl.uniform1i(location, parameterValues[0]);
+                            } else//if (1 === numColumns)
+                             {
+                                gl.uniform1iv(location, parameterValues);
+                            }
                         }
                     }
                 }
@@ -1678,14 +1747,39 @@ WebGLPass.prototype = {
                     var location = gl.getUniformLocation(glProgram, p);
                     if(null !== location) {
                         parameter.location = location;
-                        if(parameter.sampler) {
+                        if(paramInfo.sampler) {
                             gl.uniform1i(location, parameter.textureUnit);
                         } else {
-                            if(1 < paramInfo.numValues) {
-                                parameter.setter.call(gl, location, paramInfo.values);
-                            } else//if (1 === paramInfo.numValues)
-                             {
-                                parameter.setter.call(gl, location, paramInfo.values[0]);
+                            var parameterValues = paramInfo.values;
+                            var numColumns;
+                            if(paramInfo.type === 'float') {
+                                numColumns = paramInfo.columns;
+                                if(4 === numColumns) {
+                                    gl.uniform4fv(location, parameterValues);
+                                } else if(3 === numColumns) {
+                                    gl.uniform3fv(location, parameterValues);
+                                } else if(2 === numColumns) {
+                                    gl.uniform2fv(location, parameterValues);
+                                } else if(1 === paramInfo.rows) {
+                                    gl.uniform1f(location, parameterValues[0]);
+                                } else//if (1 === numColumns)
+                                 {
+                                    gl.uniform1fv(location, parameterValues);
+                                }
+                            } else {
+                                numColumns = paramInfo.columns;
+                                if(4 === numColumns) {
+                                    gl.uniform4iv(location, parameterValues);
+                                } else if(3 === numColumns) {
+                                    gl.uniform3iv(location, parameterValues);
+                                } else if(2 === numColumns) {
+                                    gl.uniform2iv(location, parameterValues);
+                                } else if(1 === paramInfo.rows) {
+                                    gl.uniform1i(location, parameterValues[0]);
+                                } else//if (1 === numColumns)
+                                 {
+                                    gl.uniform1iv(location, parameterValues);
+                                }
                             }
                         }
                     }
@@ -1768,14 +1862,11 @@ WebGLPass.create = function webGLPassCreateFn(gd, shader, params) {
         if(paramInfo) {
             parameter.location = null;
             if(paramInfo.sampler) {
-                parameter.sampler = paramInfo.sampler;
                 parameter.textureUnit = numTextureUnits;
                 numTextureUnits += 1;
             } else {
-                parameter.sampler = undefined;
                 parameter.textureUnit = undefined;
             }
-            parameter.setter = paramInfo.setter;
         }
     }
     pass.numTextureUnits = numTextureUnits;
@@ -1790,7 +1881,6 @@ WebGLPass.create = function webGLPassCreateFn(gd, shader, params) {
         }
         return true;
     }
-    var hasProperty = Object.prototype.hasOwnProperty;
     var stateHandlers = gd.stateHandlers;
     var passStates = [];
     var passStatesSet = {
@@ -1798,7 +1888,7 @@ WebGLPass.create = function webGLPassCreateFn(gd, shader, params) {
     pass.states = passStates;
     pass.statesSet = passStatesSet;
     for(s in states) {
-        if(hasProperty.call(states, s)) {
+        if(states.hasOwnProperty(s)) {
             var stateHandler = stateHandlers[s];
             if(stateHandler) {
                 var values = stateHandler.parse(states[s]);
@@ -1855,6 +1945,9 @@ Technique.prototype = {
             this.shader.initialize(gd);
             this.initialize(gd);
         }
+        if(debug) {
+            gd.metrics.techniqueChanges += 1;
+        }
     },
     deactivate: function deactivateFn() {
         this.device = null;
@@ -1875,9 +1968,8 @@ Technique.prototype = {
             } else {
                 gd.setParametersDeferred(gd, passes, fakeTechniqueParameters);
             }
-            var hasProperty = Object.prototype.hasOwnProperty;
             for(p in fakeTechniqueParameters) {
-                if(hasProperty.call(fakeTechniqueParameters, p)) {
+                if(fakeTechniqueParameters.hasOwnProperty(p)) {
                     delete this[p];
                 }
             }
@@ -2051,7 +2143,7 @@ Technique.prototype = {
                     paramInfo = parameter.info;
                     if(paramInfo) {
                         if(undefined !== parameter.location) {
-                            if(parameter.sampler) {
+                            if(paramInfo.sampler) {
                                 setter = make_sampler_setter(pass, parameter);
                             } else {
                                 if(paramInfo.type === 'float') {
@@ -2069,8 +2161,7 @@ Technique.prototype = {
                     }
                 }
             }
-            this.checkProperties = function () {
-            };
+            this.checkProperties = null;
         } else {
             Object.defineProperty(this, 'device', {
                 writable: true,
@@ -2320,13 +2411,13 @@ Shader.create = function webGLShaderCreateFn(gd, params) {
                 wrapR: (sampler.WrapR || defaultSampler.wrapR),
                 maxAnisotropy: samplerMaxAnisotropy
             };
-            if(sampler.wrapS === 10496) {
+            if(sampler.wrapS === 0x2900) {
                 sampler.wrapS = gl.CLAMP_TO_EDGE;
             }
-            if(sampler.wrapT === 10496) {
+            if(sampler.wrapT === 0x2900) {
                 sampler.wrapT = gl.CLAMP_TO_EDGE;
             }
-            if(sampler.wrapR === 10496) {
+            if(sampler.wrapR === 0x2900) {
                 sampler.wrapR = gl.CLAMP_TO_EDGE;
             }
             shader.samplers[p] = gd.createSampler(sampler);
@@ -2362,49 +2453,7 @@ Shader.create = function webGLShaderCreateFn(gd, params) {
                         parameter.values = new Int32Array(parameter.numValues);
                     }
                 }
-                if(parameterType === 'float') {
-                    switch(parameter.columns) {
-                        case 1:
-                            if(1 === parameter.numValues) {
-                                parameter.setter = gl.uniform1f;
-                            } else {
-                                parameter.setter = gl.uniform1fv;
-                            }
-                            break;
-                        case 2:
-                            parameter.setter = gl.uniform2fv;
-                            break;
-                        case 3:
-                            parameter.setter = gl.uniform3fv;
-                            break;
-                        case 4:
-                            parameter.setter = gl.uniform4fv;
-                            break;
-                        default:
-                            break;
-                    }
-                } else {
-                    switch(parameter.columns) {
-                        case 1:
-                            if(1 === parameter.numValues) {
-                                parameter.setter = gl.uniform1i;
-                            } else {
-                                parameter.setter = gl.uniform1iv;
-                            }
-                            break;
-                        case 2:
-                            parameter.setter = gl.uniform2iv;
-                            break;
-                        case 3:
-                            parameter.setter = gl.uniform3iv;
-                            break;
-                        case 4:
-                            parameter.setter = gl.uniform4iv;
-                            break;
-                        default:
-                            break;
-                    }
-                }
+                parameter.sampler = undefined;
             } else// Sampler
              {
                 sampler = shader.samplers[p];
@@ -2454,12 +2503,6 @@ TechniqueParameters.create = function TechniqueParametersFn(params) {
 //
 // TechniqueParameterBuffer
 //
-function techniqueParameterBufferSetData(data, offset, numValues) {
-    for(var n = 0, o = offset; n < numValues; n += 1 , o += 1) {
-        this[o] = data[n];
-    }
-    return o;
-}
 var techniqueParameterBufferCreate = function techniqueParameterBufferCreateFn(params) {
     if(Float32Array.prototype.map === undefined) {
         Float32Array.prototype.map = function techniqueParameterBufferMap(offset, numFloats) {
@@ -2478,7 +2521,8 @@ var techniqueParameterBufferCreate = function techniqueParameterBufferCreateFn(p
                         buffer[offset] = value;
                         offset += 1;
                     } else {
-                        offset = techniqueParameterBufferSetData.call(buffer, value, offset, value.length);
+                        buffer.setData(value, offset, value.length);
+                        offset += value.length;
                     }
                 }
             }
@@ -2486,6 +2530,17 @@ var techniqueParameterBufferCreate = function techniqueParameterBufferCreateFn(p
         };
         Float32Array.prototype.unmap = function techniqueParameterBufferUnmap() {
             /* writer */         };
+        Float32Array.prototype.setData = function techniqueParameterBufferSetData(data, offset, numValues) {
+            if(offset === undefined) {
+                offset = 0;
+            }
+            if(numValues === undefined) {
+                numValues = this.length;
+            }
+            for(var n = 0; n < numValues; n += 1 , offset += 1) {
+                this[offset] = data[n];
+            }
+        };
     }
     return new Float32Array(params.numFloats);
 };
@@ -2613,6 +2668,7 @@ DrawParameters.create = function webGLDrawParametersFn() {
 
 
 
+
 function WebGLGraphicsDevice() {
     return this;
 }
@@ -2668,12 +2724,14 @@ WebGLGraphicsDevice.prototype = {
     PIXELFORMAT_L8A8: 2,
     PIXELFORMAT_R5G5B5A1: 3,
     PIXELFORMAT_R5G6B5: 4,
-    PIXELFORMAT_R8G8B8A8: 5,
-    PIXELFORMAT_R8G8B8: 6,
-    PIXELFORMAT_D24S8: 7,
-    PIXELFORMAT_DXT1: 8,
-    PIXELFORMAT_DXT3: 9,
-    PIXELFORMAT_DXT5: 10,
+    PIXELFORMAT_R4G4B4A4: 5,
+    PIXELFORMAT_R8G8B8A8: 6,
+    PIXELFORMAT_R8G8B8: 7,
+    PIXELFORMAT_D24S8: 8,
+    PIXELFORMAT_D16: 9,
+    PIXELFORMAT_DXT1: 10,
+    PIXELFORMAT_DXT3: 11,
+    PIXELFORMAT_DXT5: 12,
     drawIndexed: function drawIndexedFn(primitive, numIndices, first) {
         var gl = this.gl;
         var indexBuffer = this.activeIndexBuffer;
@@ -2689,7 +2747,9 @@ WebGLGraphicsDevice.prototype = {
         var passes = activeTechnique.passes;
         var numPasses = passes.length;
         var mask;
-        activeTechnique.checkProperties(this);
+        if(activeTechnique.checkProperties) {
+            activeTechnique.checkProperties(this);
+        }
         /*jshint bitwise: false*/
         if(1 === numPasses) {
             mask = (passes[0].semanticsMask & attributeMask);
@@ -2697,6 +2757,9 @@ WebGLGraphicsDevice.prototype = {
                 this.enableClientState(mask);
             }
             gl.drawElements(primitive, numIndices, format, offset);
+            if(debug) {
+                this.metrics.addPrimitives(primitive, numIndices);
+            }
         } else {
             for(var p = 0; p < numPasses; p += 1) {
                 var pass = passes[p];
@@ -2706,6 +2769,9 @@ WebGLGraphicsDevice.prototype = {
                 }
                 this.setPass(pass);
                 gl.drawElements(primitive, numIndices, format, offset);
+                if(debug) {
+                    this.metrics.addPrimitives(primitive, numIndices);
+                }
             }
         }
         /*jshint bitwise: true*/
@@ -2717,7 +2783,9 @@ WebGLGraphicsDevice.prototype = {
         var passes = activeTechnique.passes;
         var numPasses = passes.length;
         var mask;
-        activeTechnique.checkProperties(this);
+        if(activeTechnique.checkProperties) {
+            activeTechnique.checkProperties(this);
+        }
         /*jshint bitwise: false*/
         if(1 === numPasses) {
             mask = (passes[0].semanticsMask & attributeMask);
@@ -2725,6 +2793,9 @@ WebGLGraphicsDevice.prototype = {
                 this.enableClientState(mask);
             }
             gl.drawArrays(primitive, first, numVertices);
+            if(debug) {
+                this.metrics.addPrimitives(primitive, numVertices);
+            }
         } else {
             for(var p = 0; p < numPasses; p += 1) {
                 var pass = passes[p];
@@ -2734,6 +2805,9 @@ WebGLGraphicsDevice.prototype = {
                 }
                 this.setPass(pass);
                 gl.drawArrays(primitive, first, numVertices);
+                if(debug) {
+                    this.metrics.addPrimitives(primitive, numVertices);
+                }
             }
         }
         /*jshint bitwise: true*/
@@ -2755,19 +2829,45 @@ WebGLGraphicsDevice.prototype = {
         for(var p in techniqueParameters) {
             var parameter = parameters[p];
             if(parameter !== undefined) {
-                var sampler = parameter.sampler;
                 var parameterValues = techniqueParameters[p];
                 if(parameterValues !== undefined) {
-                    if(sampler !== undefined) {
-                        gd.setTexture(parameter.textureUnit, parameterValues, sampler);
+                    var paramInfo = parameter.info;
+                    var numColumns, location;
+                    if(paramInfo.type === 'float') {
+                        numColumns = paramInfo.columns;
+                        location = parameter.location;
+                        if(4 === numColumns) {
+                            gl.uniform4fv(location, parameterValues);
+                        } else if(3 === numColumns) {
+                            gl.uniform3fv(location, parameterValues);
+                        } else if(2 === numColumns) {
+                            gl.uniform2fv(location, parameterValues);
+                        } else if(1 === paramInfo.rows) {
+                            gl.uniform1f(location, parameterValues);
+                        } else//if (1 === numColumns)
+                         {
+                            gl.uniform1fv(location, parameterValues);
+                        }
+                    } else if(paramInfo.sampler !== undefined) {
+                        gd.setTexture(parameter.textureUnit, parameterValues, paramInfo.sampler);
                     } else {
-                        parameter.setter.call(gl, parameter.location, parameterValues);
+                        numColumns = paramInfo.columns;
+                        location = parameter.location;
+                        if(4 === numColumns) {
+                            gl.uniform4iv(location, parameterValues);
+                        } else if(3 === numColumns) {
+                            gl.uniform3iv(location, parameterValues);
+                        } else if(2 === numColumns) {
+                            gl.uniform2iv(location, parameterValues);
+                        } else if(1 === paramInfo.rows) {
+                            gl.uniform1i(location, parameterValues);
+                        } else//if (1 === numColumns)
+                         {
+                            gl.uniform1iv(location, parameterValues);
+                        }
                     }
                 } else {
                     delete techniqueParameters[p];
-                    if(sampler) {
-                        gd.setTexture(parameter.textureUnit);
-                    }
                 }
             }
         }
@@ -2783,19 +2883,45 @@ WebGLGraphicsDevice.prototype = {
             if(parameter !== undefined) {
                 var parameterValues = techniqueParameters[p];
                 if(parameter.value !== parameterValues) {
-                    parameter.value = parameterValues;
-                    var sampler = parameter.sampler;
                     if(parameterValues !== undefined) {
-                        if(sampler !== undefined) {
-                            gd.setTexture(parameter.textureUnit, parameterValues, sampler);
+                        parameter.value = parameterValues;
+                        var paramInfo = parameter.info;
+                        var numColumns, location;
+                        if(paramInfo.type === 'float') {
+                            numColumns = paramInfo.columns;
+                            location = parameter.location;
+                            if(4 === numColumns) {
+                                gl.uniform4fv(location, parameterValues);
+                            } else if(3 === numColumns) {
+                                gl.uniform3fv(location, parameterValues);
+                            } else if(2 === numColumns) {
+                                gl.uniform2fv(location, parameterValues);
+                            } else if(1 === paramInfo.rows) {
+                                gl.uniform1f(location, parameterValues);
+                            } else//if (1 === numColumns)
+                             {
+                                gl.uniform1fv(location, parameterValues);
+                            }
+                        } else if(paramInfo.sampler !== undefined) {
+                            gd.setTexture(parameter.textureUnit, parameterValues, paramInfo.sampler);
                         } else {
-                            parameter.setter.call(gl, parameter.location, parameterValues);
+                            numColumns = paramInfo.columns;
+                            location = parameter.location;
+                            if(4 === numColumns) {
+                                gl.uniform4iv(location, parameterValues);
+                            } else if(3 === numColumns) {
+                                gl.uniform3iv(location, parameterValues);
+                            } else if(2 === numColumns) {
+                                gl.uniform2iv(location, parameterValues);
+                            } else if(1 === paramInfo.rows) {
+                                gl.uniform1i(location, parameterValues);
+                            } else//if (1 === numColumns)
+                             {
+                                gl.uniform1iv(location, parameterValues);
+                            }
                         }
                     } else {
                         delete techniqueParameters[p];
-                        if(sampler) {
-                            gd.setTexture(parameter.textureUnit);
-                        }
                     }
                 }
             }
@@ -2814,10 +2940,10 @@ WebGLGraphicsDevice.prototype = {
             for(var p in techniqueParameters) {
                 var parameter = parameters[p];
                 if(parameter) {
-                    var paramInfo = parameter.info;
                     var parameterValues = techniqueParameters[p];
                     if(parameterValues !== undefined) {
-                        if(parameter.sampler) {
+                        var paramInfo = parameter.info;
+                        if(paramInfo.sampler) {
                             paramInfo.values = parameterValues;
                             parameter.dirty = 1;
                         } else if(typeof parameterValues !== 'number') {
@@ -2901,6 +3027,9 @@ WebGLGraphicsDevice.prototype = {
             }
             var gl = this.gl;
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, glBuffer);
+            if(debug) {
+                this.metrics.indexBufferChanges += 1;
+            }
         }
     },
     drawArray: function drawArrayFn(drawParametersArray, globalTechniqueParametersArray, sortMode) {
@@ -2915,13 +3044,15 @@ WebGLGraphicsDevice.prototype = {
                 drawParametersArray.sort(function drawArraySortPositive(a, b) {
                     return (b.sortKey - a.sortKey);
                 });
-            } else if(sortMode < 0) {
+            } else//if (sortMode < 0)
+             {
                 drawParametersArray.sort(function drawArraySortNegative(a, b) {
                     return (a.sortKey - b.sortKey);
                 });
             }
         }
         var activeIndexBuffer = this.activeIndexBuffer;
+        var attributeMask = this.attributeMask;
         var setParameters = null;
         var lastTechnique = null;
         var lastEndStreams = -1;
@@ -2930,15 +3061,18 @@ WebGLGraphicsDevice.prototype = {
         var v = 0;
         var streamsMatch = false;
         var vertexBuffer = null;
-        var offset = 0;
         var passes = null;
         var p = null;
         var pass = null;
-        var format = 0;
+        var indexFormat = 0;
+        var indexStride = 0;
         var numPasses = 0;
         var mask = 0;
-        var attributeMask = 0;
         var t = 0;
+        if(activeIndexBuffer) {
+            indexFormat = activeIndexBuffer.format;
+            indexStride = activeIndexBuffer.stride;
+        }
         for(var n = 0; n < numDrawParameters; n += 1) {
             var drawParameters = drawParametersArray[n];
             var technique = drawParameters.technique;
@@ -2956,11 +3090,17 @@ WebGLGraphicsDevice.prototype = {
                 if(1 === numPasses) {
                     this.setTechniqueCaching(technique);
                     setParameters = setParametersCaching;
+                    mask = (passes[0].semanticsMask & attributeMask);
+                    if(mask !== this.clientStateMask) {
+                        this.enableClientState(mask);
+                    }
                 } else {
                     this.setTechnique(technique);
                     setParameters = setParametersDeferred;
                 }
-                technique.checkProperties(this);
+                if(technique.checkProperties) {
+                    technique.checkProperties(this);
+                }
                 for(t = 0; t < numGlobalTechniqueParameters; t += 1) {
                     setParameters(this, passes, globalTechniqueParametersArray[t]);
                 }
@@ -2985,32 +3125,41 @@ WebGLGraphicsDevice.prototype = {
                     }
                 }
                 attributeMask = this.attributeMask;
+                if(1 === numPasses) {
+                    mask = (passes[0].semanticsMask & attributeMask);
+                    if(mask !== this.clientStateMask) {
+                        this.enableClientState(mask);
+                    }
+                }
             }
             /*jshint bitwise: false*/
             if(indexBuffer) {
                 if(activeIndexBuffer !== indexBuffer) {
                     activeIndexBuffer = indexBuffer;
                     gl.bindBuffer(ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer);
-                }
-                offset = firstIndex;
-                if(offset) {
-                    offset *= indexBuffer.stride;
-                }
-                format = indexBuffer.format;
-                if(1 === numPasses) {
-                    mask = (passes[0].semanticsMask & attributeMask);
-                    if(mask !== this.clientStateMask) {
-                        this.enableClientState(mask);
+                    indexFormat = indexBuffer.format;
+                    indexStride = indexBuffer.stride;
+                    if(debug) {
+                        this.metrics.indexBufferChanges += 1;
                     }
+                }
+                firstIndex *= indexStride;
+                if(1 === numPasses) {
                     t = ((16 * 3) + 8);
                     if(t < endInstances) {
                         do {
                             setParameters(this, passes, drawParameters[t]);
-                            gl.drawElements(primitive, count, format, offset);
+                            gl.drawElements(primitive, count, indexFormat, firstIndex);
+                            if(debug) {
+                                this.metrics.addPrimitives(primitive, count);
+                            }
                             t += 1;
                         }while(t < endInstances);
                     } else {
-                        gl.drawElements(primitive, count, format, offset);
+                        gl.drawElements(primitive, count, indexFormat, firstIndex);
+                        if(debug) {
+                            this.metrics.addPrimitives(primitive, count);
+                        }
                     }
                 } else {
                     t = ((16 * 3) + 8);
@@ -3024,7 +3173,10 @@ WebGLGraphicsDevice.prototype = {
                                     this.enableClientState(mask);
                                 }
                                 this.setPass(pass);
-                                gl.drawElements(primitive, count, format, offset);
+                                gl.drawElements(primitive, count, indexFormat, firstIndex);
+                                if(debug) {
+                                    this.metrics.addPrimitives(primitive, count);
+                                }
                             }
                             t += 1;
                         }while(t < endInstances);
@@ -3036,25 +3188,30 @@ WebGLGraphicsDevice.prototype = {
                                 this.enableClientState(mask);
                             }
                             this.setPass(pass);
-                            gl.drawElements(primitive, count, format, offset);
+                            gl.drawElements(primitive, count, indexFormat, firstIndex);
+                            if(debug) {
+                                this.metrics.addPrimitives(primitive, count);
+                            }
                         }
                     }
                 }
             } else {
                 if(1 === numPasses) {
-                    mask = (passes[0].semanticsMask & attributeMask);
-                    if(mask !== this.clientStateMask) {
-                        this.enableClientState(mask);
-                    }
                     t = ((16 * 3) + 8);
                     if(t < endInstances) {
                         do {
                             setParameters(this, passes, drawParameters[t]);
                             gl.drawArrays(primitive, firstIndex, count);
+                            if(debug) {
+                                this.metrics.addPrimitives(primitive, count);
+                            }
                             t += 1;
                         }while(t < endInstances);
                     } else {
                         gl.drawArrays(primitive, firstIndex, count);
+                        if(debug) {
+                            this.metrics.addPrimitives(primitive, count);
+                        }
                     }
                 } else {
                     t = ((16 * 3) + 8);
@@ -3070,6 +3227,9 @@ WebGLGraphicsDevice.prototype = {
                                 this.setPass(pass);
                                 gl.drawArrays(primitive, firstIndex, count);
                             }
+                            if(debug) {
+                                this.metrics.addPrimitives(primitive, count);
+                            }
                             t += 1;
                         }while(t < endInstances);
                     } else {
@@ -3081,6 +3241,9 @@ WebGLGraphicsDevice.prototype = {
                             }
                             this.setPass(pass);
                             gl.drawArrays(primitive, firstIndex, count);
+                            if(debug) {
+                                this.metrics.addPrimitives(primitive, count);
+                            }
                         }
                     }
                 }
@@ -3183,13 +3346,13 @@ WebGLGraphicsDevice.prototype = {
                 gl.clearColor(color0, color1, color2, color3);
             }
         }
-        if(depth !== undefined) {
+        if(typeof depth === 'number') {
             clearMask += gl.DEPTH_BUFFER_BIT;
             if(state.clearDepth !== depth) {
                 state.clearDepth = depth;
                 gl.clearDepth(depth);
             }
-            if(stencil !== undefined) {
+            if(typeof stencil === 'number') {
                 clearMask += gl.STENCIL_BUFFER_BIT;
                 if(state.clearStencil !== stencil) {
                     state.clearStencil = stencil;
@@ -3252,10 +3415,23 @@ WebGLGraphicsDevice.prototype = {
         this.resetStates();
         this.setScissor(0, 0, this.width, this.height);
         this.setViewport(0, 0, this.width, this.height);
-        return true;
+        if(debug) {
+            this.metrics.renderTargetChanges = 0;
+            this.metrics.textureChanges = 0;
+            this.metrics.renderStateChanges = 0;
+            this.metrics.vertexBufferChanges = 0;
+            this.metrics.indexBufferChanges = 0;
+            this.metrics.techniqueChanges = 0;
+            this.metrics.drawCalls = 0;
+            this.metrics.primitives = 0;
+        }
+        return !(document.hidden || document['webkitHidden']);
     },
     beginRenderTarget: function beginRenderTargetFn(renderTarget) {
         this.activeRenderTarget = renderTarget;
+        if(debug) {
+            this.metrics.renderTargetChanges += 1;
+        }
         return renderTarget.bind();
     },
     endRenderTarget: function endRenderTargetFn() {
@@ -3459,6 +3635,12 @@ WebGLGraphicsDevice.prototype = {
             return pixels;
         }
     },
+    flush: function flush() {
+        this.gl.flush();
+    },
+    finish: function finish() {
+        this.gl.finish();
+    },
     checkFullScreen: // private
     function checkFullScreenFn() {
         var fullscreen = this.fullscreen;
@@ -3515,6 +3697,9 @@ WebGLGraphicsDevice.prototype = {
             this.bindedVertexBuffer = buffer;
             var gl = this.gl;
             gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            if(debug) {
+                this.metrics.vertexBufferChanges += 1;
+            }
         }
     },
     unbindVertexBuffer: function unbindVertexBufferFn(buffer) {
@@ -3633,14 +3818,14 @@ WebGLGraphicsDevice.prototype = {
         var enableMask = ((~oldMask) & mask);
         var n;
         if(disableMask) {
-            if((disableMask & 255) === 0) {
+            if((disableMask & 0xff) === 0) {
                 disableMask >>= 8;
                 n = 8;
             } else {
                 n = 0;
             }
             do {
-                if(0 !== (1 & disableMask)) {
+                if(0 !== (0x01 & disableMask)) {
                     gl.disableVertexAttribArray(n);
                 }
                 n += 1;
@@ -3648,14 +3833,14 @@ WebGLGraphicsDevice.prototype = {
             }while(disableMask);
         }
         if(enableMask) {
-            if((enableMask & 255) === 0) {
+            if((enableMask & 0xff) === 0) {
                 enableMask >>= 8;
                 n = 8;
             } else {
                 n = 0;
             }
             do {
-                if(0 !== (1 & enableMask)) {
+                if(0 !== (0x01 & enableMask)) {
                     gl.enableVertexAttribArray(n);
                 }
                 n += 1;
@@ -3687,6 +3872,9 @@ WebGLGraphicsDevice.prototype = {
                 if(texture.sampler !== sampler) {
                     texture.sampler = sampler;
                     this.setSampler(sampler, gltarget);
+                }
+                if(debug) {
+                    this.metrics.textureChanges += 1;
                 }
             }
         } else {
@@ -3864,6 +4052,8 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
     } else {
         gd.maxAnisotropy = 1;
     }
+    // Enable OES_element_index_uint extension
+    gl.getExtension('OES_element_index_uint');
     gd.PRIMITIVE_POINTS = gl.POINTS;
     gd.PRIMITIVE_LINES = gl.LINES;
     gd.PRIMITIVE_LINE_LOOP = gl.LINE_LOOP;
@@ -3876,17 +4066,17 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
     gd.INDEXFORMAT_UINT = gl.UNSIGNED_INT;
     var getNormalizationScale = function getNormalizationScaleFn(format) {
         if(format === gl.BYTE) {
-            return 127;
+            return 0x7f;
         } else if(format === gl.UNSIGNED_BYTE) {
-            return 255;
+            return 0xff;
         } else if(format === gl.SHORT) {
-            return 32767;
+            return 0x7fff;
         } else if(format === gl.UNSIGNED_SHORT) {
-            return 65535;
+            return 0xffff;
         } else if(format === gl.INT) {
-            return 2147483647;
+            return 0x7fffffff;
         } else if(format === gl.UNSIGNED_INT) {
-            return 4294967295;
+            return 0xffffffff;
         } else//if (format === gl.FLOAT)
          {
             return 1;
@@ -3987,6 +4177,8 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
     textureUnits.length = maxTextureUnit;
     for(var t = 0; t < maxTextureUnit; t += 1) {
         textureUnits[t] = {
+            texture: null,
+            target: 0
         };
     }
     var defaultDepthFunc = gl.LEQUAL;
@@ -4016,7 +4208,7 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
         ],
         stencilFunc: defaultStencilFunc,
         stencilRef: 0,
-        stencilMask: 4294967295,
+        stencilMask: 0xffffffff,
         stencilFail: defaultStencilOp,
         stencilZFail: defaultStencilOp,
         stencilZPass: defaultStencilOp,
@@ -4051,6 +4243,51 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
         program: null
     };
     gd.state = currentState;
+    if(debug) {
+        gd.metrics = {
+            renderTargetChanges: 0,
+            textureChanges: 0,
+            renderStateChanges: 0,
+            vertexBufferChanges: 0,
+            indexBufferChanges: 0,
+            techniqueChanges: 0,
+            drawCalls: 0,
+            primitives: 0,
+            addPrimitives: function addPrimitivesFn(primitive, count) {
+                this.drawCalls += 1;
+                switch(primitive) {
+                    case 0x0000:
+                        //POINTS
+                        this.primitives += count;
+                        break;
+                    case 0x0001:
+                        //LINES
+                        this.primitives += (count >> 1);
+                        break;
+                    case 0x0002:
+                        //LINE_LOOP
+                        this.primitives += count;
+                        break;
+                    case 0x0003:
+                        //LINE_STRIP
+                        this.primitives += count - 1;
+                        break;
+                    case 0x0004:
+                        //TRIANGLES
+                        this.primitives += (count / 3) | 0;
+                        break;
+                    case 0x0005:
+                        //TRIANGLE_STRIP
+                        this.primitives += count - 2;
+                        break;
+                    case 0x0006:
+                        //TRIANGLE_FAN
+                        this.primitives += count - 2;
+                        break;
+                }
+            }
+        };
+    }
     // State handlers
     function setDepthTestEnable(enable) {
         if(currentState.depthTestEnable !== enable) {
@@ -4060,18 +4297,27 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             } else {
                 gl.disable(gl.DEPTH_TEST);
             }
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setDepthFunc(func) {
         if(currentState.depthFunc !== func) {
             currentState.depthFunc = func;
             gl.depthFunc(func);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setDepthMask(enable) {
         if(currentState.depthMask !== enable) {
             currentState.depthMask = enable;
             gl.depthMask(enable);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setBlendEnable(enable) {
@@ -4082,6 +4328,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             } else {
                 gl.disable(gl.BLEND);
             }
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setBlendFunc(src, dst) {
@@ -4089,6 +4338,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             currentState.blendSrc = src;
             currentState.blendDst = dst;
             gl.blendFunc(src, dst);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setCullFaceEnable(enable) {
@@ -4099,18 +4351,27 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             } else {
                 gl.disable(gl.CULL_FACE);
             }
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setCullFace(face) {
         if(currentState.cullFace !== face) {
             currentState.cullFace = face;
             gl.cullFace(face);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setFrontFace(face) {
         if(currentState.frontFace !== face) {
             currentState.frontFace = face;
             gl.frontFace(face);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setColorMask(mask0, mask1, mask2, mask3) {
@@ -4121,6 +4382,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             colorMask[2] = mask2;
             colorMask[3] = mask3;
             gl.colorMask(mask0, mask1, mask2, mask3);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setStencilTestEnable(enable) {
@@ -4131,6 +4395,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             } else {
                 gl.disable(gl.STENCIL_TEST);
             }
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setStencilFunc(stencilFunc, stencilRef, stencilMask) {
@@ -4139,6 +4406,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             currentState.stencilRef = stencilRef;
             currentState.stencilMask = stencilMask;
             gl.stencilFunc(stencilFunc, stencilRef, stencilMask);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setStencilOp(stencilFail, stencilZfail, stencilZpass) {
@@ -4147,6 +4417,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             currentState.stencilZFail = stencilZfail;
             currentState.stencilZPass = stencilZpass;
             gl.stencilOp(stencilFail, stencilZfail, stencilZpass);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setPolygonOffsetFillEnable(enable) {
@@ -4157,6 +4430,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             } else {
                 gl.disable(gl.POLYGON_OFFSET_FILL);
             }
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setPolygonOffset(factor, units) {
@@ -4164,12 +4440,18 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             currentState.polygonOffsetFactor = factor;
             currentState.polygonOffsetUnits = units;
             gl.polygonOffset(factor, units);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function setLineWidth(lineWidth) {
         if(currentState.lineWidth !== lineWidth) {
             currentState.lineWidth = lineWidth;
             gl.lineWidth(lineWidth);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetDepthTestEnable() {
@@ -4177,6 +4459,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
         if(!currentState.depthTestEnable) {
             currentState.depthTestEnable = true;
             gl.enable(gl.DEPTH_TEST);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetDepthFunc() {
@@ -4185,6 +4470,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
         if(currentState.depthFunc !== func) {
             currentState.depthFunc = func;
             gl.depthFunc(func);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetDepthMask() {
@@ -4192,6 +4480,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
         if(!currentState.depthMask) {
             currentState.depthMask = true;
             gl.depthMask(true);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetBlendEnable() {
@@ -4199,6 +4490,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
         if(currentState.blendEnable) {
             currentState.blendEnable = false;
             gl.disable(gl.BLEND);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetBlendFunc() {
@@ -4209,6 +4503,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             currentState.blendSrc = src;
             currentState.blendDst = dst;
             gl.blendFunc(src, dst);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetCullFaceEnable() {
@@ -4216,6 +4513,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
         if(!currentState.cullFaceEnable) {
             currentState.cullFaceEnable = true;
             gl.enable(gl.CULL_FACE);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetCullFace() {
@@ -4224,6 +4524,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
         if(currentState.cullFace !== face) {
             currentState.cullFace = face;
             gl.cullFace(face);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetFrontFace() {
@@ -4232,6 +4535,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
         if(currentState.frontFace !== face) {
             currentState.frontFace = face;
             gl.frontFace(face);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetColorMask() {
@@ -4243,6 +4549,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             colorMask[2] = true;
             colorMask[3] = true;
             gl.colorMask(true, true, true, true);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetStencilTestEnable() {
@@ -4250,16 +4559,22 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
         if(currentState.stencilTestEnable) {
             currentState.stencilTestEnable = false;
             gl.disable(gl.STENCIL_TEST);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetStencilFunc() {
         //setStencilFunc(defaultStencilFunc, 0, 0xffffffff);
         var stencilFunc = defaultStencilFunc;
-        if(currentState.stencilFunc !== stencilFunc || currentState.stencilRef !== 0 || currentState.stencilMask !== 4294967295) {
+        if(currentState.stencilFunc !== stencilFunc || currentState.stencilRef !== 0 || currentState.stencilMask !== 0xffffffff) {
             currentState.stencilFunc = stencilFunc;
             currentState.stencilRef = 0;
-            currentState.stencilMask = 4294967295;
-            gl.stencilFunc(stencilFunc, 0, 4294967295);
+            currentState.stencilMask = 0xffffffff;
+            gl.stencilFunc(stencilFunc, 0, 0xffffffff);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetStencilOp() {
@@ -4270,6 +4585,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             currentState.stencilZFail = stencilOp;
             currentState.stencilZPass = stencilOp;
             gl.stencilOp(stencilOp, stencilOp, stencilOp);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetPolygonOffsetFillEnable() {
@@ -4277,6 +4595,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
         if(currentState.polygonOffsetFillEnable) {
             currentState.polygonOffsetFillEnable = false;
             gl.disable(gl.POLYGON_OFFSET_FILL);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetPolygonOffset() {
@@ -4285,6 +4606,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
             currentState.polygonOffsetFactor = 0;
             currentState.polygonOffsetUnits = 0;
             gl.polygonOffset(0, 0);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function resetLineWidth() {
@@ -4292,6 +4616,9 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
         if(currentState.lineWidth !== 1) {
             currentState.lineWidth = 1;
             gl.lineWidth(1);
+            if(debug) {
+                gd.metrics.renderStateChanges += 1;
+            }
         }
     }
     function parseBoolean(state) {
@@ -4456,7 +4783,7 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
     addStateHandler("StencilFunc", setStencilFunc, resetStencilFunc, parseEnum3, [
         defaultStencilFunc, 
         0, 
-        4294967295
+        0xffffffff
     ]);
     addStateHandler("StencilOp", setStencilOp, resetStencilOp, parseEnum3, [
         defaultStencilOp, 

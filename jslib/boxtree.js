@@ -55,8 +55,8 @@ var BoxTree = (function () {
         this.numAdds = 0;
         this.numUpdates = 0;
         this.numExternalNodes = 0;
-        this.startUpdate = 2147483647;
-        this.endUpdate = -2147483647;
+        this.startUpdate = 0x7FFFFFFF;
+        this.endUpdate = -0x7FFFFFFF;
         this.highQuality = highQuality;
     }
     BoxTree.version = 1;
@@ -247,8 +247,8 @@ var BoxTree = (function () {
         this.needsRebound = false;
         this.numAdds = 0;
         //this.numUpdates = 0;
-        this.startUpdate = 2147483647;
-        this.endUpdate = -2147483647;
+        this.startUpdate = 0x7FFFFFFF;
+        this.endUpdate = -0x7FFFFFFF;
     };
     BoxTree.prototype.rebuild = function () {
         if(this.numExternalNodes > 0) {
@@ -304,8 +304,8 @@ var BoxTree = (function () {
         this.needsRebound = false;
         this.numAdds = 0;
         this.numUpdates = 0;
-        this.startUpdate = 2147483647;
-        this.endUpdate = -2147483647;
+        this.startUpdate = 0x7FFFFFFF;
+        this.endUpdate = -0x7FFFFFFF;
     };
     BoxTree.prototype.sortNodes = function (nodes) {
         var numNodesLeaf = this.numNodesLeaf;
@@ -896,8 +896,8 @@ var BoxTree = (function () {
         this.numAdds = 0;
         this.numUpdates = 0;
         this.numExternalNodes = 0;
-        this.startUpdate = 2147483647;
-        this.endUpdate = -2147483647;
+        this.startUpdate = 0x7FFFFFFF;
+        this.endUpdate = -0x7FFFFFFF;
     };
     BoxTree.rayTest = function rayTest(trees, ray, callback) {
         // convert ray to parametric form

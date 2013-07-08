@@ -57,7 +57,7 @@ var SimpleRendering = (function () {
                 if(!rendererInfo) {
                     rendererInfo = renderingCommonCreateRendererInfoFn(renderable);
                 }
-                rendererInfo.renderUpdate.call(renderable, camera);
+                renderable.renderUpdate(camera);
                 drawParametersArray = renderable.drawParameters;
                 numDrawParameters = drawParametersArray.length;
                 for(drawParametersIndex = 0; drawParametersIndex < numDrawParameters; drawParametersIndex += 1) {
@@ -65,7 +65,7 @@ var SimpleRendering = (function () {
                     passIndex = drawParameters.userData.passIndex;
                     if(passIndex === transparent) {
                         if(rendererInfo.far) {
-                            drawParameters.sortKey = 1e+38;
+                            drawParameters.sortKey = 1.e38;
                         } else {
                             drawParameters.sortKey = renderable.distance;
                         }
@@ -181,7 +181,7 @@ var SimpleRendering = (function () {
         if(!geometryInstance.sharedMaterial.techniqueParameters.uvTransform && !geometryInstance.techniqueParameters.uvTransform) {
             geometryInstance.techniqueParameters.uvTransform = SimpleRendering.identityUVTransform;
         }
-        geometryInstance.rendererInfo.renderUpdate = this.update;
+        geometryInstance.renderUpdate = this.update;
     };
     SimpleRendering.create = //
     // Constructor function
@@ -213,21 +213,16 @@ var SimpleRendering = (function () {
         shaderManager.load(simpleCGFX, onShaderLoaded);
         shaderManager.load(debugCGFX);
         // Prepare effects
-        var m43MulM44 = md.m43MulM44;
-        var m43Inverse = md.m43Inverse;
-        var m43TransformPoint = md.m43TransformPoint;
-        var m33Transpose = md.m33Transpose;
-        var m33InverseTranspose = md.m33InverseTranspose;
         var simpleUpdate = function simpleUpdateFn(camera) {
             var techniqueParameters = this.techniqueParameters;
             var node = this.node;
             var matrix = node.world;
             var worldUpdate = node.worldUpdate;
             var lightPositionUpdated, eyePositionUpdated, worldInverse;
-            techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
+            techniqueParameters.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
             if(this.techniqueParametersUpdated !== worldUpdate) {
                 this.techniqueParametersUpdated = worldUpdate;
-                this.worldInverse = worldInverse = m43Inverse.call(md, matrix, worldInverse);
+                this.worldInverse = worldInverse = md.m43Inverse(matrix, worldInverse);
                 lightPositionUpdated = true;
                 eyePositionUpdated = true;
             } else {
@@ -236,10 +231,10 @@ var SimpleRendering = (function () {
                 worldInverse = this.worldInverse;
             }
             if(lightPositionUpdated) {
-                techniqueParameters.lightPosition = m43TransformPoint.call(md, worldInverse, dr.lightPosition, techniqueParameters.lightPosition);
+                techniqueParameters.lightPosition = md.m43TransformPoint(worldInverse, dr.lightPosition, techniqueParameters.lightPosition);
             }
             if(eyePositionUpdated) {
-                techniqueParameters.eyePosition = m43TransformPoint.call(md, worldInverse, dr.eyePosition, techniqueParameters.eyePosition);
+                techniqueParameters.eyePosition = md.m43TransformPoint(worldInverse, dr.eyePosition, techniqueParameters.eyePosition);
             }
         };
         var simpleSkinnedUpdate = function simpleSkinnedUpdateFn(camera) {
@@ -248,10 +243,10 @@ var SimpleRendering = (function () {
             var matrix = node.world;
             var worldUpdate = node.worldUpdate;
             var lightPositionUpdated, eyePositionUpdated, worldInverse;
-            techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
+            techniqueParameters.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
             if(this.techniqueParametersUpdated !== worldUpdate) {
                 this.techniqueParametersUpdated = worldUpdate;
-                this.worldInverse = worldInverse = m43Inverse.call(md, matrix, worldInverse);
+                this.worldInverse = worldInverse = md.m43Inverse(matrix, worldInverse);
                 lightPositionUpdated = true;
                 eyePositionUpdated = true;
             } else {
@@ -260,10 +255,10 @@ var SimpleRendering = (function () {
                 worldInverse = this.worldInverse;
             }
             if(lightPositionUpdated) {
-                techniqueParameters.lightPosition = m43TransformPoint.call(md, worldInverse, dr.lightPosition, techniqueParameters.lightPosition);
+                techniqueParameters.lightPosition = md.m43TransformPoint(worldInverse, dr.lightPosition, techniqueParameters.lightPosition);
             }
             if(eyePositionUpdated) {
-                techniqueParameters.eyePosition = m43TransformPoint.call(md, worldInverse, dr.eyePosition, techniqueParameters.eyePosition);
+                techniqueParameters.eyePosition = md.m43TransformPoint(worldInverse, dr.eyePosition, techniqueParameters.eyePosition);
             }
             var skinController = this.skinController;
             if(skinController) {
@@ -273,11 +268,11 @@ var SimpleRendering = (function () {
         };
         var simpleNoLightUpdate = function simpleNoLightUpdateFn(camera) {
             var techniqueParameters = this.techniqueParameters;
-            techniqueParameters.worldViewProjection = m43MulM44.call(md, this.node.world, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
+            techniqueParameters.worldViewProjection = md.m43MulM44(this.node.world, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
         };
         var simpleNoLightSkinnedUpdate = function simpleNoLightSkinnedUpdateFn(camera) {
             var techniqueParameters = this.techniqueParameters;
-            techniqueParameters.worldViewProjection = m43MulM44.call(md, this.node.world, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
+            techniqueParameters.worldViewProjection = md.m43MulM44(this.node.world, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
             var skinController = this.skinController;
             if(skinController) {
                 techniqueParameters.skinBones = skinController.output;
@@ -289,10 +284,10 @@ var SimpleRendering = (function () {
             var node = this.node;
             var matrix = node.world;
             var worldUpdate = node.worldUpdate;
-            techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
+            techniqueParameters.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
             if(this.techniqueParametersUpdated !== worldUpdate) {
                 this.techniqueParametersUpdated = worldUpdate;
-                techniqueParameters.worldInverseTranspose = m33InverseTranspose.call(md, matrix, techniqueParameters.worldInverseTranspose);
+                techniqueParameters.worldInverseTranspose = md.m33InverseTranspose(matrix, techniqueParameters.worldInverseTranspose);
             }
         };
         var simpleDebugNormalsSkinnedUpdate = function simpleDebugNormalsSkinnedUpdateFn(camera) {
@@ -300,10 +295,10 @@ var SimpleRendering = (function () {
             var node = this.node;
             var matrix = node.world;
             var worldUpdate = node.worldUpdate;
-            techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
+            techniqueParameters.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
             if(this.techniqueParametersUpdated !== worldUpdate) {
                 this.techniqueParametersUpdated = worldUpdate;
-                techniqueParameters.worldInverseTranspose = m33InverseTranspose.call(md, matrix, techniqueParameters.worldInverseTranspose);
+                techniqueParameters.worldInverseTranspose = md.m33InverseTranspose(matrix, techniqueParameters.worldInverseTranspose);
             }
             var skinController = this.skinController;
             if(skinController) {
@@ -317,15 +312,15 @@ var SimpleRendering = (function () {
             var matrix = node.world;
             var worldUpdate = node.worldUpdate;
             var worldInverse;
-            techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
+            techniqueParameters.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
             if(this.techniqueParametersUpdated !== worldUpdate) {
                 this.techniqueParametersUpdated = worldUpdate;
-                this.worldInverse = worldInverse = m43Inverse.call(md, matrix, worldInverse);
-                techniqueParameters.worldInverseTranspose = m33InverseTranspose.call(md, matrix, techniqueParameters.worldInverseTranspose);
+                this.worldInverse = worldInverse = md.m43Inverse(matrix, worldInverse);
+                techniqueParameters.worldInverseTranspose = md.m33InverseTranspose(matrix, techniqueParameters.worldInverseTranspose);
             } else {
                 worldInverse = this.worldInverse;
             }
-            techniqueParameters.eyePosition = m43TransformPoint.call(md, worldInverse, dr.eyePosition, techniqueParameters.eyePosition);
+            techniqueParameters.eyePosition = md.m43TransformPoint(worldInverse, dr.eyePosition, techniqueParameters.eyePosition);
         };
         var simpleEnvSkinnedUpdate = function simpleEnvSkinnedUpdateFn(camera) {
             var techniqueParameters = this.techniqueParameters;
@@ -333,15 +328,15 @@ var SimpleRendering = (function () {
             var matrix = node.world;
             var worldUpdate = node.worldUpdate;
             var worldInverse;
-            techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
+            techniqueParameters.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
             if(this.techniqueParametersUpdated !== worldUpdate) {
                 this.techniqueParametersUpdated = worldUpdate;
-                this.worldInverse = worldInverse = m43Inverse.call(md, matrix, worldInverse);
-                techniqueParameters.worldInverseTranspose = m33InverseTranspose.call(md, matrix, techniqueParameters.worldInverseTranspose);
+                this.worldInverse = worldInverse = md.m43Inverse(matrix, worldInverse);
+                techniqueParameters.worldInverseTranspose = md.m33InverseTranspose(matrix, techniqueParameters.worldInverseTranspose);
             } else {
                 worldInverse = this.worldInverse;
             }
-            techniqueParameters.eyePosition = m43TransformPoint.call(md, worldInverse, dr.eyePosition, techniqueParameters.eyePosition);
+            techniqueParameters.eyePosition = md.m43TransformPoint(worldInverse, dr.eyePosition, techniqueParameters.eyePosition);
             var skinController = this.skinController;
             if(skinController) {
                 techniqueParameters.skinBones = skinController.output;
@@ -1172,6 +1167,20 @@ var SimpleRendering = (function () {
         };
         effectTypeData.loadTechniques(shaderManager);
         effect.add(skinned, effectTypeData);
+        //
+        // lightmap
+        //
+        effect = Effect.create("lightmap");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: simplePrepare,
+            shaderName: simpleCGFX,
+            techniqueName: "lightmap",
+            update: simpleNoLightUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
         return dr;
     };
     return SimpleRendering;

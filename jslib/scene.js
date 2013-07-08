@@ -34,9 +34,9 @@ var Scene = (function () {
     //
     function (rootNode) {
         // Add the root to the top level nodes list and update the scene hierarchys
-        Utilities.assert(rootNode.name, "Root nodes must be named");
-        Utilities.assert(!rootNode.scene, "Root node already in a scene");
-        Utilities.assert(!this.rootNodesMap[rootNode.name], "Root node with the same name exits in the scene");
+        debug.assert(rootNode.name, "Root nodes must be named");
+        debug.assert(!rootNode.scene, "Root node already in a scene");
+        debug.assert(!this.rootNodesMap[rootNode.name], "Root node with the same name exits in the scene");
         rootNode.scene = this;
         this.rootNodes.push(rootNode);
         if(!this.dirtyRoots) {
@@ -50,7 +50,7 @@ var Scene = (function () {
     // removeRootNode
     //
     function (rootNode) {
-        Utilities.assert(rootNode.scene === this, "Root node is not in the scene");
+        debug.assert(rootNode.scene === this, "Root node is not in the scene");
         rootNode.removedFromScene(this);
         var rootNodes = this.rootNodes;
         var numRootNodes = rootNodes.length;
@@ -1276,13 +1276,10 @@ var Scene = (function () {
     //
     function (camera) {
         var visibleNodes = this.visibleNodes;
-        visibleNodes.length = 0;
         var numVisibleNodes = 0;
         var visibleRenderables = this.visibleRenderables;
-        visibleRenderables.length = 0;
         var numVisibleRenderables = 0;
         var visibleLights = this.visibleLights;
-        visibleLights.length = 0;
         var numVisibleLights = 0;
         this.extractFrustumPlanes(camera);
         var frameIndex = this.frameIndex;
@@ -1317,81 +1314,79 @@ var Scene = (function () {
                 distance = node.distance;
             }
             if(0 < distance) {
-                if(!node.disabled) {
-                    var renderable, i, lightInstance, l;
-                    var renderables = node.renderables;
-                    var numRenderables = (renderables ? renderables.length : 0);
-                    var lights = node.lightInstances;
-                    var numLights = (lights ? lights.length : 0);
-                    var fullyVisible = (1 < (numLights + numRenderables) ? isFullyInsidePlanesAABB(extents, planes) : false);
-                    if(renderables) {
-                        if(numRenderables === 1 && !lights) {
-                            renderable = renderables[0];
-                            if(!renderable.disabled && renderable.queryCounter !== queryCounter) {
-                                if(maxDistance < distance) {
-                                    maxDistance = distance;
-                                }
-                                renderable.distance = distance;
-                                renderable.frameVisible = frameIndex;
-                                renderable.queryCounter = queryCounter;
-                                visibleRenderables[numVisibleRenderables] = renderable;
-                                numVisibleRenderables += 1;
+                var renderable, i, lightInstance, l;
+                var renderables = node.renderables;
+                var numRenderables = (renderables ? renderables.length : 0);
+                var lights = node.lightInstances;
+                var numLights = (lights ? lights.length : 0);
+                var fullyVisible = (1 < (numLights + numRenderables) ? isFullyInsidePlanesAABB(extents, planes) : false);
+                if(renderables) {
+                    if(numRenderables === 1 && !lights) {
+                        renderable = renderables[0];
+                        if(!renderable.disabled && renderable.queryCounter !== queryCounter) {
+                            if(maxDistance < distance) {
+                                maxDistance = distance;
                             }
-                        } else {
-                            for(i = 0; i < numRenderables; i += 1) {
-                                renderable = renderables[i];
-                                if(!renderable.disabled && renderable.queryCounter !== queryCounter) {
-                                    extents = renderable.getWorldExtents();
-                                    if(fullyVisible || isInsidePlanesAABB(extents, planes)) {
-                                        distance = ((d0 * (d0 > 0 ? extents[3] : extents[0])) + (d1 * (d1 > 0 ? extents[4] : extents[1])) + (d2 * (d2 > 0 ? extents[5] : extents[2])) - offset);
-                                        if(0 < distance) {
-                                            if(maxDistance < distance) {
-                                                maxDistance = distance;
-                                            }
-                                            renderable.distance = distance;
-                                            renderable.frameVisible = frameIndex;
-                                            renderable.queryCounter = queryCounter;
-                                            visibleRenderables[numVisibleRenderables] = renderable;
-                                            numVisibleRenderables += 1;
-                                        } else {
-                                            allVisible = false;
+                            renderable.distance = distance;
+                            renderable.frameVisible = frameIndex;
+                            renderable.queryCounter = queryCounter;
+                            visibleRenderables[numVisibleRenderables] = renderable;
+                            numVisibleRenderables += 1;
+                        }
+                    } else {
+                        for(i = 0; i < numRenderables; i += 1) {
+                            renderable = renderables[i];
+                            if(!renderable.disabled && renderable.queryCounter !== queryCounter) {
+                                extents = renderable.getWorldExtents();
+                                if(fullyVisible || isInsidePlanesAABB(extents, planes)) {
+                                    distance = ((d0 * (d0 > 0 ? extents[3] : extents[0])) + (d1 * (d1 > 0 ? extents[4] : extents[1])) + (d2 * (d2 > 0 ? extents[5] : extents[2])) - offset);
+                                    if(0 < distance) {
+                                        if(maxDistance < distance) {
+                                            maxDistance = distance;
                                         }
+                                        renderable.distance = distance;
+                                        renderable.frameVisible = frameIndex;
+                                        renderable.queryCounter = queryCounter;
+                                        visibleRenderables[numVisibleRenderables] = renderable;
+                                        numVisibleRenderables += 1;
                                     } else {
                                         allVisible = false;
                                     }
+                                } else {
+                                    allVisible = false;
                                 }
                             }
                         }
                     }
-                    if(lights) {
-                        if(numLights === 1 && !renderables) {
-                            lightInstance = lights[0];
+                }
+                if(lights) {
+                    if(numLights === 1 && !renderables) {
+                        lightInstance = lights[0];
+                        if(!lightInstance.disabled && lightInstance.queryCounter !== queryCounter && !lightInstance.light.isGlobal()) {
+                            lightInstance.distance = distance;
+                            lightInstance.frameVisible = frameIndex;
+                            lightInstance.queryCounter = queryCounter;
+                            visibleLights[numVisibleLights] = lightInstance;
+                            numVisibleLights += 1;
+                        }
+                    } else {
+                        for(l = 0; l < numLights; l += 1) {
+                            lightInstance = lights[l];
                             if(!lightInstance.disabled && lightInstance.queryCounter !== queryCounter && !lightInstance.light.isGlobal()) {
-                                lightInstance.distance = distance;
-                                lightInstance.frameVisible = frameIndex;
-                                lightInstance.queryCounter = queryCounter;
-                                visibleLights[numVisibleLights] = lightInstance;
-                                numVisibleLights += 1;
-                            }
-                        } else {
-                            for(l = 0; l < numLights; l += 1) {
-                                lightInstance = lights[l];
-                                if(!lightInstance.disabled && lightInstance.queryCounter !== queryCounter && !lightInstance.light.isGlobal()) {
-                                    extents = lightInstance.getWorldExtents();
-                                    if(fullyVisible || isInsidePlanesAABB(extents, planes)) {
-                                        distance = ((d0 * (d0 > 0 ? extents[3] : extents[0])) + (d1 * (d1 > 0 ? extents[4] : extents[1])) + (d2 * (d2 > 0 ? extents[5] : extents[2])) - offset);
-                                        if(0 < distance) {
-                                            lightInstance.distance = distance;
-                                            lightInstance.frameVisible = frameIndex;
-                                            lightInstance.queryCounter = queryCounter;
-                                            visibleLights[numVisibleLights] = lightInstance;
-                                            numVisibleLights += 1;
-                                        } else {
-                                            allVisible = false;
-                                        }
+                                extents = lightInstance.getWorldExtents();
+                                if(fullyVisible || isInsidePlanesAABB(extents, planes)) {
+                                    distance = ((d0 * (d0 > 0 ? extents[3] : extents[0])) + (d1 * (d1 > 0 ? extents[4] : extents[1])) + (d2 * (d2 > 0 ? extents[5] : extents[2])) - offset);
+                                    if(0 < distance) {
+                                        lightInstance.distance = distance;
+                                        lightInstance.frameVisible = frameIndex;
+                                        lightInstance.queryCounter = queryCounter;
+                                        visibleLights[numVisibleLights] = lightInstance;
+                                        numVisibleLights += 1;
                                     } else {
                                         allVisible = false;
                                     }
+                                } else {
+                                    allVisible = false;
                                 }
                             }
                         }
@@ -1462,7 +1457,7 @@ var Scene = (function () {
                 for(n = 0; n < numNodes; n += 1) {
                     node = nodes[n];
                     node.queryCounter = queryCounter;
-                    if(isInsidePlanesAABB(node.worldExtents, frustumPlanes)) {
+                    if(!node.disabled && isInsidePlanesAABB(node.worldExtents, frustumPlanes)) {
                         sceneProcessVisibleNode(node, frustumPlanes);
                     }
                 }
@@ -1494,7 +1489,9 @@ var Scene = (function () {
                         for(n = 0; n < numNodes; n += 1) {
                             node = nodes[n];
                             if(node.queryCounter !== queryCounter) {
-                                if(isInsidePlanesAABB(node.worldExtents, portalPlanes)) {
+                                if(node.disabled) {
+                                    node.queryCounter = queryCounter;
+                                } else if(isInsidePlanesAABB(node.worldExtents, portalPlanes)) {
                                     sceneProcessVisibleNode(node, portalPlanes);
                                 }
                             }
@@ -1514,12 +1511,11 @@ var Scene = (function () {
             this.staticSpatialMap.getVisibleNodes(frustumPlanes, queryVisibleNodes);
             this.dynamicSpatialMap.getVisibleNodes(frustumPlanes, queryVisibleNodes);
             var numQueryVisibleNodes = queryVisibleNodes.length;
-            if(numQueryVisibleNodes) {
-                n = 0;
-                do {
-                    sceneProcessVisibleNode(queryVisibleNodes[n], frustumPlanes);
-                    n += 1;
-                }while(n < numQueryVisibleNodes);
+            for(n = 0; n < numQueryVisibleNodes; n += 1) {
+                node = queryVisibleNodes[n];
+                if(!node.disabled) {
+                    sceneProcessVisibleNode(node, frustumPlanes);
+                }
             }
         }
         this.maxDistance = (maxDistance + camera.nearPlane);
@@ -1568,8 +1564,6 @@ var Scene = (function () {
                 }
             }
             if(oldNumVisibleRenderables !== numVisibleRenderables || oldNumVisibleLights !== numVisibleLights) {
-                visibleRenderables.length = numVisibleRenderables;
-                visibleLights.length = numVisibleLights;
                 n = 0;
                 while(n < numVisibleNodes) {
                     node = visibleNodes[n];
@@ -1586,9 +1580,11 @@ var Scene = (function () {
                         n += 1;
                     }
                 }
-                visibleNodes.length = numVisibleNodes;
             }
         }
+        visibleRenderables.length = numVisibleRenderables;
+        visibleLights.length = numVisibleLights;
+        visibleNodes.length = numVisibleNodes;
         this.frameIndex += 1;
     };
     Scene.prototype.getCurrentVisibleNodes = //
@@ -2227,6 +2223,7 @@ var Scene = (function () {
         var materials = this.materials;
         var material = Material.create(graphicsDevice);
         var param, filename, effectType, p;
+        var fileEffectMeta;
         // Effect associated, load from file
         if(fileEffects) {
             var fileEffect = fileEffects[effectName];
@@ -2253,6 +2250,7 @@ var Scene = (function () {
                     }
                 }
                 effectType = fileEffect.type;
+                fileEffectMeta = fileEffect.meta;
             } else {
                 effectType = effectName;
             }
@@ -2281,8 +2279,18 @@ var Scene = (function () {
             }
         }
         material.effectName = effectType;
-        if(fileMaterial.meta) {
-            material.meta = fileMaterial.meta;
+        var fileMaterialMeta = fileMaterial.meta;
+        if(fileMaterialMeta) {
+            if(fileEffectMeta) {
+                for(p in fileEffectMeta) {
+                    if(fileEffectMeta.hasOwnProperty(p) && !fileMaterialMeta.hasOwnProperty(p)) {
+                        fileMaterialMeta[p] = fileEffectMeta[p];
+                    }
+                }
+            }
+            material.meta = fileMaterialMeta;
+        } else if(fileEffectMeta) {
+            material.meta = fileEffectMeta;
         }
         materials[materialName] = material;
         material.name = materialName;
@@ -2563,26 +2571,37 @@ var Scene = (function () {
                 var updateSingleIndexTables = function updateSingleIndexTablesFn(surface, indicesPerVertex, verticesAsIndexLists, verticesAsIndexListTable) {
                     var faces = surface.faces;
                     var numVerts = faces.length / indicesPerVertex;
-                    var singleIndices = [];
-                    singleIndices[numVerts - 1] = 0;
-                    var hashIndexList = function hashIndexListFn(indexList) {
-                        return indexList.join(",");
-                    };
+                    var singleIndices = new Array(numVerts);
+                    var thisVert = new Array(indicesPerVertex);
                     var vertIdx = 0;
                     var srcIdx = 0;
                     var nextSrcIdx = indicesPerVertex;
+                    var numUniqueVertIndex = verticesAsIndexLists.length;
+                    var numUniqueVertices = ((numUniqueVertIndex / indicesPerVertex) | 0);
+                    var n;
                     while(srcIdx < faces.length) {
-                        var thisVert = faces.slice(srcIdx, nextSrcIdx);
-                        var thisVertHash = hashIndexList(thisVert);
+                        n = 0;
+                        do {
+                            thisVert[n] = faces[srcIdx];
+                            n += 1;
+                            srcIdx += 1;
+                        }while(srcIdx < nextSrcIdx);
+                        var thisVertHash = thisVert.join(",");
                         var thisVertIndex = verticesAsIndexListTable[thisVertHash];
-                        if(!thisVertIndex) {
+                        if(thisVertIndex === undefined) {
                             // New index - add to tables
-                            thisVertIndex = verticesAsIndexLists.length;
-                            verticesAsIndexLists[thisVertIndex] = thisVert;
+                            thisVertIndex = numUniqueVertices;
                             verticesAsIndexListTable[thisVertHash] = thisVertIndex;
+                            numUniqueVertices += 1;
+                            // Copy indices
+                            n = 0;
+                            do {
+                                verticesAsIndexLists[numUniqueVertIndex] = thisVert[n];
+                                numUniqueVertIndex += 1;
+                                n += 1;
+                            }while(n < indicesPerVertex);
                         }
                         singleIndices[vertIdx] = thisVertIndex;
-                        srcIdx = nextSrcIdx;
                         nextSrcIdx += indicesPerVertex;
                         vertIdx += 1;
                     }
@@ -2600,34 +2619,37 @@ var Scene = (function () {
                             updateSingleIndexTables(shapeSurface, indicesPerVertex, verticesAsIndexLists, verticesAsIndexListTable);
                         }
                     }
+                    verticesAsIndexListTable = null;
                     // recalc totalNumVertices
-                    totalNumVertices = verticesAsIndexLists.length;
+                    totalNumVertices = ((verticesAsIndexLists.length / indicesPerVertex) | 0);
                     // Recreate vertex buffer data on the vertexSources
-                    for(var vertSource in vertexSources) {
-                        if(vertexSources.hasOwnProperty(vertSource)) {
-                            vertexSource = vertexSources[vertSource];
-                            var thisSourceOffset = vertexSource.offset;
-                            var thisSourceStride = vertexSource.stride;
-                            var thisSourceData = vertexSource.data;
-                            var newData = new Array(thisSourceStride * totalNumVertices);
-                            // For each entry in index list
-                            var vertIdx = 0;
-                            while(vertIdx < totalNumVertices) {
-                                var newVBIdx = thisSourceStride * vertIdx;
-                                var oldVBIdx = thisSourceStride * verticesAsIndexLists[vertIdx][thisSourceOffset];
-                                // Copy the vertex data out of the vertex buffer
-                                for(var attrIdx = 0; attrIdx < thisSourceStride; attrIdx += 1) {
-                                    newData[newVBIdx + attrIdx] = thisSourceData[oldVBIdx + attrIdx];
-                                }
-                                vertIdx += 1;
+                    for(vs = 0; vs < numVertexSources; vs += 1) {
+                        vertexSource = vertexSources[vs];
+                        var thisSourceOffset = vertexSource.offset;
+                        var thisSourceStride = vertexSource.stride;
+                        var thisSourceData = vertexSource.data;
+                        var newData = new Array(thisSourceStride * totalNumVertices);
+                        // For each entry in index list
+                        var vertIdx = 0;
+                        var vertIdxOffset = thisSourceOffset;
+                        while(vertIdx < totalNumVertices) {
+                            var newVBIdx = thisSourceStride * vertIdx;
+                            var oldVBIdx = thisSourceStride * verticesAsIndexLists[vertIdxOffset];
+                            // Copy the vertex data out of the vertex buffer
+                            for(var attrIdx = 0; attrIdx < thisSourceStride; attrIdx += 1) {
+                                newData[newVBIdx + attrIdx] = thisSourceData[oldVBIdx + attrIdx];
                             }
-                            vertexSource.data = newData;
-                            vertexSource.offset = 0;
+                            vertIdx += 1;
+                            vertIdxOffset += indicesPerVertex;
                         }
+                        vertexSource.data = newData;
+                        vertexSource.offset = 0;
                     }
+                    verticesAsIndexLists.length = 0;
+                    verticesAsIndexLists = null;
                     indicesPerVertex = 1;
                 }
-                Utilities.assert(indicesPerVertex === 1);
+                debug.assert(indicesPerVertex === 1);
                 totalNumVertices = vertexSources[0].data.length / vertexSources[0].stride;
                 var vertexBufferManager = (loadParams.vertexBufferManager || this.vertexBufferManager);
                 if(!vertexBufferManager) {
@@ -3044,7 +3066,7 @@ var Scene = (function () {
                             }
                             var sharedMaterial = materials[sharedMaterialName];
                             if(!sharedMaterial) {
-                                if(baseScene) {
+                                if(baseMaterials) {
                                     sharedMaterial = baseMaterials[sharedMaterialName];
                                 }
                                 if(!sharedMaterial) {

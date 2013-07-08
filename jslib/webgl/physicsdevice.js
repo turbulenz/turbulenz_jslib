@@ -65,9 +65,9 @@ var WebGLPhysicsConfig = {
     GJK_EPA_DISTANCE_THRESHOLD: //
     // (Collision detection)
     // seperation distance to assume objects are infact intersecting.
-    0.0001,
+    1e-4,
     GJK_FRACTIONAL_THRESHOLD: // fractional change in computed distance at which we may terminate GJK algorithm.
-    0.0001,
+    1e-4,
     CONTINUOUS_LINEAR_SQ: //
     // Threshold for the square of the ratio of velocity to radius of an object to be considered
     // moving fast enough to be collided continuously against static/sleeping objects.
@@ -1239,7 +1239,7 @@ var WebGLPhysicsConvexHullHelpers = {
         return true;
     },
     makePlanarConvexHull: function makePlanarConvexHullFn(points) {
-        var DONT_NORMALIZE_THRESHOLD = 0.000001;
+        var DONT_NORMALIZE_THRESHOLD = 1e-6;
         // Use a 2D graham scan with projections of points onto their maximal plane.
         // Time complexity O(nh) for n points and h out-points.
         // Determine maximal plane for projection as the plane containing points.
@@ -3714,7 +3714,7 @@ WebGLGJKContactSolver.prototype = {
         var closest = this.closest;
         var simplex = this.simplex;
         // Epsilon defined based on rough experimental result.
-        var equalVertexThreshold = 0.0001;
+        var equalVertexThreshold = 1e-4;
         for(; ; ) {
             curIter += 1;
             // supportA = xformA * shapeA.localSupport ( - ixformA * axis)
@@ -4013,7 +4013,7 @@ WebGLContactEPA.prototype = {
             }
             // Epsilon based on rough experimental result.
             // Negative epsilon 'not' a typo!
-            if(forced || (face.distance >= -0.000001)) {
+            if(forced || (face.distance >= -1e-6)) {
                 fn[0] *= scale;
                 fn[1] *= scale;
                 fn[2] *= scale;
@@ -4038,7 +4038,7 @@ WebGLContactEPA.prototype = {
             var edge1 = (edge + 1) % 3;
             // Epsilon based on rough experimental result
             // Negative epsilon 'not' a typo!
-            if((((fn0 * w0) + (fn1 * w1) + (fn2 * w2)) - face.distance) < -0.000001) {
+            if((((fn0 * w0) + (fn1 * w1) + (fn2 * w2)) - face.distance) < -1e-6) {
                 var newFace = this.buildNewFace(face.vertex[edge1], face.vertex[edge], w, false);
                 if(newFace) {
                     this.bind(newFace, 0, face, edge);
@@ -4559,7 +4559,7 @@ WebGLPhysicsArbiter.prototype = {
         // contact bitangent
         data[18] = (cn1 * ct2);
         data[19] = ((cn2 * ct0) - (cn0 * ct2));
-        data[20] = (-(cn1 * ct0));
+        data[20] = /*(cn0 * ct1)*/ (-(cn1 * ct0));
         data[40] = jAccN;
         var contactCallbacks, publicContact;
         contactCallbacks = objectA.contactCallbacks;
@@ -4886,7 +4886,7 @@ WebGLPhysicsArbiter.prototype = {
             //c.bounce = VMath.v3Dot(vel, c.normal) * this.restitution;
             var bounce = ((vel0 * n0) + (vel1 * n1) + (vel2 * n2)) * this.restitution;
             // Epsilon based on experimental result
-            if(bounce * bounce < 0.01) {
+            if(bounce * bounce < 1e-2) {
                 bounce = 0;
             }
             data[50] = bounce;
@@ -7372,7 +7372,7 @@ WebGLPrivatePhysicsWorld.prototype = {
             }
             // Cut off on epsilon distance
             // Based on rough experimental result
-            if(upperBound < 0.0001) {
+            if(upperBound < 1e-4) {
                 // clean up remaining objects for GC
                 for(j = i; j < limit; j += 1) {
                     objects[j] = undefined;
@@ -7520,8 +7520,8 @@ WebGLPrivatePhysicsWorld.prototype = {
         while(this.collisionObjects.length > 0) {
             this.removeBody(this.collisionObjects[0]);
         }
-        while(this.kinematicObjects.length > 0) {
-            this.removeBody(this.kinematicObjects[0]);
+        while(this.kinematicBodies.length > 0) {
+            this.removeBody(this.kinematicBodies[0]);
         }
         while(this.constraints.length > 0) {
             this.removeConstraint(this.constraints[0]);
@@ -7824,5 +7824,5 @@ WebGLPhysicsDevice.prototype.FILTER_TRIGGER = 16;
 WebGLPhysicsDevice.prototype.FILTER_CHARACTER = 32;
 WebGLPhysicsDevice.prototype.FILTER_PROJECTILE = 64;
 WebGLPhysicsDevice.prototype.FILTER_USER_MIN = 128;
-WebGLPhysicsDevice.prototype.FILTER_USER_MAX = 32768;
-WebGLPhysicsDevice.prototype.FILTER_ALL = 65535;
+WebGLPhysicsDevice.prototype.FILTER_USER_MAX = 0x8000;
+WebGLPhysicsDevice.prototype.FILTER_ALL = 0xffff;

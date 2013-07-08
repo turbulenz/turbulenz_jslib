@@ -200,7 +200,7 @@ TARLoader.create = function TarLoaderCreateFn(params) {
                             buffer = [];
                             buffer.length = numChars;
                             for(var i = 0; i < numChars; i += 1) {
-                                buffer[i] = (text.charCodeAt(i) & 255);
+                                buffer[i] = (text.charCodeAt(i) & 0xff);
                             }
                             /*jshint bitwise: true*/
                                                     }

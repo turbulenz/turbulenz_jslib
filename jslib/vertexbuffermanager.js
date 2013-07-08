@@ -135,7 +135,7 @@ var VertexBufferManager = (function () {
                 vertexbufferParameters.numVertices = maxVerticesPerVertexBuffer;
                 vertexbuffer = this.graphicsDevice.createVertexBuffer(vertexbufferParameters);
                 this.debugCreatedVertexBuffers += 1;
-                Utilities.assert(vertexbuffer, "VertexBuffer not created.");
+                debug.assert(vertexbuffer, "VertexBuffer not created.");
                 if(vertexbuffer) {
                     vertexBufferData = {
                         vertexBuffer: vertexbuffer,
@@ -154,7 +154,7 @@ var VertexBufferManager = (function () {
             vertexbufferParameters.numVertices = numVertices;
             vertexbuffer = this.graphicsDevice.createVertexBuffer(vertexbufferParameters);
             this.debugCreatedVertexBuffers += 1;
-            Utilities.assert(vertexbuffer, "VertexBuffer not created.");
+            debug.assert(vertexbuffer, "VertexBuffer not created.");
             if(vertexbuffer) {
                 vertexBuffersPool.vertexBufferData.push({
                     vertexBuffer: vertexbuffer,

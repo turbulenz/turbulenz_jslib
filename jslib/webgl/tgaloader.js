@@ -18,11 +18,11 @@ TGALoader.prototype = {
     TYPE_MAPPED_RLE: 9,
     TYPE_COLOR_RLE: 10,
     TYPE_GRAY_RLE: 11,
-    DESC_ABITS: 15,
-    DESC_HORIZONTAL: 16,
-    DESC_VERTICAL: 32,
+    DESC_ABITS: 0x0f,
+    DESC_HORIZONTAL: 0x10,
+    DESC_VERTICAL: 0x20,
     SIGNATURE: "TRUEVISION-XFILE",
-    RLE_PACKETSIZE: 128,
+    RLE_PACKETSIZE: 0x80,
     processBytes: function processBytesFn(bytes) {
         var header = this.parseHeader(bytes);
         if(!this.isValidHeader(header)) {
@@ -435,7 +435,7 @@ TGALoader.create = function tgaLoaderFn(params) {
                             buffer = [];
                             buffer.length = numChars;
                             for(var i = 0; i < numChars; i += 1) {
-                                buffer[i] = (text.charCodeAt(i) & 255);
+                                buffer[i] = (text.charCodeAt(i) & 0xff);
                             }
                             /*jshint bitwise: true*/
                                                     }

@@ -17,15 +17,12 @@ var ShadowMapping = (function () {
             this.blurTechnique = shader.getTechnique("blur");
         }
     };
-    ShadowMapping.prototype.update = function (camera, md) {
-        var node = this.node;
-        var techniqueParameters = this.shadowTechniqueParameters;
-        techniqueParameters['worldView'] = md.m43Mul(node.world, camera.viewMatrix, techniqueParameters['worldView']);
+    ShadowMapping.prototype.update = function () {
+        this.shadowTechniqueParameters['world'] = this.node.world;
     };
-    ShadowMapping.prototype.skinnedUpdate = function (camera, md) {
-        var node = this.node;
+    ShadowMapping.prototype.skinnedUpdate = function () {
         var techniqueParameters = this.shadowTechniqueParameters;
-        techniqueParameters['worldView'] = md.m43Mul(node.world, camera.viewMatrix, techniqueParameters['worldView']);
+        techniqueParameters['world'] = this.node.world;
         var skinController = this.skinController;
         if(skinController) {
             techniqueParameters['skinBones'] = skinController.output;
@@ -110,24 +107,24 @@ var ShadowMapping = (function () {
         this.depthBufferLow = gd.createRenderBuffer({
             width: sizeLow,
             height: sizeLow,
-            format: "D24S8"
+            format: "D16"
         });
         this.depthBufferHigh = gd.createRenderBuffer({
             width: sizeHigh,
             height: sizeHigh,
-            format: "D24S8"
+            format: "D16"
         });
         this.blurTextureLow = gd.createTexture({
             width: sizeLow,
             height: sizeLow,
-            format: "R8G8B8A8",
+            format: "R5G6B5",
             mipmaps: false,
             renderable: true
         });
         this.blurTextureHigh = gd.createTexture({
             width: sizeHigh,
             height: sizeHigh,
-            format: "R8G8B8A8",
+            format: "R5G6B5",
             mipmaps: false,
             renderable: true
         });
@@ -167,18 +164,31 @@ var ShadowMapping = (function () {
             lightInstance.shadowMapInfo = shadowMapInfo;
         }
         target = shadowMapInfo.target;
+        var camera = shadowMapInfo.camera;
         if(light.spot) {
             frustumWorld = md.m33MulM43(light.frustum, matrix, shadowMapInfo.frustumWorld);
             md.v3Add(origin, md.m43At(frustumWorld, target), target);
             up = md.m43Up(frustumWorld, this.tempV3Up);
             shadowMapInfo.frustumWorld = frustumWorld;
-        } else if(light.point) {
+            camera.parallel = false;
+        } else {
             var nodeUp = md.m43Up(matrix, this.tempV3Up);
             var nodeAt = md.m43At(matrix, this.tempV3At);
             var nodePos = md.m43Pos(matrix, this.tempV3Pos);
             var abs = Math.abs;
-            md.v3Add(nodePos, md.v3ScalarMul(nodeUp, -halfExtents[1], target), target);
-            var direction = md.v3Sub(target, origin, nodePos);
+            var direction;
+            if(light.point) {
+                md.v3AddScalarMul(nodePos, nodeUp, -halfExtents[1], target);
+                direction = md.v3Sub(target, origin, nodePos);
+                camera.parallel = false;
+            } else// directional
+             {
+                direction = md.m43TransformVector(matrix, light.direction);
+                var lightSize = md.v3Length(halfExtents);
+                md.v3AddScalarMul(nodePos, direction, lightSize, target);
+                origin = md.v3AddScalarMul(nodePos, direction, -lightSize);
+                camera.parallel = true;
+            }
             if(abs(md.v3Dot(direction, nodeAt)) < abs(md.v3Dot(direction, nodeUp))) {
                 up = nodeAt;
             } else {
@@ -187,7 +197,6 @@ var ShadowMapping = (function () {
         }
         // TODO: we do this in the drawShadowMap function as well
         // could we put this on the lightInstance?
-        var camera = shadowMapInfo.camera;
         this.lookAt(camera, target, up, origin);
         camera.updateViewMatrix();
         var viewMatrix = camera.viewMatrix;
@@ -247,7 +256,7 @@ var ShadowMapping = (function () {
                 shadowMapTexture = gd.createTexture({
                     width: shadowMapSize,
                     height: shadowMapSize,
-                    format: "R8G8B8A8",
+                    format: "R5G6B5",
                     mipmaps: false,
                     renderable: true
                 });
@@ -283,7 +292,7 @@ var ShadowMapping = (function () {
                 shadowMapTexture = gd.createTexture({
                     width: shadowMapSize,
                     height: shadowMapSize,
-                    format: "R8G8B8A8",
+                    format: "R5G6B5",
                     mipmaps: false,
                     renderable: true
                 });
@@ -320,7 +329,7 @@ var ShadowMapping = (function () {
         lightViewWindowX = lightInstance.lightViewWindowX;
         lightViewWindowY = lightInstance.lightViewWindowY;
         lightDepth = lightInstance.lightDepth;
-        if(!lightDepth) {
+        if(!lightDepth || light.dynamic) {
             if(light.spot) {
                 var tan = Math.tan;
                 var acos = Math.acos;
@@ -340,7 +349,7 @@ var ShadowMapping = (function () {
                 var farLightTop = md.v3Normalize(md.v3Sub(md.v3ScalarMul(md.v3Add(p0, p1), 0.5), origin));
                 lightViewWindowX = tan(acos(md.v3Dot(farLightCenter, farLightRight)));
                 lightViewWindowY = tan(acos(md.v3Dot(farLightCenter, farLightTop)));
-            } else {
+            } else if(light.point) {
                 // HACK: as we are only rendering shadowmaps for the lower half
                 lightOrigin = light.origin;
                 if(lightOrigin) {
@@ -362,6 +371,17 @@ var ShadowMapping = (function () {
                 }
                 lightViewWindowX *= 3;
                 lightViewWindowY *= 3;
+            } else// directional
+             {
+                var m0 = viewMatrix[0];
+                var m1 = viewMatrix[1];
+                var m3 = viewMatrix[3];
+                var m4 = viewMatrix[4];
+                var m6 = viewMatrix[6];
+                var m7 = viewMatrix[7];
+                lightViewWindowX = ((m0 < 0 ? -m0 : m0) * halfExtents0 + (m3 < 0 ? -m3 : m3) * halfExtents1 + (m6 < 0 ? -m6 : m6) * halfExtents2);
+                lightViewWindowY = ((m1 < 0 ? -m1 : m1) * halfExtents0 + (m4 < 0 ? -m4 : m4) * halfExtents1 + (m7 < 0 ? -m7 : m7) * halfExtents2);
+                lightDepth = 2 * Math.sqrt((halfExtents0 * halfExtents0) + (halfExtents1 * halfExtents1) + (halfExtents2 * halfExtents2));
             }
             lightInstance.lightViewWindowX = lightViewWindowX;
             lightInstance.lightViewWindowY = lightViewWindowY;
@@ -376,50 +396,76 @@ var ShadowMapping = (function () {
             var maxLightDistanceX = lightInstance.maxLightDistanceX;
             var minLightDistanceY = lightInstance.minLightDistanceY;
             var maxLightDistanceY = lightInstance.maxLightDistanceY;
-            var endLightDistance = (lightDepth < maxLightDistance ? lightDepth : maxLightDistance);
-            lightOrigin = light.origin;
-            if(lightOrigin) {
-                var displacedExtent0 = (halfExtents0 + Math.abs(origin[0]));
-                var displacedExtent2 = (halfExtents2 + Math.abs(origin[2]));
-                if(minLightDistanceX < -displacedExtent0) {
-                    minLightDistanceX = -displacedExtent0;
+            var minimalViewWindowX, minimalViewWindowY;
+            if(light.directional) {
+                if(minLightDistanceX < -lightViewWindowX) {
+                    minLightDistanceX = -lightViewWindowX;
                 }
-                if(maxLightDistanceX > displacedExtent0) {
-                    maxLightDistanceX = displacedExtent0;
+                if(maxLightDistanceX > lightViewWindowX) {
+                    maxLightDistanceX = lightViewWindowX;
                 }
-                if(minLightDistanceY < -displacedExtent2) {
-                    minLightDistanceY = -displacedExtent2;
+                if(minLightDistanceY < -lightViewWindowY) {
+                    minLightDistanceY = -lightViewWindowY;
                 }
-                if(maxLightDistanceY > displacedExtent2) {
-                    maxLightDistanceY = displacedExtent2;
+                if(maxLightDistanceY > lightViewWindowY) {
+                    maxLightDistanceY = lightViewWindowY;
+                }
+                minimalViewWindowX = Math.max(Math.abs(maxLightDistanceX), Math.abs(minLightDistanceX));
+                minimalViewWindowX += 2 * borderPadding * minimalViewWindowX;
+                minimalViewWindowY = Math.max(Math.abs(maxLightDistanceY), Math.abs(minLightDistanceY));
+                minimalViewWindowY += 2 * borderPadding * minimalViewWindowY;
+                if(lightViewWindowX > minimalViewWindowX) {
+                    lightViewWindowX = minimalViewWindowX;
+                }
+                if(lightViewWindowY > minimalViewWindowY) {
+                    lightViewWindowY = minimalViewWindowY;
                 }
             } else {
-                if(minLightDistanceX < -halfExtents0) {
-                    minLightDistanceX = -halfExtents0;
+                var endLightDistance = (lightDepth < maxLightDistance ? lightDepth : maxLightDistance);
+                lightOrigin = light.origin;
+                if(lightOrigin) {
+                    var displacedExtent0 = (halfExtents0 + Math.abs(origin[0]));
+                    var displacedExtent2 = (halfExtents2 + Math.abs(origin[2]));
+                    if(minLightDistanceX < -displacedExtent0) {
+                        minLightDistanceX = -displacedExtent0;
+                    }
+                    if(maxLightDistanceX > displacedExtent0) {
+                        maxLightDistanceX = displacedExtent0;
+                    }
+                    if(minLightDistanceY < -displacedExtent2) {
+                        minLightDistanceY = -displacedExtent2;
+                    }
+                    if(maxLightDistanceY > displacedExtent2) {
+                        maxLightDistanceY = displacedExtent2;
+                    }
+                } else {
+                    if(minLightDistanceX < -halfExtents0) {
+                        minLightDistanceX = -halfExtents0;
+                    }
+                    if(maxLightDistanceX > halfExtents0) {
+                        maxLightDistanceX = halfExtents0;
+                    }
+                    if(minLightDistanceY < -halfExtents2) {
+                        minLightDistanceY = -halfExtents2;
+                    }
+                    if(maxLightDistanceY > halfExtents2) {
+                        maxLightDistanceY = halfExtents2;
+                    }
                 }
-                if(maxLightDistanceX > halfExtents0) {
-                    maxLightDistanceX = halfExtents0;
+                minLightDistanceX /= (minLightDistanceX <= 0 ? minLightDistance : endLightDistance);
+                maxLightDistanceX /= (maxLightDistanceX >= 0 ? minLightDistance : endLightDistance);
+                minLightDistanceY /= (minLightDistanceY <= 0 ? minLightDistance : endLightDistance);
+                maxLightDistanceY /= (maxLightDistanceY >= 0 ? minLightDistance : endLightDistance);
+                minimalViewWindowX = ((0.5 * (maxLightDistanceX - minLightDistanceX)) + borderPadding);
+                minimalViewWindowY = ((0.5 * (maxLightDistanceY - minLightDistanceY)) + borderPadding);
+                if(lightViewWindowX > minimalViewWindowX) {
+                    lightViewWindowX = minimalViewWindowX;
+                    lightViewOffsetX = (minimalViewWindowX + minLightDistanceX - borderPadding);
                 }
-                if(minLightDistanceY < -halfExtents2) {
-                    minLightDistanceY = -halfExtents2;
+                if(lightViewWindowY > minimalViewWindowY) {
+                    lightViewWindowY = minimalViewWindowY;
+                    lightViewOffsetY = (minimalViewWindowY + minLightDistanceY - borderPadding);
                 }
-                if(maxLightDistanceY > halfExtents2) {
-                    maxLightDistanceY = halfExtents2;
-                }
-            }
-            minLightDistanceX /= (minLightDistanceX <= 0 ? minLightDistance : endLightDistance);
-            maxLightDistanceX /= (maxLightDistanceX >= 0 ? minLightDistance : endLightDistance);
-            minLightDistanceY /= (minLightDistanceY <= 0 ? minLightDistance : endLightDistance);
-            maxLightDistanceY /= (maxLightDistanceY >= 0 ? minLightDistance : endLightDistance);
-            var minimalViewWindowX = ((0.5 * (maxLightDistanceX - minLightDistanceX)) + borderPadding);
-            var minimalViewWindowY = ((0.5 * (maxLightDistanceY - minLightDistanceY)) + borderPadding);
-            if(lightViewWindowX > minimalViewWindowX) {
-                lightViewWindowX = minimalViewWindowX;
-                lightViewOffsetX = (minimalViewWindowX + minLightDistanceX - borderPadding);
-            }
-            if(lightViewWindowY > minimalViewWindowY) {
-                lightViewWindowY = minimalViewWindowY;
-                lightViewOffsetY = (minimalViewWindowY + minLightDistanceY - borderPadding);
             }
         }
         camera.aspectRatio = 1;
@@ -479,7 +525,8 @@ var ShadowMapping = (function () {
         var offset = -viewMatrix[11];
         */
                 var drawParametersArray, numDrawParameters, drawParametersIndex;
-        shadowMapTechniqueParameters['shadowProjection'] = camera.projectionMatrix;
+        shadowMapTechniqueParameters['viewTranspose'] = md.m43Transpose(viewMatrix, shadowMapTechniqueParameters['viewTranspose']);
+        shadowMapTechniqueParameters['shadowProjectionTranspose'] = md.m44Transpose(camera.projectionMatrix, shadowMapTechniqueParameters['shadowProjectionTranspose']);
         shadowMapTechniqueParameters['shadowDepth'] = md.v4Build(0, 0, -maxDepthReciprocal, -minLightDistance * maxDepthReciprocal, shadowMapTechniqueParameters['shadowDepth']);
         var drawQueue = this.drawQueue;
         var drawQueueLength = 0;
@@ -491,10 +538,10 @@ var ShadowMapping = (function () {
                 rendererInfo = renderingCommonCreateRendererInfoFn(renderable);
             }
             if(rendererInfo.far) {
-                renderable.distance = 1e+38;
+                renderable.distance = 1.e38;
             }
             if(rendererInfo.shadowMappingUpdate && renderable.shadowMappingDrawParameters) {
-                rendererInfo.shadowMappingUpdate.call(renderable, camera, md);
+                rendererInfo.shadowMappingUpdate.call(renderable);
                 drawParametersArray = renderable.shadowMappingDrawParameters;
                 numDrawParameters = drawParametersArray.length;
                 for(drawParametersIndex = 0; drawParametersIndex < numDrawParameters; drawParametersIndex += 1) {
@@ -649,9 +696,6 @@ var ShadowMapping = (function () {
         gd.setStream(this.quadVertexBuffer, this.quadSemantics);
         var shadowMappingBlurTechnique = this.blurTechnique;
         gd.setTechnique(shadowMappingBlurTechnique);
-        var beginRenderTarget = gd.beginRenderTarget;
-        var endRenderTarget = gd.endRenderTarget;
-        var draw = gd.draw;
         var quadPrimitive = this.quadPrimitive;
         numShadowMaps = this.highIndex;
         if(numShadowMaps) {
@@ -671,21 +715,21 @@ var ShadowMapping = (function () {
                 shadowMap = shadowMaps[n];
                 if(shadowMap.needsBlur) {
                     // Horizontal
-                    if(!beginRenderTarget.call(gd, shadowMapBlurRenderTarget)) {
+                    if(!gd.beginRenderTarget(shadowMapBlurRenderTarget)) {
                         break;
                     }
                     shadowMappingBlurTechnique['shadowMap'] = shadowMap.texture;
                     shadowMappingBlurTechnique['pixelOffset'] = pixelOffsetH;
-                    draw.call(gd, quadPrimitive, 4);
-                    endRenderTarget.call(gd);
+                    gd.draw(quadPrimitive, 4);
+                    gd.endRenderTarget();
                     // Vertical
-                    if(!beginRenderTarget.call(gd, shadowMap.renderTarget)) {
+                    if(!gd.beginRenderTarget(shadowMap.renderTarget)) {
                         break;
                     }
                     shadowMappingBlurTechnique['shadowMap'] = shadowMapBlurTexture;
                     shadowMappingBlurTechnique['pixelOffset'] = pixelOffsetV;
-                    draw.call(gd, quadPrimitive, 4);
-                    endRenderTarget.call(gd);
+                    gd.draw(quadPrimitive, 4);
+                    gd.endRenderTarget();
                 }
             }
         }
@@ -707,34 +751,32 @@ var ShadowMapping = (function () {
                 shadowMap = shadowMaps[n];
                 if(shadowMap.needsBlur) {
                     // Horizontal
-                    if(!beginRenderTarget.call(gd, shadowMapBlurRenderTarget)) {
+                    if(!gd.beginRenderTarget(shadowMapBlurRenderTarget)) {
                         break;
                     }
                     shadowMappingBlurTechnique['shadowMap'] = shadowMap.texture;
                     shadowMappingBlurTechnique['pixelOffset'] = pixelOffsetH;
-                    draw.call(gd, quadPrimitive, 4);
-                    endRenderTarget.call(gd);
+                    gd.draw(quadPrimitive, 4);
+                    gd.endRenderTarget();
                     // Vertical
-                    if(!beginRenderTarget.call(gd, shadowMap.renderTarget)) {
+                    if(!gd.beginRenderTarget(shadowMap.renderTarget)) {
                         break;
                     }
                     shadowMappingBlurTechnique['shadowMap'] = shadowMapBlurTexture;
                     shadowMappingBlurTechnique['pixelOffset'] = pixelOffsetV;
-                    draw.call(gd, quadPrimitive, 4);
-                    endRenderTarget.call(gd);
+                    gd.draw(quadPrimitive, 4);
+                    gd.endRenderTarget();
                 }
             }
         }
     };
     ShadowMapping.prototype.lookAt = function (camera, lookAt, up, eyePosition) {
         var md = this.md;
-        var v3Normalize = md.v3Normalize;
-        var v3Cross = md.v3Cross;
         var zaxis = md.v3Sub(eyePosition, lookAt, this.tempV3AxisZ);
-        v3Normalize.call(md, zaxis, zaxis);
-        var xaxis = v3Cross.call(md, v3Normalize.call(md, up, up), zaxis, this.tempV3AxisX);
-        v3Normalize.call(md, xaxis, xaxis);
-        var yaxis = v3Cross.call(md, zaxis, xaxis, this.tempV3AxisY);
+        md.v3Normalize(zaxis, zaxis);
+        var xaxis = md.v3Cross(md.v3Normalize(up, up), zaxis, this.tempV3AxisX);
+        md.v3Normalize(xaxis, xaxis);
+        var yaxis = md.v3Cross(zaxis, xaxis, this.tempV3AxisY);
         camera.matrix = md.m43Build(xaxis, yaxis, zaxis, eyePosition, camera.matrix);
     };
     ShadowMapping.prototype.destroy = function () {
@@ -770,7 +812,7 @@ var ShadowMapping = (function () {
         shaderManager.load("shaders/shadowmapping.cgfx");
         shadowMapping.gd = gd;
         shadowMapping.md = md;
-        shadowMapping.clearColor = md.v4Build(1, 0, 0, 0);
+        shadowMapping.clearColor = md.v4Build(1, 1, 1, 1);
         shadowMapping.tempMatrix43 = md.m43BuildIdentity();
         shadowMapping.tempV3Up = md.v3BuildZero();
         shadowMapping.tempV3At = md.v3BuildZero();

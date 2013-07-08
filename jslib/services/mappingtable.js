@@ -1,13 +1,27 @@
 /* This file was generated from TypeScript source tslib/services/mappingtable.ts */
 
 
-function MappingTable() {
-    return this;
-}
-MappingTable.prototype = {
-    version: 1,
-    getURL: function mappingTableGetURL(assetPath, missingCallbackFn) {
-        var url = this.urlMapping[assetPath];
+
+
+
+
+
+var MappingTable = (function () {
+    function MappingTable() { }
+    MappingTable.version = 1;
+    MappingTable.prototype.getURL = function (assetPath, missingCallbackFn) {
+        var overrides = this.overrides;
+        var profile = this.currentProfile;
+        var override = overrides[profile];
+        var url;
+        while(override) {
+            url = override.urnmapping[assetPath];
+            if(url) {
+                return url;
+            }
+            override = overrides[override.parent];
+        }
+        url = this.urlMapping[assetPath];
         if(url) {
             return url;
         } else {
@@ -16,50 +30,100 @@ MappingTable.prototype = {
             }
             return (this.assetPrefix + assetPath);
         }
-    },
-    map: function mappingTableMap(logicalPath, physicalPath) {
+    };
+    MappingTable.prototype.setMapping = // Overides and previously set mapping
+    function (mapping) {
+        this.urlMapping = mapping;
+    };
+    MappingTable.prototype.map = function (logicalPath, physicalPath) {
         this.urlMapping[logicalPath] = physicalPath;
-    },
-    alias: function mappingTableAlias(alias, logicalPath) {
+    };
+    MappingTable.prototype.alias = function (alias, logicalPath) {
         var urlMapping = this.urlMapping;
         urlMapping[alias] = urlMapping[logicalPath];
-    }
-};
-MappingTable.create = function MappingTableCreateFn(params) {
-    var mappingTable = new MappingTable();
-    mappingTable.mappingTableURL = params.mappingTableURL;
-    mappingTable.mappingTablePrefix = params.mappingTablePrefix;
-    mappingTable.assetPrefix = params.assetPrefix;
-    mappingTable.errorCallbackFn = params.errorCallback || TurbulenzServices.defaultErrorCallback;
-    if(!mappingTable.mappingTableURL) {
-        mappingTable.errorCallbackFn("TurbulenzServices.createMappingTable no mapping table file given");
-    }
-    function createMappingTableCallbackFn(urlMappingData) {
-        var urlMapping = urlMappingData.urnmapping || urlMappingData.urnremapping || {
+    };
+    MappingTable.prototype.getCurrentProfile = function () {
+        return this.currentProfile;
+    };
+    MappingTable.prototype.setProfile = function (profile) {
+        if(this.overrides.hasOwnProperty(profile)) {
+            this.currentProfile = profile;
+        } else {
+            this.currentProfile = undefined;
+        }
+    };
+    MappingTable.create = function create(params) {
+        var mappingTable = new MappingTable();
+        mappingTable.mappingTableURL = params.mappingTableURL;
+        mappingTable.tablePrefix = params.mappingTablePrefix;
+        mappingTable.assetPrefix = params.assetPrefix;
+        mappingTable.overrides = {
         };
-        mappingTable.urlMapping = urlMapping;
-        // Prepend all the mapped physical paths with the asset server
-        var mappingTablePrefix = mappingTable.mappingTablePrefix;
-        if(mappingTablePrefix) {
-            var source;
-            for(source in urlMapping) {
-                if(urlMapping.hasOwnProperty(source)) {
-                    urlMapping[source] = mappingTablePrefix + urlMapping[source];
+        mappingTable.errorCallbackFn = params.errorCallback || TurbulenzServices.defaultErrorCallback;
+        mappingTable.currentProfile = TurbulenzEngine.getSystemInfo().platformProfile;
+        var onMappingTableLoad = function onMappingTableLoadFn(tableData) {
+            var urlMapping = tableData.urnmapping || tableData.urnremapping || {
+            };
+            var overrides = tableData.overrides || {
+            };
+            mappingTable.urlMapping = urlMapping;
+            mappingTable.overrides = overrides;
+            // Prepend all the mapped physical paths with the asset server
+            var tablePrefix = mappingTable.tablePrefix;
+            if(tablePrefix) {
+                var appendPrefix = function appendPrefix(map) {
+                    var source;
+                    for(source in map) {
+                        if(map.hasOwnProperty(source)) {
+                            map[source] = tablePrefix + map[source];
+                        }
+                    }
+                };
+                // Apply the prefix to the main runmapping table, and
+                // any override tables.
+                appendPrefix(urlMapping);
+                var o;
+                for(o in overrides) {
+                    if(overrides.hasOwnProperty(o)) {
+                        appendPrefix(overrides[o].urnmapping);
+                    }
                 }
             }
-        }
-        params.onload(mappingTable);
-    }
-    params.requestHandler.request({
-        src: mappingTable.mappingTableURL,
-        onload: function jsonifyResponse(jsonResponse, status) {
-            var obj = JSON.parse(jsonResponse);
-            if(status === 200) {
-                createMappingTableCallbackFn(obj);
+            params.onload(mappingTable);
+        };
+        // For testing purposes we support creation from immediate
+        // strings, but at least one of 'mappingTableURL' and
+        // 'mappingTableData' must be present.
+        if(!mappingTable.mappingTableURL) {
+            if(params.mappingTableData) {
+                TurbulenzEngine.setTimeout(function () {
+                    onMappingTableLoad(JSON.parse(params.mappingTableData));
+                }, 0);
             } else {
-                mappingTable.errorCallbackFn("TurbulenzServices.createMappingTable error with HTTP status " + status + ": " + jsonResponse.msg, status);
+                TurbulenzEngine.setTimeout(function () {
+                    mappingTable.errorCallbackFn("!! mappingtable params contain no url or data");
+                }, 0);
             }
+        } else {
+            params.requestHandler.request({
+                src: mappingTable.mappingTableURL,
+                onload: function jsonifyResponse(jsonResponse, status) {
+                    if(status === 200) {
+                        var obj = JSON.parse(jsonResponse);
+                        onMappingTableLoad(obj);
+                    } else {
+                        mappingTable.urlMapping = {
+                        };
+                        jsonResponse = jsonResponse || {
+                            msg: "(no response)"
+                        };
+                        mappingTable.errorCallbackFn("MappingTable.create: HTTP status " + status + ": " + jsonResponse.msg, status);
+                    }
+                }
+            });
         }
-    });
-    return mappingTable;
-};
+        return mappingTable;
+    };
+    return MappingTable;
+})();
+

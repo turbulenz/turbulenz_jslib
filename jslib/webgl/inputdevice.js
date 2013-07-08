@@ -228,7 +228,8 @@ WebGLInputDevice.prototype = {
         HOME: 634,
         END: 635,
         PAGE_UP: 636,
-        PAGE_DOWN: 637
+        PAGE_DOWN: 637,
+        BACK: 638
     },
     mouseCodes: {
         BUTTON_0: 0,

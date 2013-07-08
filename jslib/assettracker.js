@@ -1,6 +1,6 @@
 /* This file was generated from TypeScript source tslib/assettracker.ts */
 
-// Copyright (c) 2009-2012 Turbulenz Limited
+// Copyright (c) 2009-2013 Turbulenz Limited
 /*global Utilities: false*/
 /// <reference path="utilities.ts" />
 var AssetTracker = (function () {
@@ -21,7 +21,7 @@ var AssetTracker = (function () {
         this.assetsLoadedCount += 1;
         if(numberAssetsToLoad) {
             var progress = this.assetsLoadedCount / numberAssetsToLoad;
-            this.loadingProgress = (progress > 1.0) ? 1.0 : progress;
+            this.loadingProgress = Math.max(this.loadingProgress, Math.min(progress, 1.0));
         }
         if(this.displayLog) {
             Utilities.log(event.name + " (Asset Number " + this.assetsLoadedCount + ") Progress : " + this.loadingProgress);
@@ -37,7 +37,7 @@ var AssetTracker = (function () {
         if((numberAssetsToLoad) && (this.numberAssetsToLoad !== numberAssetsToLoad)) {
             this.numberAssetsToLoad = numberAssetsToLoad;
             var progress = this.assetsLoadedCount / numberAssetsToLoad;
-            this.loadingProgress = (progress > 1.0) ? 1.0 : progress;
+            this.loadingProgress = Math.max(this.loadingProgress, Math.min(progress, 1.0));
         }
         if(this.callback) {
             this.callback();

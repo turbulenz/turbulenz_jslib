@@ -1361,21 +1361,21 @@ var FontManager = (function () {
             function unpack(dst, d, c) {
                 /*jshint bitwise: false*/
                 dst[d + 0] = 255;
-                dst[d + 1] = (c & 128 ? 255 : 0);
+                dst[d + 1] = (c & 0x80 ? 255 : 0);
                 dst[d + 2] = 255;
-                dst[d + 3] = (c & 64 ? 255 : 0);
+                dst[d + 3] = (c & 0x40 ? 255 : 0);
                 dst[d + 4] = 255;
-                dst[d + 5] = (c & 32 ? 255 : 0);
+                dst[d + 5] = (c & 0x20 ? 255 : 0);
                 dst[d + 6] = 255;
-                dst[d + 7] = (c & 16 ? 255 : 0);
+                dst[d + 7] = (c & 0x10 ? 255 : 0);
                 dst[d + 8] = 255;
-                dst[d + 9] = (c & 8 ? 255 : 0);
+                dst[d + 9] = (c & 0x08 ? 255 : 0);
                 dst[d + 10] = 255;
-                dst[d + 11] = (c & 4 ? 255 : 0);
+                dst[d + 11] = (c & 0x04 ? 255 : 0);
                 dst[d + 12] = 255;
-                dst[d + 13] = (c & 2 ? 255 : 0);
+                dst[d + 13] = (c & 0x02 ? 255 : 0);
                 dst[d + 14] = 255;
-                dst[d + 15] = (c & 1 ? 255 : 0);
+                dst[d + 15] = (c & 0x01 ? 255 : 0);
                 /*jshint bitwise: true*/
                             }
             var textureData = new Array(16 * 16 * 8 * 8 * 2);

@@ -18,7 +18,7 @@ var SceneNode = (function () {
     //SceneNode.invalidSetLocalTransform
     //
     function invalidSetLocalTransform() {
-        Utilities.assert(false, "setLocalTransform can not be called on " + "static nodes.");
+        debug.abort("setLocalTransform can not be called on static nodes.");
     };
     SceneNode.prototype.getName = //
     //getName
@@ -96,7 +96,7 @@ var SceneNode = (function () {
                 }
             }
         }
-        Utilities.assert(false, "Invalid child");
+        debug.abort("Invalid child");
     };
     SceneNode.prototype.findChild = //
     //findChild
@@ -453,7 +453,7 @@ var SceneNode = (function () {
     //
     function () {
         //Private function
-        //Utilities.assert(this.childNeedsUpdateCount >= 0, "Child update logic incorrect");
+        //debug.assert(this.childNeedsUpdateCount >= 0, "Child update logic incorrect");
         this.childNeedsUpdateCount -= 1;
         if(this.childNeedsUpdateCount === 0 && this.dirtyWorld === false && this.dirtyWorldExtents === false) {
             //no longer dirty
@@ -522,8 +522,6 @@ var SceneNode = (function () {
     /* private */ function (mathDevice, scene, nodes) {
         var node, parent, index, worldExtents;
         var numNodes = nodes.length;
-        var m43Copy = mathDevice.m43Copy;
-        var m43Mul = mathDevice.m43Mul;
         do {
             numNodes -= 1;
             node = nodes[numNodes];
@@ -534,12 +532,12 @@ var SceneNode = (function () {
                 if(parent) {
                     var local = node.local;
                     if(local) {
-                        node.world = m43Mul.call(mathDevice, local, parent.world, node.world);
+                        node.world = mathDevice.m43Mul(local, parent.world, node.world);
                     } else {
-                        node.world = m43Copy.call(mathDevice, parent.world, node.world);
+                        node.world = mathDevice.m43Copy(parent.world, node.world);
                     }
                 } else {
-                    node.world = m43Copy.call(mathDevice, node.local, node.world);
+                    node.world = mathDevice.m43Copy(node.local, node.world);
                 }
             }
             if(node.dirtyWorldExtents) {
@@ -1139,7 +1137,7 @@ var SceneNode = (function () {
                 return;
             }
         }
-        Utilities.assert(false, "Invalid renderable");
+        debug.abort("Invalid renderable");
     };
     SceneNode.prototype.hasRenderables = //
     //hasRenderables
@@ -1193,7 +1191,7 @@ var SceneNode = (function () {
                 return;
             }
         }
-        Utilities.assert(false, "Invalid light");
+        debug.abort("Invalid light");
     };
     SceneNode.prototype.hasLightInstances = //
     //hasLightInstances
@@ -1206,7 +1204,7 @@ var SceneNode = (function () {
     //
     function () {
         //Should only be called when parent is null
-        Utilities.assert(!this.parent, "SceneNode should be remove from parent before destroy is called");
+        debug.assert(!this.parent, "SceneNode should be remove from parent before destroy is called");
         if(this.destroyedObserver) {
             this.destroyedObserver.notify({
                 node: this

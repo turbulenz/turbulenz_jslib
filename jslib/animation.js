@@ -375,31 +375,27 @@ var InterpolatorController = (function () {
         var endTime = boundsEnd.time;
         var delta = (currentTime - startTime) / (endTime - startTime);
         var mathDevice = this.mathDevice;
-        var v3Copy, v3Add;
         var ibounds = this.bounds;
         // If delta is close to the limits we just copy the bounds
         var minKeyframeDelta = Animation.minKeyframeDelta;
         if(delta < minKeyframeDelta) {
             // copy the bounds
-            v3Copy = mathDevice.v3Copy;
-            ibounds.center = v3Copy.call(mathDevice, boundsStart.center, ibounds.center);
-            ibounds.halfExtent = v3Copy.call(mathDevice, boundsStart.halfExtent, ibounds.halfExtent);
+            ibounds.center = mathDevice.v3Copy(boundsStart.center, ibounds.center);
+            ibounds.halfExtent = mathDevice.v3Copy(boundsStart.halfExtent, ibounds.halfExtent);
         } else if((1.0 - delta) < minKeyframeDelta) {
             // copy the bounds
-            v3Copy = mathDevice.v3Copy;
-            ibounds.center = v3Copy.call(mathDevice, boundsEnd.center, ibounds.center);
-            ibounds.halfExtent = v3Copy.call(mathDevice, boundsEnd.halfExtent, ibounds.halfExtent);
+            ibounds.center = mathDevice.v3Copy(boundsEnd.center, ibounds.center);
+            ibounds.halfExtent = mathDevice.v3Copy(boundsEnd.halfExtent, ibounds.halfExtent);
         } else {
             // accumulate the bounds as average of the center position and max of the extent
             // plus the half distance between the centers
-            v3Add = mathDevice.v3Add;
-            var centerSum = v3Add.call(mathDevice, boundsStart.center, boundsEnd.center, ibounds.center);
+            var centerSum = mathDevice.v3Add(boundsStart.center, boundsEnd.center, ibounds.center);
             var newCenter = mathDevice.v3ScalarMul(centerSum, 0.5, centerSum);
             ibounds.center = newCenter;
             var newExtent = mathDevice.v3Max(boundsStart.halfExtent, boundsEnd.halfExtent, ibounds.halfExtent);
             var centerOffset = mathDevice.v3Sub(boundsStart.center, newCenter, this.scratchPad.v1);
             centerOffset = mathDevice.v3Abs(centerOffset, centerOffset);
-            ibounds.halfExtent = v3Add.call(mathDevice, newExtent, centerOffset, newExtent);
+            ibounds.halfExtent = mathDevice.v3Add(newExtent, centerOffset, newExtent);
         }
         this.dirtyBounds = false;
     };
@@ -1490,10 +1486,6 @@ var SkinController = (function () {
         }
         // convert the input interpolator quat pos data into skinning matrices
         var md = this.md;
-        var m43Mul = md.m43Mul;
-        var m43MulTranspose = md.m43MulTranspose;
-        var m43FromRTS = md.m43FromRTS;
-        var m43FromRT = md.m43FromRT;
         var interpOut = this.inputController.output;
         var interpChannels = this.inputController.outputChannels;
         var hasScale = interpChannels.scale;
@@ -1506,16 +1498,16 @@ var SkinController = (function () {
             var interpVal = interpOut[b];
             var boneMatrix;
             if(hasScale) {
-                boneMatrix = m43FromRTS.call(md, interpVal.rotation, interpVal.translation, interpVal.scale, ltms[b]);
+                boneMatrix = md.m43FromRTS(interpVal.rotation, interpVal.translation, interpVal.scale, ltms[b]);
             } else {
-                boneMatrix = m43FromRT.call(md, interpVal.rotation, interpVal.translation, ltms[b]);
+                boneMatrix = md.m43FromRT(interpVal.rotation, interpVal.translation, ltms[b]);
             }
             var parentIndex = jointParents[b];
             if(parentIndex !== -1) {
-                boneMatrix = m43Mul.call(md, boneMatrix, ltms[parentIndex], ltms[b]);
+                boneMatrix = md.m43Mul(boneMatrix, ltms[parentIndex], ltms[b]);
             }
             ltms[b] = boneMatrix;
-            output[b] = m43MulTranspose.call(md, invBoneLTMs[b], boneMatrix, output[b]);
+            output[b] = md.m43MulTranspose(invBoneLTMs[b], boneMatrix, output[b]);
         }
         this.dirty = false;
     };
@@ -1572,10 +1564,6 @@ var GPUSkinController = (function () {
         var writer = output.map();
         if(writer) {
             var md = this.md;
-            var m43Mul = md.m43Mul;
-            var m43MulTranspose = md.m43MulTranspose;
-            var m43FromRTS = md.m43FromRTS;
-            var m43FromRT = md.m43FromRT;
             var interpOut = this.inputController.output;
             var interpChannels = this.inputController.outputChannels;
             var hasScale = interpChannels.scale;
@@ -1591,19 +1579,19 @@ var GPUSkinController = (function () {
                 var parentIndex = jointParents[b];
                 if(parentIndex !== -1) {
                     if(hasScale) {
-                        convertedquatPos = m43FromRTS.call(md, interpVal.rotation, interpVal.translation, interpVal.scale, convertedquatPos);
+                        convertedquatPos = md.m43FromRTS(interpVal.rotation, interpVal.translation, interpVal.scale, convertedquatPos);
                     } else {
-                        convertedquatPos = m43FromRT.call(md, interpVal.rotation, interpVal.translation, convertedquatPos);
+                        convertedquatPos = md.m43FromRT(interpVal.rotation, interpVal.translation, convertedquatPos);
                     }
-                    ltms[b] = ltm = m43Mul.call(md, convertedquatPos, ltms[parentIndex], ltms[b]);
+                    ltms[b] = ltm = md.m43Mul(convertedquatPos, ltms[parentIndex], ltms[b]);
                 } else {
                     if(hasScale) {
-                        ltms[b] = ltm = m43FromRTS.call(md, interpVal.rotation, interpVal.translation, interpVal.scale, ltms[b]);
+                        ltms[b] = ltm = md.m43FromRTS(interpVal.rotation, interpVal.translation, interpVal.scale, ltms[b]);
                     } else {
-                        ltms[b] = ltm = m43FromRT.call(md, interpVal.rotation, interpVal.translation, ltms[b]);
+                        ltms[b] = ltm = md.m43FromRT(interpVal.rotation, interpVal.translation, ltms[b]);
                     }
                 }
-                outputMat = m43MulTranspose.call(md, invBoneLTMs[b], ltm, outputMat);
+                outputMat = md.m43MulTranspose(invBoneLTMs[b], ltm, outputMat);
                 writer(outputMat);
             }
             this.outputMat = outputMat;

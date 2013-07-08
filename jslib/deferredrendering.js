@@ -12,6 +12,7 @@ var DeferredRendering = (function () {
         this.minPixelCount = 256;
     }
     DeferredRendering.version = 1;
+    DeferredRendering.nextNodeID = 0;
     DeferredRendering.prototype.updateShader = // TODO: Where is this set?  Not mentioned in the docs.
     function (sm) {
         var shader = sm.get("shaders/deferredlights.cgfx");
@@ -42,9 +43,11 @@ var DeferredRendering = (function () {
         var distanceReverseCompareFn = function distanceReverseCompareFnFn(objA, objB) {
             return (objB.distance - objA.distance);
         };
+        var localDirectionalLights = this.localDirectionalLights;
         var pointLights = this.pointLights;
         var spotLights = this.spotLights;
         var fogLights = this.fogLights;
+        var numLocalDirectionalLights = 0;
         var numPoint = 0;
         var numSpot = 0;
         var numFog = 0;
@@ -69,9 +72,9 @@ var DeferredRendering = (function () {
                     rendererInfo = renderingCommonCreateRendererInfoFn(renderable);
                 }
                 if(rendererInfo.far) {
-                    renderable.distance = 1e+38;
+                    renderable.distance = 1.e38;
                 }
-                rendererInfo.renderUpdate.call(renderable, camera);
+                renderable.renderUpdate(camera);
                 drawParametersArray = renderable.drawParameters;
                 numDrawParameters = drawParametersArray.length;
                 for(drawParametersIndex = 0; drawParametersIndex < numDrawParameters; drawParametersIndex += 1) {
@@ -105,8 +108,11 @@ var DeferredRendering = (function () {
                     } else if(light.fog) {
                         fogLights[numFog] = lightInstance;
                         numFog += 1;
+                    } else if(light.directional) {
+                        localDirectionalLights[numLocalDirectionalLights] = lightInstance;
+                        numLocalDirectionalLights += 1;
                     } else {
-                        // this includes local ambient and directional lights
+                        // this includes local ambient
                         pointLights[numPoint] = lightInstance;
                         numPoint += 1;
                     }
@@ -114,6 +120,7 @@ var DeferredRendering = (function () {
                 l += 1;
             }while(l < numVisibleLights);
         }
+        localDirectionalLights.length = numLocalDirectionalLights;
         pointLights.length = numPoint;
         spotLights.length = numSpot;
         fogLights.length = numFog;
@@ -143,13 +150,46 @@ var DeferredRendering = (function () {
         sharedTechniqueParameters['viewProjection'] = viewProjectionMatrix;
         sharedTechniqueParameters['maxDepth'] = -maxDepth;
         var l, node, light, lightInstance, matrix, techniqueParameters, origin, halfExtents, worldView;
-        var lightFindVisibleRenderables = this.lightFindVisibleRenderables;
-        var m43InverseTransposeProjection = md.m43InverseTransposeProjection;
-        var m43Mul = md.m43Mul;
-        var m43Transpose = md.m43Transpose;
-        var m43TransformPoint = md.m43TransformPoint;
-        var m43Pos = md.m43Pos;
-        var v3Build = md.v3Build;
+        var directionalInstances = this.localDirectionalLights;
+        var numDirectionalInstances = directionalInstances.length;
+        if(numDirectionalInstances) {
+            var direction;
+            l = 0;
+            do {
+                lightInstance = directionalInstances[l];
+                node = lightInstance.node;
+                light = lightInstance.light;
+                lightInstance.shadows = false;
+                if(this.lightFindVisibleRenderables(lightInstance, scene)) {
+                    matrix = node.world;
+                    techniqueParameters = lightInstance.techniqueParameters;
+                    if(!techniqueParameters) {
+                        techniqueParameters = gd.createTechniqueParameters();
+                        lightInstance.techniqueParameters = techniqueParameters;
+                    }
+                    halfExtents = light.halfExtents;
+                    worldView = md.m43Mul(matrix, viewMatrix, worldView);
+                    techniqueParameters.world = matrix;
+                    techniqueParameters.worldViewTranspose = md.m43Transpose(worldView, techniqueParameters.worldViewTranspose);
+                    direction = md.m43TransformVector(worldView, light.direction, direction);
+                    techniqueParameters.lightOrigin = md.v3ScalarMul(direction, -1e6, techniqueParameters.lightOrigin);
+                    techniqueParameters.lightColor = light.color;
+                    techniqueParameters.lightExtents = halfExtents;
+                    techniqueParameters.lightViewInverseTranspose = md.m43InverseTransposeProjection(worldView, halfExtents, techniqueParameters.lightViewInverseTranspose);
+                    l += 1;
+                } else {
+                    numDirectionalInstances -= 1;
+                    if(l < numDirectionalInstances) {
+                        directionalInstances[l] = directionalInstances[numDirectionalInstances];
+                    } else {
+                        break;
+                    }
+                }
+            }while(l < numDirectionalInstances);
+            if(numDirectionalInstances < directionalInstances.length) {
+                directionalInstances.length = numDirectionalInstances;
+            }
+        }
         var pointInstances = this.pointLights;
         var numPointInstances = pointInstances.length;
         if(numPointInstances) {
@@ -159,7 +199,7 @@ var DeferredRendering = (function () {
                 node = lightInstance.node;
                 light = lightInstance.light;
                 lightInstance.shadows = false;
-                if(lightFindVisibleRenderables.call(this, lightInstance, scene)) {
+                if(this.lightFindVisibleRenderables(lightInstance, scene)) {
                     matrix = node.world;
                     techniqueParameters = lightInstance.techniqueParameters;
                     if(!techniqueParameters) {
@@ -168,17 +208,17 @@ var DeferredRendering = (function () {
                     }
                     origin = light.origin;
                     halfExtents = light.halfExtents;
-                    worldView = m43Mul.call(md, matrix, viewMatrix, worldView);
+                    worldView = md.m43Mul(matrix, viewMatrix, worldView);
                     techniqueParameters.world = matrix;
-                    techniqueParameters.worldViewTranspose = m43Transpose.call(md, worldView, techniqueParameters.worldViewTranspose);
+                    techniqueParameters.worldViewTranspose = md.m43Transpose(worldView, techniqueParameters.worldViewTranspose);
                     if(origin) {
-                        techniqueParameters.lightOrigin = m43TransformPoint.call(md, worldView, origin, techniqueParameters.lightOrigin);
+                        techniqueParameters.lightOrigin = md.m43TransformPoint(worldView, origin, techniqueParameters.lightOrigin);
                     } else {
-                        techniqueParameters.lightOrigin = m43Pos.call(md, worldView, techniqueParameters.lightOrigin);
+                        techniqueParameters.lightOrigin = md.m43Pos(worldView, techniqueParameters.lightOrigin);
                     }
                     techniqueParameters.lightColor = light.color;
                     techniqueParameters.lightExtents = halfExtents;
-                    techniqueParameters.lightViewInverseTranspose = m43InverseTransposeProjection.call(md, worldView, halfExtents, techniqueParameters.lightViewInverseTranspose);
+                    techniqueParameters.lightViewInverseTranspose = md.m43InverseTransposeProjection(worldView, halfExtents, techniqueParameters.lightViewInverseTranspose);
                     l += 1;
                 } else {
                     numPointInstances -= 1;
@@ -197,8 +237,6 @@ var DeferredRendering = (function () {
         var numSpotInstances = spotInstances.length;
         if(numSpotInstances) {
             var lightView, lightViewInverse, lightProjection, lightViewInverseProjection;
-            var m33MulM43 = md.m33MulM43;
-            var m43Inverse = md.m43Inverse;
             lightProjection = md.m43Copy(this.lightProjection);
             l = 0;
             do {
@@ -206,7 +244,7 @@ var DeferredRendering = (function () {
                 node = lightInstance.node;
                 light = lightInstance.light;
                 lightInstance.shadows = false;
-                if(lightFindVisibleRenderables.call(this, lightInstance, scene)) {
+                if(this.lightFindVisibleRenderables(lightInstance, scene)) {
                     matrix = node.world;
                     techniqueParameters = lightInstance.techniqueParameters;
                     if(!techniqueParameters) {
@@ -214,25 +252,25 @@ var DeferredRendering = (function () {
                         lightInstance.techniqueParameters = techniqueParameters;
                     }
                     origin = light.origin;
-                    worldView = m43Mul.call(md, matrix, viewMatrix, worldView);
+                    worldView = md.m43Mul(matrix, viewMatrix, worldView);
                     techniqueParameters.world = matrix;
-                    techniqueParameters.worldViewTranspose = m43Transpose.call(md, worldView, techniqueParameters.worldViewTranspose);
+                    techniqueParameters.worldViewTranspose = md.m43Transpose(worldView, techniqueParameters.worldViewTranspose);
                     if(origin) {
-                        techniqueParameters.lightOrigin = m43TransformPoint.call(md, worldView, origin, techniqueParameters.lightOrigin);
+                        techniqueParameters.lightOrigin = md.m43TransformPoint(worldView, origin, techniqueParameters.lightOrigin);
                     } else {
-                        techniqueParameters.lightOrigin = m43Pos.call(md, worldView, techniqueParameters.lightOrigin);
+                        techniqueParameters.lightOrigin = md.m43Pos(worldView, techniqueParameters.lightOrigin);
                     }
                     techniqueParameters.lightColor = light.color;
                     var frustum = light.frustum;
                     var frustumNear = light.frustumNear;
                     var invFrustumNear = 1.0 / (1 - frustumNear);
-                    lightView = m33MulM43.call(md, frustum, worldView, lightView);
-                    lightViewInverse = m43Inverse.call(md, lightView, lightViewInverse);
+                    lightView = md.m33MulM43(frustum, worldView, lightView);
+                    lightViewInverse = md.m43Inverse(lightView, lightViewInverse);
                     lightProjection[8] = invFrustumNear;
                     lightProjection[11] = -(frustumNear * invFrustumNear);
-                    lightViewInverseProjection = m43Mul.call(md, lightViewInverse, lightProjection, lightViewInverseProjection);
+                    lightViewInverseProjection = md.m43Mul(lightViewInverse, lightProjection, lightViewInverseProjection);
                     techniqueParameters.lightFrustum = frustum;
-                    techniqueParameters.lightViewInverseTranspose = m43Transpose.call(md, lightViewInverseProjection, techniqueParameters.lightViewInverseTranspose);
+                    techniqueParameters.lightViewInverseTranspose = md.m43Transpose(lightViewInverseProjection, techniqueParameters.lightViewInverseTranspose);
                     l += 1;
                 } else {
                     numSpotInstances -= 1;
@@ -251,7 +289,6 @@ var DeferredRendering = (function () {
         var numFogInstances = fogInstances.length;
         if(numFogInstances) {
             var halfExtentsInverse, lightViewInverseTranspose;
-            var m34Pos = md.m34Pos;
             l = 0;
             do {
                 lightInstance = fogInstances[l];
@@ -268,22 +305,22 @@ var DeferredRendering = (function () {
                 var he1 = halfExtents[1];
                 var he2 = halfExtents[2];
                 if(he1) {
-                    halfExtents = v3Build.call(md, he0, he1, he2);
+                    halfExtents = md.v3Build(he0, he1, he2);
                     var he1inv = 1.0 / he1;
-                    halfExtentsInverse = v3Build.call(md, he0 * he1inv, 1.0, he2 * he1inv);
+                    halfExtentsInverse = md.v3Build(he0 * he1inv, 1.0, he2 * he1inv);
                 } else {
-                    halfExtents = v3Build.call(md, 0, 0, 0);
-                    halfExtentsInverse = v3Build.call(md, 0, 0, 0);
+                    halfExtents = md.v3Build(0, 0, 0);
+                    halfExtentsInverse = md.v3Build(0, 0, 0);
                 }
-                worldView = m43Mul.call(md, matrix, viewMatrix, worldView);
-                lightViewInverseTranspose = m43InverseTransposeProjection.call(md, worldView, halfExtents, techniqueParameters.lightViewInverseTranspose);
+                worldView = md.m43Mul(matrix, viewMatrix, worldView);
+                lightViewInverseTranspose = md.m43InverseTransposeProjection(worldView, halfExtents, techniqueParameters.lightViewInverseTranspose);
                 techniqueParameters.world = matrix;
-                techniqueParameters.worldViewTranspose = m43Transpose.call(md, worldView, techniqueParameters.worldViewTranspose);
-                techniqueParameters.lightOrigin = m43Pos.call(md, worldView, techniqueParameters.lightOrigin);
+                techniqueParameters.worldViewTranspose = md.m43Transpose(worldView, techniqueParameters.worldViewTranspose);
+                techniqueParameters.lightOrigin = md.m43Pos(worldView, techniqueParameters.lightOrigin);
                 techniqueParameters.lightColor = light.color;
                 techniqueParameters.lightExtents = halfExtents;
                 techniqueParameters.lightExtentsInverse = halfExtentsInverse;
-                techniqueParameters.eyePositionLightSpace = m34Pos.call(md, lightViewInverseTranspose, techniqueParameters.eyePositionLightSpace);
+                techniqueParameters.eyePositionLightSpace = md.m34Pos(lightViewInverseTranspose, techniqueParameters.eyePositionLightSpace);
                 techniqueParameters.lightViewInverseTranspose = lightViewInverseTranspose;
                 l += 1;
             }while(l < numFogInstances);
@@ -530,6 +567,27 @@ var DeferredRendering = (function () {
             return (nodeB.pixelCount - nodeA.pixelCount);
         }
         var l, query, light, lightInstance;
+        var directionalInstances = this.localDirectionalLights;
+        var numDirectionalInstances = directionalInstances.length;
+        if(numDirectionalInstances) {
+            l = 0;
+            do {
+                lightInstance = directionalInstances[l];
+                query = lightInstance.occlusionQuery;
+                if(undefined === query) {
+                    lightInstance.occlusionQuery = gd.createOcclusionQuery();
+                    lightInstance.pixelCount = minPixelCount;
+                } else if(null === query) {
+                    lightInstance.pixelCount = minPixelCount;
+                } else {
+                    lightInstance.pixelCount = query.pixelCount;
+                }
+                l += 1;
+            }while(l < numDirectionalInstances);
+            if(1 < numDirectionalInstances) {
+                directionalInstances.sort(pixelCountCompareFn);
+            }
+        }
         var pointInstances = this.pointLights;
         var numPointInstances = pointInstances.length;
         if(numPointInstances) {
@@ -576,11 +634,25 @@ var DeferredRendering = (function () {
         var shadowMaps = this.shadowMaps;
         var globalCameraMatrix = this.globalCameraMatrix;
         if(shadowMaps) {
-            var lightShadowMapDraw = shadowMaps.drawShadowMap;
             var sceneExtents = this.sceneExtents;
             var minExtentsHigh = (Math.max((sceneExtents[3] - sceneExtents[0]), (sceneExtents[4] - sceneExtents[1]), (sceneExtents[5] - sceneExtents[2])) / 6);
             shadowMaps.lowIndex = 0;
             shadowMaps.highIndex = 0;
+            if(numDirectionalInstances) {
+                l = 0;
+                do {
+                    lightInstance = directionalInstances[l];
+                    light = lightInstance.light;
+                    if(light.shadows && !light.ambient) {
+                        if(lightInstance.pixelCount >= minPixelCount) {
+                            shadowMaps.drawShadowMap(globalCameraMatrix, minExtentsHigh, lightInstance);
+                        } else {
+                            break;
+                        }
+                    }
+                    l += 1;
+                }while(l < numDirectionalInstances);
+            }
             if(numPointInstances) {
                 l = 0;
                 do {
@@ -588,7 +660,7 @@ var DeferredRendering = (function () {
                     light = lightInstance.light;
                     if(light.shadows && !light.ambient) {
                         if(lightInstance.pixelCount >= minPixelCount) {
-                            lightShadowMapDraw.call(shadowMaps, globalCameraMatrix, minExtentsHigh, lightInstance);
+                            shadowMaps.drawShadowMap(globalCameraMatrix, minExtentsHigh, lightInstance);
                         } else {
                             break;
                         }
@@ -603,7 +675,7 @@ var DeferredRendering = (function () {
                     light = lightInstance.light;
                     if(light.shadows && !light.ambient) {
                         if(lightInstance.pixelCount >= minPixelCount) {
-                            lightShadowMapDraw.call(shadowMaps, globalCameraMatrix, minExtentsHigh, lightInstance);
+                            shadowMaps.drawShadowMap(globalCameraMatrix, minExtentsHigh, lightInstance);
                         } else {
                             break;
                         }
@@ -614,12 +686,6 @@ var DeferredRendering = (function () {
             shadowMaps.blurShadowMaps();
         }
         // Apply lights
-        var setStream = gd.setStream;
-        var setTechnique = gd.setTechnique;
-        var setTechniqueParameters = gd.setTechniqueParameters;
-        var draw = gd.draw;
-        var beginOcclusionQuery = gd.beginOcclusionQuery;
-        var endOcclusionQuery = gd.endOcclusionQuery;
         var sharedTechniqueParameters = this.sharedTechniqueParameters;
         var quadPrimitive = this.quadPrimitive;
         var quadVertexBuffer = this.quadVertexBuffer;
@@ -633,8 +699,8 @@ var DeferredRendering = (function () {
             var globalLights = this.sceneGlobalLights;
             var numGlobalLights = globalLights.length;
             if(numGlobalLights) {
-                var directionalLights = [];
-                var numDirectionalLights = 0;
+                var globalDirectionalLights = [];
+                var numGlobalDirectionalLights = 0;
                 var ambientColor0 = 0;
                 var ambientColor1 = 0;
                 var ambientColor2 = 0;
@@ -648,39 +714,39 @@ var DeferredRendering = (function () {
                             ambientColor1 += globalLightColor[1];
                             ambientColor2 += globalLightColor[2];
                         } else if(globalLight.directional) {
-                            directionalLights[numDirectionalLights] = globalLight;
-                            numDirectionalLights += 1;
+                            globalDirectionalLights[numGlobalDirectionalLights] = globalLight;
+                            numGlobalDirectionalLights += 1;
                         }
                     }
                 }
-                if(numDirectionalLights) {
+                if(numGlobalDirectionalLights) {
                     var ambientDirectionalLightTechnique = this.ambientDirectionalLightTechnique;
                     var directionalLightTechnique = this.directionalLightTechnique;
                     var viewMatrix = md.m43InverseOrthonormal(this.globalCameraMatrix);
-                    setStream.call(gd, quadVertexBuffer, quadSemantics);
-                    setTechnique.call(gd, ambientDirectionalLightTechnique);
+                    gd.setStream(quadVertexBuffer, quadSemantics);
+                    gd.setTechnique(ambientDirectionalLightTechnique);
                     ambientDirectionalLightTechnique['normalTexture'] = this.normalTexture;
                     ambientDirectionalLightTechnique['ambientColor'] = md.v3Build(ambientColor0, ambientColor1, ambientColor2);
-                    globalLight = directionalLights[0];
+                    globalLight = globalDirectionalLights[0];
                     ambientDirectionalLightTechnique['lightColor'] = globalLight.color;
                     ambientDirectionalLightTechnique['lightDirection'] = md.m43TransformVector(viewMatrix, globalLight.direction);
-                    draw.call(gd, quadPrimitive, 4);
-                    if(1 < numDirectionalLights) {
-                        setTechnique.call(gd, directionalLightTechnique);
+                    gd.draw(quadPrimitive, 4);
+                    if(1 < numGlobalDirectionalLights) {
+                        gd.setTechnique(directionalLightTechnique);
                         directionalLightTechnique['normalTexture'] = this.normalTexture;
-                        for(g = 1; g < numDirectionalLights; g += 1) {
-                            globalLight = directionalLights[g];
+                        for(g = 1; g < numGlobalDirectionalLights; g += 1) {
+                            globalLight = globalDirectionalLights[g];
                             directionalLightTechnique['lightColor'] = globalLight.color;
                             directionalLightTechnique['lightDirection'] = md.m43TransformVector(viewMatrix, globalLight.direction);
-                            draw.call(gd, quadPrimitive, 4);
+                            gd.draw(quadPrimitive, 4);
                         }
                     }
                     firstLight = false;
                 } else if(ambientColor0 !== 0 || ambientColor1 !== 0 || ambientColor1 !== 0) {
-                    setStream.call(gd, quadVertexBuffer, quadSemantics);
-                    setTechnique.call(gd, this.ambientLightTechnique);
+                    gd.setStream(quadVertexBuffer, quadSemantics);
+                    gd.setTechnique(this.ambientLightTechnique);
                     this.ambientLightTechnique['lightColor'] = md.v3Build(ambientColor0, ambientColor1, ambientColor2);
-                    draw.call(gd, quadPrimitive, 4);
+                    gd.draw(quadPrimitive, 4);
                     firstLight = false;
                 } else {
                     gd.clear(this.black);
@@ -690,11 +756,65 @@ var DeferredRendering = (function () {
             }
             // Local lights
                         var technique, currentTechnique;
+            if(numDirectionalInstances) {
+                var directionalLightTechnique = this.pointLightTechnique;
+                var directionalLightSpecularTechnique = this.pointLightSpecularTechnique;
+                var directionalLightSpecularShadowTechnique = this.pointLightSpecularShadowTechnique;
+                gd.setStream(this.pointLightVolumeVertexBuffer, lightSemantics);
+                // draw lights
+                l = 0;
+                do {
+                    lightInstance = directionalInstances[l];
+                    light = lightInstance.light;
+                    query = lightInstance.occlusionQuery;
+                    techniqueParameters = lightInstance.techniqueParameters;
+                    lightTechniqueParameters = light.techniqueParameters;
+                    if(lightInstance.pixelCount < minPixelCount || light.ambient) {
+                        firstLight = false;
+                        technique = directionalLightTechnique;
+                    } else {
+                        if(firstLight) {
+                            firstLight = false;
+                            if(lightInstance.shadows) {
+                                technique = this.pointLightSpecularShadowOpaqueTechnique;
+                            } else {
+                                technique = this.pointLightSpecularOpaqueTechnique;
+                            }
+                        } else {
+                            if(lightInstance.shadows) {
+                                technique = directionalLightSpecularShadowTechnique;
+                            } else {
+                                technique = directionalLightSpecularTechnique;
+                            }
+                        }
+                    }
+                    if(currentTechnique !== technique) {
+                        currentTechnique = technique;
+                        currentLightTechniqueParameters = lightTechniqueParameters;
+                        gd.setTechnique(technique);
+                        gd.setTechniqueParameters(sharedTechniqueParameters, lightTechniqueParameters, techniqueParameters);
+                    } else if(currentLightTechniqueParameters !== lightTechniqueParameters) {
+                        currentLightTechniqueParameters = lightTechniqueParameters;
+                        gd.setTechniqueParameters(lightTechniqueParameters, techniqueParameters);
+                    } else {
+                        gd.setTechniqueParameters(techniqueParameters);
+                    }
+                    if(null !== query) {
+                        if(gd.beginOcclusionQuery(query)) {
+                            gd.draw(lightPrimitive, 14);
+                            gd.endOcclusionQuery(query);
+                        }
+                    } else {
+                        gd.draw(lightPrimitive, 14);
+                    }
+                    l += 1;
+                }while(l < numDirectionalInstances);
+            }
             if(numPointInstances) {
                 var pointLightTechnique = this.pointLightTechnique;
                 var pointLightSpecularTechnique = this.pointLightSpecularTechnique;
                 var pointLightSpecularShadowTechnique = this.pointLightSpecularShadowTechnique;
-                setStream.call(gd, this.pointLightVolumeVertexBuffer, lightSemantics);
+                gd.setStream(this.pointLightVolumeVertexBuffer, lightSemantics);
                 // draw lights
                 l = 0;
                 do {
@@ -725,21 +845,21 @@ var DeferredRendering = (function () {
                     if(currentTechnique !== technique) {
                         currentTechnique = technique;
                         currentLightTechniqueParameters = lightTechniqueParameters;
-                        setTechnique.call(gd, technique);
-                        setTechniqueParameters.call(gd, sharedTechniqueParameters, lightTechniqueParameters, techniqueParameters);
+                        gd.setTechnique(technique);
+                        gd.setTechniqueParameters(sharedTechniqueParameters, lightTechniqueParameters, techniqueParameters);
                     } else if(currentLightTechniqueParameters !== lightTechniqueParameters) {
                         currentLightTechniqueParameters = lightTechniqueParameters;
-                        setTechniqueParameters.call(gd, lightTechniqueParameters, techniqueParameters);
+                        gd.setTechniqueParameters(lightTechniqueParameters, techniqueParameters);
                     } else {
-                        setTechniqueParameters.call(gd, techniqueParameters);
+                        gd.setTechniqueParameters(techniqueParameters);
                     }
                     if(null !== query) {
-                        if(beginOcclusionQuery.call(gd, query)) {
-                            draw.call(gd, lightPrimitive, 14);
-                            endOcclusionQuery.call(gd, query);
+                        if(gd.beginOcclusionQuery(query)) {
+                            gd.draw(lightPrimitive, 14);
+                            gd.endOcclusionQuery(query);
                         }
                     } else {
-                        draw.call(gd, lightPrimitive, 14);
+                        gd.draw(lightPrimitive, 14);
                     }
                     l += 1;
                 }while(l < numPointInstances);
@@ -747,7 +867,7 @@ var DeferredRendering = (function () {
             if(numSpotInstances) {
                 var spotLightTechnique = this.spotLightTechnique;
                 var spotLightShadowTechnique = this.spotLightShadowTechnique;
-                setStream.call(gd, this.spotLightVolumeVertexBuffer, lightSemantics);
+                gd.setStream(this.spotLightVolumeVertexBuffer, lightSemantics);
                 l = 0;
                 do {
                     lightInstance = spotInstances[l];
@@ -763,21 +883,21 @@ var DeferredRendering = (function () {
                     if(currentTechnique !== technique) {
                         currentTechnique = technique;
                         currentLightTechniqueParameters = lightTechniqueParameters;
-                        setTechnique.call(gd, technique);
-                        setTechniqueParameters.call(gd, sharedTechniqueParameters, lightTechniqueParameters, techniqueParameters);
+                        gd.setTechnique(technique);
+                        gd.setTechniqueParameters(sharedTechniqueParameters, lightTechniqueParameters, techniqueParameters);
                     } else if(currentLightTechniqueParameters !== lightTechniqueParameters) {
                         currentLightTechniqueParameters = lightTechniqueParameters;
-                        setTechniqueParameters.call(gd, lightTechniqueParameters, techniqueParameters);
+                        gd.setTechniqueParameters(lightTechniqueParameters, techniqueParameters);
                     } else {
-                        setTechniqueParameters.call(gd, techniqueParameters);
+                        gd.setTechniqueParameters(techniqueParameters);
                     }
                     if(null !== query) {
-                        if(beginOcclusionQuery.call(gd, query)) {
-                            draw.call(gd, lightPrimitive, 8);
-                            endOcclusionQuery.call(gd, query);
+                        if(gd.beginOcclusionQuery(query)) {
+                            gd.draw(lightPrimitive, 8);
+                            gd.endOcclusionQuery(query);
                         }
                     } else {
-                        draw.call(gd, lightPrimitive, 8);
+                        gd.draw(lightPrimitive, 8);
                     }
                     l += 1;
                 }while(l < numSpotInstances);
@@ -786,10 +906,10 @@ var DeferredRendering = (function () {
         }
         // Mix everything together and draw decal and transparent objects
         if(gd.beginRenderTarget(this.mixRenderTarget)) {
-            setStream.call(gd, quadVertexBuffer, quadSemantics);
-            setTechnique.call(gd, this.mixTechnique);
-            setTechniqueParameters.call(gd, this.mixTechniqueParameters);
-            draw.call(gd, quadPrimitive, 4);
+            gd.setStream(quadVertexBuffer, quadSemantics);
+            gd.setTechnique(this.mixTechnique);
+            gd.setTechniqueParameters(this.mixTechniqueParameters);
+            gd.draw(quadPrimitive, 4);
             gd.drawArray(this.passes[this.passIndex.decal], [
                 globalTechniqueParameters
             ], -1);
@@ -800,8 +920,8 @@ var DeferredRendering = (function () {
             var fogInstances = this.fogLights;
             var numFogInstances = fogInstances.length;
             if(numFogInstances) {
-                setStream.call(gd, this.pointLightVolumeVertexBuffer, lightSemantics);
-                setTechnique.call(gd, this.fogLightTechnique);
+                gd.setStream(this.pointLightVolumeVertexBuffer, lightSemantics);
+                gd.setTechnique(this.fogLightTechnique);
                 currentLightTechniqueParameters = undefined;
                 l = 0;
                 do {
@@ -811,14 +931,14 @@ var DeferredRendering = (function () {
                     lightTechniqueParameters = light.techniqueParameters;
                     if(l === 0) {
                         currentLightTechniqueParameters = lightTechniqueParameters;
-                        setTechniqueParameters.call(gd, sharedTechniqueParameters, lightTechniqueParameters, techniqueParameters);
+                        gd.setTechniqueParameters(sharedTechniqueParameters, lightTechniqueParameters, techniqueParameters);
                     } else if(currentLightTechniqueParameters !== lightTechniqueParameters) {
                         currentLightTechniqueParameters = lightTechniqueParameters;
-                        setTechniqueParameters.call(gd, lightTechniqueParameters, techniqueParameters);
+                        gd.setTechniqueParameters(lightTechniqueParameters, techniqueParameters);
                     } else {
-                        setTechniqueParameters.call(gd, techniqueParameters);
+                        gd.setTechniqueParameters(techniqueParameters);
                     }
-                    draw.call(gd, lightPrimitive, 14);
+                    gd.draw(lightPrimitive, 14);
                     l += 1;
                 }while(l < numFogInstances);
             }
@@ -848,8 +968,8 @@ var DeferredRendering = (function () {
             }
         }
         postFXsetupFn(gd, finalTexture);
-        setStream.call(gd, quadVertexBuffer, quadSemantics);
-        draw.call(gd, quadPrimitive, 4);
+        gd.setStream(quadVertexBuffer, quadSemantics);
+        gd.draw(quadPrimitive, 4);
     };
     DeferredRendering.prototype.setLightingScale = function (scale) {
         this.mixTechniqueParameters['lightingScale'] = scale;
@@ -1060,6 +1180,7 @@ var DeferredRendering = (function () {
         dr.opaqueRenderables = [];
         dr.decalRenderables = [];
         dr.transparentRenderables = [];
+        dr.localDirectionalLights = [];
         dr.spotLights = [];
         dr.pointLights = [];
         dr.fogLights = [];
@@ -1090,8 +1211,6 @@ var DeferredRendering = (function () {
         var worldView;// Temp variable for reused matrix
         
         var flareIndexBuffer, flareSemantics;
-        var m43BuildIdentity = md.m43BuildIdentity;
-        var m33Mul = md.m33Mul;
         // Version of m33Mul that can be applied to just the 3x3 part of 2
         // M43 matrices, resulting in an M33.
         var m43MulAsM33 = function m34MulAsM33Fn(a, b, dst) {
@@ -1127,7 +1246,6 @@ var DeferredRendering = (function () {
             dst[8] = (b2 * a6 + b5 * a7 + b8 * a8);
             return dst;
         };
-        var m33InverseTranspose = md.m33InverseTranspose;
         var lightProjectionRight = md.v3Build(0.5, 0.0, 0.0);
         var lightProjectionUp = md.v3Build(0.0, 0.5, 0.0);
         var lightProjectionAt = md.v3Build(0.5, 0.5, 1.0);
@@ -1138,7 +1256,7 @@ var DeferredRendering = (function () {
             var node = this.node;
             var matrix = node.world;
             worldView = m43MulAsM33(matrix, camera.viewMatrix, worldView);
-            techniqueParameters.worldViewInverseTranspose = m33InverseTranspose.call(md, worldView, techniqueParameters.worldViewInverseTranspose);
+            techniqueParameters.worldViewInverseTranspose = md.m33InverseTranspose(worldView, techniqueParameters.worldViewInverseTranspose);
             this.frameUpdated = this.frameVisible;
             var worldUpdate = node.worldUpdate;
             if(this.techniqueParametersUpdated !== worldUpdate) {
@@ -1150,8 +1268,8 @@ var DeferredRendering = (function () {
             var techniqueParameters = this.techniqueParameters;
             var node = this.node;
             var matrix = node.world;
-            worldView = m33Mul.call(md, matrix, camera.viewMatrix, worldView);
-            techniqueParameters.worldViewInverseTranspose = m33InverseTranspose.call(md, worldView, techniqueParameters.worldViewInverseTranspose);
+            worldView = md.m33Mul(matrix, camera.viewMatrix, worldView);
+            techniqueParameters.worldViewInverseTranspose = md.m33InverseTranspose(worldView, techniqueParameters.worldViewInverseTranspose);
             this.frameUpdated = this.frameVisible;
             var worldUpdate = node.worldUpdate;
             if(this.techniqueParametersUpdated !== worldUpdate) {
@@ -1189,12 +1307,19 @@ var DeferredRendering = (function () {
             drawParameters.setTechniqueParameters(0, geometryInstance.sharedMaterial.techniqueParameters);
             drawParameters.setTechniqueParameters(1, geometryInstance.techniqueParameters);
             drawParameters.technique = this.technique;
-            rendererInfo.renderUpdate = this.update;
+            geometryInstance.renderUpdate = this.update;
+            var node = geometryInstance.node;
+            if(!node.rendererInfo) {
+                node.rendererInfo = {
+                    id: DeferredRendering.nextNodeID
+                };
+                DeferredRendering.nextNodeID += 1;
+            }
             //
             // shadows
             //
             if(dr.shadowMaps) {
-                if(this.shadowMappingUpdate && !geometryInstance.sharedMaterial.meta.noshadows) {
+                if(this.shadowMappingUpdate && !meta.noshadows) {
                     drawParameters = gd.createDrawParameters();
                     drawParameters.userData = {
                     };
@@ -1205,12 +1330,12 @@ var DeferredRendering = (function () {
                     drawParameters.userData.passIndex = dr.passIndex.shadow;
                     rendererInfo.shadowMappingUpdate = this.shadowMappingUpdate;
                     drawParameters.technique = this.shadowTechnique;
-                    drawParameters.sortKey = renderingCommonSortKeyFn(this.shadowTechniqueIndex, 0);
+                    drawParameters.sortKey = renderingCommonSortKeyFn(this.shadowTechniqueIndex, node.rendererInfo.id);
                     var shadowTechniqueParameters = gd.createTechniqueParameters();
                     geometryInstance.shadowTechniqueParameters = shadowTechniqueParameters;
                     drawParameters.setTechniqueParameters(0, shadowTechniqueParameters);
                 } else {
-                    geometryInstance.sharedMaterial.meta.noshadows = true;
+                    meta.noshadows = true;
                 }
             }
         };
@@ -1247,7 +1372,7 @@ var DeferredRendering = (function () {
                 var techniqueParameters = this.techniqueParameters;
                 var matrix = node.world;
                 techniqueParameters.world = matrix;
-                techniqueParameters.worldInverseTranspose = m33InverseTranspose.call(md, matrix, techniqueParameters.worldInverseTranspose);
+                techniqueParameters.worldInverseTranspose = md.m33InverseTranspose(matrix, techniqueParameters.worldInverseTranspose);
             }
         };
         var deferredEnvSkinnedUpdate = function deferredEnvSkinnedUpdateFn() {
@@ -1259,7 +1384,7 @@ var DeferredRendering = (function () {
                 this.techniqueParametersUpdated = worldUpdate;
                 var matrix = node.world;
                 techniqueParameters.world = matrix;
-                techniqueParameters.worldInverseTranspose = m33InverseTranspose.call(md, matrix, techniqueParameters.worldInverseTranspose);
+                techniqueParameters.worldInverseTranspose = md.m33InverseTranspose(matrix, techniqueParameters.worldInverseTranspose);
             }
             var skinController = this.skinController;
             if(skinController) {
@@ -1441,7 +1566,7 @@ var DeferredRendering = (function () {
             if(this.techniqueParametersUpdated !== worldUpdate) {
                 this.techniqueParametersUpdated = worldUpdate;
                 var matrix = node.world;
-                this.techniqueParameters.world = m43BuildIdentity.call(md);
+                this.techniqueParameters.world = md.m43BuildIdentity();
                 var sourceVertices = geometry.sourceVertices;
                 top = md.m43TransformPoint(matrix, sourceVertices[0], geometry.top);
                 bottom = md.m43TransformPoint(matrix, sourceVertices[1], geometry.bottom);

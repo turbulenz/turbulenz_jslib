@@ -2133,10 +2133,9 @@ var CanvasContext = (function () {
             } else {
                 this.fillFlatBuffer(rect, 4);
                 var technique = this.flatTechniques['copy'];
-                gd.setTechnique(technique);
-                technique['screen'] = this.screen;
-                technique['color'] = this.v4Zero;
-                gd.draw(this.triangleStripPrimitive, 4);
+                this.setTechniqueWithColor(technique, this.screen, this.v4Zero);
+                gd.draw(this.triangleStripPrimitive, 4, this.flatOffset);
+                this.flatOffset += 4;
             }
         }
     };
@@ -2148,10 +2147,11 @@ var CanvasContext = (function () {
             var style = this.fillStyle;
             var gd = this.gd;
             if(this.setShadowStyle(style)) {
-                gd.draw(primitive, 4);
+                gd.draw(primitive, 4, this.flatOffset);
             }
             this.setStyle(style);
-            gd.draw(primitive, 4);
+            gd.draw(primitive, 4, this.flatOffset);
+            this.flatOffset += 4;
         }
     };
     CanvasContext.prototype.strokeRect = function (x, y, w, h) {
@@ -2159,7 +2159,7 @@ var CanvasContext = (function () {
             var rect = this.transformRect(x, y, w, h, this.tempRect);
             var style = this.strokeStyle;
             var lineWidth = this.lineWidth;
-            var thinLines = (lineWidth < 2 && !this.forceFatLines);
+            var thinLines = ((this.pixelRatio * lineWidth) < 2);
             var primitive;
             var numVertices;
             var bufferData;
@@ -2209,15 +2209,17 @@ var CanvasContext = (function () {
             }
             var gd = this.gd;
             if(this.setShadowStyle(style)) {
-                gd.draw(primitive, numVertices);
+                gd.draw(primitive, numVertices, this.flatOffset);
             }
             this.setStyle(style);
-            gd.draw(primitive, numVertices);
+            gd.draw(primitive, numVertices, this.flatOffset);
+            this.flatOffset += numVertices;
         }
     };
     CanvasContext.prototype.beginPath = function () {
         this.subPaths.length = 0;
         this.currentSubPath.length = 0;
+        this.needToSimplifyPath[0] = true;
     };
     CanvasContext.prototype.closePath = function () {
         var currentSubPath = this.currentSubPath;
@@ -2231,22 +2233,32 @@ var CanvasContext = (function () {
                 if(abs(firstPoint[0] - lastPoint[0]) >= 1.0 || abs(firstPoint[1] - lastPoint[1]) >= 1.0) {
                     currentSubPath[numCurrentSubPathElements] = firstPoint;
                 }
+                this.simplifyShape(currentSubPath);
             }
             var subPaths = this.subPaths;
-            subPaths[subPaths.length] = currentSubPath;
+            var numSubPaths = subPaths.length;
+            subPaths[numSubPaths] = currentSubPath;
             this.currentSubPath = [
                 firstPoint
             ];
+            var needToSimplifyPath = this.needToSimplifyPath;
+            needToSimplifyPath[numSubPaths] = false;
+            needToSimplifyPath[numSubPaths + 1] = true;
         }
     };
     CanvasContext.prototype.moveTo = function (x, y) {
         var currentSubPath = this.currentSubPath;
-        if(currentSubPath.length > 1) {
+        var numCurrentSubPathElements = currentSubPath.length;
+        if(numCurrentSubPathElements > 1) {
             var subPaths = this.subPaths;
-            subPaths[subPaths.length] = currentSubPath;
+            var numSubPaths = subPaths.length;
+            subPaths[numSubPaths] = currentSubPath;
             this.currentSubPath = [
                 this.transformPoint(x, y)
             ];
+            var needToSimplifyPath = this.needToSimplifyPath;
+            needToSimplifyPath[numSubPaths] = (numCurrentSubPathElements > 2);
+            needToSimplifyPath[numSubPaths + 1] = true;
         } else {
             currentSubPath[0] = this.transformPoint(x, y);
         }
@@ -2271,25 +2283,23 @@ var CanvasContext = (function () {
         var x2 = p2[0];
         var y2 = p2[1];
         var abs = Math.abs;
-        /*jshint bitwise: false*/
-        var numSteps = ((0.5 * (abs(x2 - x1) + abs(y2 - y1))) | 0);
-        /*jshint bitwise: true*/
-        var dt = (1.0 / numSteps);
-        for(var t = dt; 1 < numSteps; t += dt , numSteps -= 1) {
-            var invt = (1.0 - t);
-            var invt2 = (invt * invt);
-            var t2 = (t * t);
-            var tinvt = (2 * t * invt);
-            currentSubPath[numCurrentSubPathElements] = [
-                ((invt2 * x1) + (tinvt * xq) + (t2 * x2)), 
-                ((invt2 * y1) + (tinvt * yq) + (t2 * y2))
-            ];
-            numCurrentSubPathElements += 1;
+        var numSteps = Math.ceil(this.pixelRatio * Math.sqrt(abs(xq - x1) + abs(yq - y1) + abs(x2 - xq) + abs(y2 - yq)));
+        if(1 < numSteps) {
+            currentSubPath.length += numSteps;
+            var dt = (1.0 / numSteps);
+            for(var t = dt; 1 < numSteps; t += dt , numSteps -= 1) {
+                var invt = (1.0 - t);
+                var invt2 = (invt * invt);
+                var t2 = (t * t);
+                var tinvt = (2 * t * invt);
+                currentSubPath[numCurrentSubPathElements] = [
+                    ((invt2 * x1) + (tinvt * xq) + (t2 * x2)), 
+                    ((invt2 * y1) + (tinvt * yq) + (t2 * y2))
+                ];
+                numCurrentSubPathElements += 1;
+            }
         }
-        currentSubPath[numCurrentSubPathElements] = [
-            x2, 
-            y2
-        ];
+        currentSubPath[numCurrentSubPathElements] = p2;
     };
     CanvasContext.prototype.bezierCurveTo = function (cp1x, cp1y, cp2x, cp2y, x, y) {
         var currentSubPath = this.currentSubPath;
@@ -2310,28 +2320,26 @@ var CanvasContext = (function () {
         var x2 = p2[0];
         var y2 = p2[1];
         var abs = Math.abs;
-        /*jshint bitwise: false*/
-        var numSteps = ((0.5 * (abs(x2 - x1) + abs(y2 - y1))) | 0);
-        /*jshint bitwise: true*/
-        var dt = (1.0 / numSteps);
-        for(var t = dt; 1 < numSteps; t += dt , numSteps -= 1) {
-            var invt = (1.0 - t);
-            var invt2 = (invt * invt);
-            var invt3 = (invt2 * invt);
-            var t2 = (t * t);
-            var t3 = (t2 * t);
-            var tinvt = (3 * t * invt2);
-            var invtt = (3 * t2 * invt);
-            currentSubPath[numCurrentSubPathElements] = [
-                ((invt3 * x1) + (tinvt * xq1) + (invtt * xq2) + (t3 * x2)), 
-                ((invt3 * y1) + (tinvt * yq1) + (invtt * yq2) + (t3 * y2))
-            ];
-            numCurrentSubPathElements += 1;
+        var numSteps = Math.ceil(this.pixelRatio * Math.sqrt(abs(xq1 - x1) + abs(yq1 - y1) + abs(xq2 - xq1) + abs(yq2 - yq1) + abs(x2 - xq2) + abs(y2 - yq2)));
+        if(1 < numSteps) {
+            currentSubPath.length += numSteps;
+            var dt = (1.0 / numSteps);
+            for(var t = dt; 1 < numSteps; t += dt , numSteps -= 1) {
+                var invt = (1.0 - t);
+                var invt2 = (invt * invt);
+                var invt3 = (invt2 * invt);
+                var t2 = (t * t);
+                var t3 = (t2 * t);
+                var tinvt = (3 * t * invt2);
+                var invtt = (3 * t2 * invt);
+                currentSubPath[numCurrentSubPathElements] = [
+                    ((invt3 * x1) + (tinvt * xq1) + (invtt * xq2) + (t3 * x2)), 
+                    ((invt3 * y1) + (tinvt * yq1) + (invtt * yq2) + (t3 * y2))
+                ];
+                numCurrentSubPathElements += 1;
+            }
         }
-        currentSubPath[numCurrentSubPathElements] = [
-            x2, 
-            y2
-        ];
+        currentSubPath[numCurrentSubPathElements] = p2;
     };
     CanvasContext.prototype.arcTo = function (x1, y1, x2, y2, radius) {
         if(radius < 0) {
@@ -2410,12 +2418,59 @@ var CanvasContext = (function () {
             this.interpolateArc(cp[0], cp[1], radius, startAngle, endAngle, anticlockwise);
         }
     };
+    CanvasContext.prototype.ellipse = function (x, y, radiusX, radiusY, rotation, startAngle, endAngle, anticlockwise) {
+        if(radiusX < 0 || radiusY < 0) {
+            throw 'INDEX_SIZE_ERR';
+        }
+        if(radiusX < 2.0 && radiusY < 2.0) {
+            var cp = this.transformPoint(x, y);
+            this.currentSubPath.push(cp);
+            return;
+        }
+        var radius, sx, sy;
+        if(radiusX === radiusY) {
+            radius = radiusX;
+            sx = 1;
+            sy = 1;
+        } else if(radiusX > radiusY) {
+            radius = radiusX;
+            sx = 1;
+            sy = radiusY / radiusX;
+        } else//if (radiusX < radiusY)
+         {
+            radius = radiusY;
+            sx = radiusX / radiusY;
+            sy = 1;
+        }
+        if(rotation !== 0 || sx !== 1 || sy !== 1) {
+            this.translate(x, y);
+            if(rotation !== 0) {
+                this.rotate(rotation);
+            }
+            if(sx !== 1 || sy !== 1) {
+                this.scale(sx, sy);
+            }
+            this.arc(0, 0, radius, startAngle, endAngle, anticlockwise);
+            if(sx !== 1 || sy !== 1) {
+                this.scale((1 / sx), (1 / sy));
+            }
+            if(rotation !== 0) {
+                this.rotate(-rotation);
+            }
+            this.translate(-x, -y);
+        } else {
+            this.arc(x, y, radius, startAngle, endAngle, anticlockwise);
+        }
+    };
     CanvasContext.prototype.rect = function (x, y, w, h) {
         var subPaths = this.subPaths;
         var numSubPaths = subPaths.length;
         var currentSubPath = this.currentSubPath;
-        if(currentSubPath.length > 1) {
+        var numCurrentSubPathElements = currentSubPath.length;
+        var needToSimplifyPath = this.needToSimplifyPath;
+        if(numCurrentSubPathElements > 1) {
             subPaths[numSubPaths] = currentSubPath;
+            needToSimplifyPath[numSubPaths] = (numCurrentSubPathElements > 2);
             numSubPaths += 1;
         }
         var rect = this.transformRect(x, y, w, h, this.tempRect);
@@ -2445,8 +2500,11 @@ var CanvasContext = (function () {
         this.currentSubPath = [
             p0
         ];
+        needToSimplifyPath[numSubPaths] = (w < 1 || h < 1);
+        needToSimplifyPath[numSubPaths + 1] = true;
     };
-    CanvasContext.prototype.path = function (path) {
+    CanvasContext.prototype._parsePath = function (path) {
+        var commands = [];
         var end = path.length;
         var currentCommand = -1, previousCommand = -1;
         var i = 0;
@@ -2551,6 +2609,24 @@ var CanvasContext = (function () {
                 throw "Unknown flag: " + path.slice(i);
             }
         };
+        // polygons are encoded with a negative number indicating the number of points
+        var polygonStart = -1;
+        var addLine = function addLineFn(commands, x, y) {
+            var numCommands = commands.length;
+            if(0 < polygonStart) {
+                var lastCommand = commands[polygonStart];
+                if(lastCommand < 0) {
+                    commands[polygonStart] = (lastCommand - 1);
+                } else//if (lastCommand === 76)
+                 {
+                    commands[polygonStart] = -2;
+                }
+                commands.push(x, y);
+            } else {
+                polygonStart = numCommands;
+                commands.push(76, x, y);
+            }
+        };
         var getRatio = function getRatioFn(u, v) {
             var u0 = u[0];
             var u1 = u[1];
@@ -2561,8 +2637,13 @@ var CanvasContext = (function () {
         var getAngle = function getAngleFn(u, v) {
             return ((u[0] * v[1]) < (u[1] * v[0]) ? -1 : 1) * Math.acos(getRatio(u, v));
         };
+        var sqrt = Math.sqrt;
+        var abs = Math.abs;
+        var pi = Math.PI;
         var lx = 0;
         var ly = 0;
+        var fx = 0;
+        var fy = 0;
         var x, y, x1, y1, x2, y2;
         var rx, ry, angle, largeArcFlag, sweepFlag;
         while(i < end) {
@@ -2570,7 +2651,7 @@ var CanvasContext = (function () {
             var c = skipWhiteSpace();
             if(c < 0) {
                 // end of string
-                return;
+                return commands;
             }
             // Same command, new arguments?
             if(c === 43 || //+
@@ -2599,7 +2680,8 @@ var CanvasContext = (function () {
             }
             switch(currentCommand) {
                 case 77:
-                case 109:
+                    //M
+                                    case 109:
                     //m
                     x = readNumber();
                     y = readNumber();
@@ -2608,10 +2690,14 @@ var CanvasContext = (function () {
                         x += lx;
                         y += ly;
                     }
-                    this.moveTo(x, y);
+                    fx = x;
+                    fy = y;
+                    commands.push(77, x, y);
+                    polygonStart = -1;
                     break;
                 case 76:
-                case 108:
+                    //L
+                                    case 108:
                     //l
                     x = readNumber();
                     y = readNumber();
@@ -2620,10 +2706,11 @@ var CanvasContext = (function () {
                         x += lx;
                         y += ly;
                     }
-                    this.lineTo(x, y);
+                    addLine(commands, x, y);
                     break;
                 case 72:
-                case 104:
+                    //H
+                                    case 104:
                     //h
                     x = readNumber();
                     if(currentCommand === 104)//h
@@ -2631,10 +2718,11 @@ var CanvasContext = (function () {
                         x += lx;
                     }
                     y = ly;
-                    this.lineTo(x, y);
+                    addLine(commands, x, y);
                     break;
                 case 86:
-                case 118:
+                    //V
+                                    case 118:
                     //v
                     x = lx;
                     y = readNumber();
@@ -2642,10 +2730,11 @@ var CanvasContext = (function () {
                      {
                         y += ly;
                     }
-                    this.lineTo(x, y);
+                    addLine(commands, x, y);
                     break;
                 case 67:
-                case 99:
+                    //C
+                                    case 99:
                     //c
                     x1 = readNumber();
                     y1 = readNumber();
@@ -2662,10 +2751,12 @@ var CanvasContext = (function () {
                         x += lx;
                         y += ly;
                     }
-                    this.bezierCurveTo(x1, y1, x2, y2, x, y);
+                    commands.push(67, x1, y1, x2, y2, x, y);
+                    polygonStart = -1;
                     break;
                 case 83:
-                case 115:
+                    //S
+                                    case 115:
                     //s
                     if(previousCommand === 67 || //C
                     previousCommand === 99 || //c
@@ -2689,10 +2780,12 @@ var CanvasContext = (function () {
                         x += lx;
                         y += ly;
                     }
-                    this.bezierCurveTo(x1, y1, x2, y2, x, y);
+                    commands.push(67, x1, y1, x2, y2, x, y);
+                    polygonStart = -1;
                     break;
                 case 81:
-                case 113:
+                    //Q
+                                    case 113:
                     //q
                     x1 = readNumber();
                     y1 = readNumber();
@@ -2705,10 +2798,12 @@ var CanvasContext = (function () {
                         x += lx;
                         y += ly;
                     }
-                    this.quadraticCurveTo(x1, y1, x, y);
+                    commands.push(81, x1, y1, x, y);
+                    polygonStart = -1;
                     break;
                 case 84:
-                case 116:
+                    //T
+                                    case 116:
                     //t
                     if(previousCommand === 81 || //Q
                     previousCommand === 113 || //q
@@ -2728,17 +2823,19 @@ var CanvasContext = (function () {
                         x += lx;
                         y += ly;
                     }
-                    this.quadraticCurveTo(x1, y1, x, y);
+                    commands.push(81, x1, y1, x, y);
+                    polygonStart = -1;
                     break;
                 case 65:
-                case 97:
+                    //A
+                                    case 97:
                     //a
-                    var pi = Math.PI;
                     x1 = lx;
                     y1 = ly;
                     rx = readNumber();
                     ry = readNumber();
-                    angle = (readNumber() * (pi / 180.0));
+                    angle = readNumber();
+                    angle = (angle * (pi / 180.0));
                     largeArcFlag = readFlag();
                     sweepFlag = readFlag();
                     x = readNumber();
@@ -2748,7 +2845,6 @@ var CanvasContext = (function () {
                         x += lx;
                         y += ly;
                     }
-                    var sqrt = Math.sqrt;
                     var ca = Math.cos(angle);
                     var sa = Math.sin(angle);
                     var hdx = (x1 - x) * 0.5;
@@ -2825,6 +2921,164 @@ var CanvasContext = (function () {
                         sx = rx * invry;
                         sy = 1;
                     }
+                    commands.push(65, angle, sx, sy, cx, cy, radius, a1, (a1 + ad), (true - sweepFlag));
+                    polygonStart = -1;
+                    break;
+                case 90:
+                    //Z
+                                    case 122:
+                    //z
+                    if(3 <= polygonStart && commands[polygonStart - 3] === 77) {
+                        var startX = commands[polygonStart - 2];
+                        var startY = commands[polygonStart - 1];
+                        if(abs(startX - lx) < 1.0 && abs(startY - ly) < 1.0) {
+                            // Remove last point because it is redundant
+                            // Counter is a negative value
+                            commands[polygonStart] += 1;
+                            if(commands[polygonStart] === 0) {
+                                commands.length = polygonStart;
+                            } else {
+                                commands.length -= 2;
+                            }
+                        }
+                    }
+                    x = fx;
+                    y = fy;
+                    commands.push(90);
+                    polygonStart = -1;
+                    break;
+                default:
+                    throw "Unknown command: " + path.slice(i);
+            }
+            lx = x;
+            ly = y;
+        }
+        return commands;
+    };
+    CanvasContext.prototype.addPoints = function (points, offset, numPoints) {
+        var currentSubPath = this.currentSubPath;
+        var j = currentSubPath.length;
+        var endPoints = (j + numPoints);
+        var i = offset;
+        currentSubPath.length = endPoints;
+        if(this.transformPoint === this.transformPointIdentity) {
+            do {
+                currentSubPath[j] = [
+                    points[i], 
+                    points[i + 1]
+                ];
+                i += 2;
+                j += 1;
+            }while(j < endPoints);
+        } else if(this.transformPoint === this.transformPointTranslate) {
+            var m = this.matrix;
+            var dx = m[2];
+            var dy = m[5];
+            do {
+                currentSubPath[j] = [
+                    points[i] + dx, 
+                    points[i + 1] + dy
+                ];
+                i += 2;
+                j += 1;
+            }while(j < endPoints);
+        } else {
+            do {
+                currentSubPath[j] = this.transformPoint(points[i], points[i + 1]);
+                i += 2;
+                j += 1;
+            }while(j < endPoints);
+        }
+        return i;
+    };
+    CanvasContext.prototype.path = function (path) {
+        var commands = this.cachedPaths[path];
+        if(commands === undefined) {
+            if(this.numCachedPaths >= 1024) {
+                this.cachedPaths = {
+                };
+                this.numCachedPaths = 0;
+            }
+            commands = this._parsePath(path);
+            this.cachedPaths[path] = commands;
+            this.numCachedPaths += 1;
+        }
+        var end = commands.length;
+        var currentCommand = -1;
+        var i = 0;
+        var x, y, x1, y1, x2, y2;
+        while(i < end) {
+            currentCommand = commands[i];
+            i += 1;
+            if(currentCommand < 0) {
+                i = this.addPoints(commands, i, -currentCommand);
+                continue;
+            }
+            switch(currentCommand) {
+                case 77:
+                    //M
+                    x = commands[i];
+                    i += 1;
+                    y = commands[i];
+                    i += 1;
+                    this.moveTo(x, y);
+                    break;
+                case 76:
+                    //L
+                    x = commands[i];
+                    i += 1;
+                    y = commands[i];
+                    i += 1;
+                    this.currentSubPath.push(this.transformPoint(x, y));
+                    break;
+                case 67:
+                    //C
+                    x1 = commands[i];
+                    i += 1;
+                    y1 = commands[i];
+                    i += 1;
+                    x2 = commands[i];
+                    i += 1;
+                    y2 = commands[i];
+                    i += 1;
+                    x = commands[i];
+                    i += 1;
+                    y = commands[i];
+                    i += 1;
+                    this.bezierCurveTo(x1, y1, x2, y2, x, y);
+                    break;
+                case 81:
+                    //Q
+                    x1 = commands[i];
+                    i += 1;
+                    y1 = commands[i];
+                    i += 1;
+                    x = commands[i];
+                    i += 1;
+                    y = commands[i];
+                    i += 1;
+                    this.quadraticCurveTo(x1, y1, x, y);
+                    break;
+                case 65:
+                    //A
+                    var angle = commands[i];
+                    i += 1;
+                    var sx = commands[i];
+                    i += 1;
+                    var sy = commands[i];
+                    i += 1;
+                    var cx = commands[i];
+                    i += 1;
+                    var cy = commands[i];
+                    i += 1;
+                    var radius = commands[i];
+                    i += 1;
+                    var startAngle = commands[i];
+                    i += 1;
+                    var endAngle = commands[i];
+                    i += 1;
+                    var anticlockwise = commands[i];
+                    i += 1;
                     if(angle !== 0 || sx !== 1 || sy !== 1) {
                         this.translate(cx, cy);
                         if(angle !== 0) {
@@ -2833,7 +3087,7 @@ var CanvasContext = (function () {
                         if(sx !== 1 || sy !== 1) {
                             this.scale(sx, sy);
                         }
-                        this.arc(0, 0, radius, a1, (a1 + ad), (true - sweepFlag));
+                        this.arc(0, 0, radius, startAngle, endAngle, anticlockwise);
                         if(sx !== 1 || sy !== 1) {
                             this.scale((1 / sx), (1 / sy));
                         }
@@ -2842,31 +3096,28 @@ var CanvasContext = (function () {
                         }
                         this.translate(-cx, -cy);
                     } else {
-                        this.arc(cx, cy, radius, a1, (a1 + ad), (true - sweepFlag));
+                        this.arc(cx, cy, radius, startAngle, endAngle, anticlockwise);
                     }
                     break;
                 case 90:
-                case 122:
-                    //z
-                    var firstPoint = this.currentSubPath[0];
-                    x = firstPoint[0];
-                    y = firstPoint[1];
+                    //Z
                     this.closePath();
                     break;
                 default:
-                    throw "Unknown command: " + path.slice(i);
+                    // should never happen
+                    break;
             }
-            lx = x;
-            ly = y;
         }
     };
     CanvasContext.prototype.fill = function () {
         var subPaths = this.subPaths;
         var numSubPaths = subPaths.length;
         var currentSubPath = this.currentSubPath;
+        var needToSimplifyPath = this.needToSimplifyPath;
         if(numSubPaths > 0 || currentSubPath.length > 2) {
             var autoClose = this.autoClose;
-            var isConvex = this.isConvex;
+            var canTriangulateAsFan = this.canTriangulateAsFan;
+            var triangulateAsFan = this.triangulateAsFan;
             var points, numPoints, numSegments;
             var style = this.fillStyle;
             var primitive;
@@ -2881,10 +3132,16 @@ var CanvasContext = (function () {
                     if(numPoints > 2) {
                         numPoints = autoClose(points, numPoints);
                         numSegments = (numPoints - 1);
-                        if(isConvex(points, numSegments)) {
-                            numVertices = this.triangulateConvex(points, numSegments, vertices, numVertices);
-                        } else {
-                            numVertices = this.triangulateConcave(points, numSegments, vertices, numVertices);
+                        if(needToSimplifyPath[i]) {
+                            needToSimplifyPath[i] = false;
+                            numSegments = this.simplifyShape(points);
+                        }
+                        if(numSegments > 1) {
+                            if(canTriangulateAsFan(points, numSegments)) {
+                                numVertices = triangulateAsFan(points, numSegments, vertices, numVertices);
+                            } else {
+                                numVertices = this.triangulateConcaveCached(points, numSegments, vertices, numVertices);
+                            }
                         }
                     }
                 }
@@ -2893,10 +3150,16 @@ var CanvasContext = (function () {
                 if(numPoints > 2) {
                     numPoints = autoClose(points, numPoints);
                     numSegments = (numPoints - 1);
-                    if(isConvex(points, numSegments)) {
-                        numVertices = this.triangulateConvex(points, numSegments, vertices, numVertices);
-                    } else {
-                        numVertices = this.triangulateConcave(points, numSegments, vertices, numVertices);
+                    if(needToSimplifyPath[numSubPaths]) {
+                        needToSimplifyPath[numSubPaths] = false;
+                        numSegments = this.simplifyShape(points);
+                    }
+                    if(numSegments > 1) {
+                        if(canTriangulateAsFan(points, numSegments)) {
+                            numVertices = triangulateAsFan(points, numSegments, vertices, numVertices);
+                        } else {
+                            numVertices = this.triangulateConcaveCached(points, numSegments, vertices, numVertices);
+                        }
                     }
                 }
             } else {
@@ -2909,14 +3172,20 @@ var CanvasContext = (function () {
                 if(numPoints > 2) {
                     numPoints = autoClose(points, numPoints);
                     numSegments = (numPoints - 1);
-                    if(isConvex(points, numSegments)) {
-                        primitive = this.triangleFanPrimitive;
-                        vertices = points;
-                        numVertices = numSegments;
-                    } else {
-                        primitive = this.trianglePrimitive;
-                        vertices = this.tempVertices;
-                        numVertices = this.triangulateConcave(points, numSegments, vertices, 0);
+                    if(needToSimplifyPath[0]) {
+                        needToSimplifyPath[0] = false;
+                        numSegments = this.simplifyShape(points);
+                    }
+                    if(numSegments > 1) {
+                        if(canTriangulateAsFan(points, numSegments)) {
+                            primitive = this.triangleFanPrimitive;
+                            vertices = points;
+                            numVertices = numSegments;
+                        } else {
+                            primitive = this.trianglePrimitive;
+                            vertices = this.tempVertices;
+                            numVertices = this.triangulateConcaveCached(points, numSegments, vertices, 0);
+                        }
                     }
                 }
             }
@@ -2924,10 +3193,11 @@ var CanvasContext = (function () {
                 this.fillFlatVertices(vertices, numVertices);
                 var gd = this.gd;
                 if(this.setShadowStyle(style)) {
-                    gd.draw(primitive, numVertices);
+                    gd.draw(primitive, numVertices, this.flatOffset);
                 }
                 this.setStyle(style);
-                gd.draw(primitive, numVertices);
+                gd.draw(primitive, numVertices, this.flatOffset);
+                this.flatOffset += numVertices;
             }
         }
     };
@@ -2935,49 +3205,63 @@ var CanvasContext = (function () {
         var subPaths = this.subPaths;
         var numSubPaths = subPaths.length;
         var currentSubPath = this.currentSubPath;
+        var needToSimplifyPath = this.needToSimplifyPath;
         if(numSubPaths > 0 || currentSubPath.length > 0) {
             var gd = this.gd;
             var style = this.strokeStyle;
             var lineWidth = this.lineWidth;
-            var thinLines = (lineWidth < 2 && !this.forceFatLines);
+            var thinLines = ((this.pixelRatio * lineWidth) < 2);
             var points, numPoints, primitive, numVertices;
+            if(thinLines) {
+                primitive = this.lineStripPrimitive;
+            } else {
+                primitive = this.triangleStripPrimitive;
+            }
             for(var i = 0; i < numSubPaths; i += 1) {
                 points = subPaths[i];
                 numPoints = points.length;
+                if(needToSimplifyPath[i]) {
+                    needToSimplifyPath[i] = false;
+                    numPoints = (1 + this.simplifyShape(points));
+                }
                 if(thinLines) {
-                    primitive = this.lineStripPrimitive;
                     numVertices = numPoints;
                     this.fillFlatVertices(points, numPoints);
                 } else if(numPoints > 1) {
-                    primitive = this.triangleStripPrimitive;
                     numVertices = this.fillFatStrip(points, numPoints, lineWidth);
                 } else {
                     continue;
                 }
                 if(this.setShadowStyle(style)) {
-                    gd.draw(primitive, numVertices);
+                    gd.draw(primitive, numVertices, this.flatOffset);
                 }
                 this.setStyle(style);
-                gd.draw(primitive, numVertices);
+                gd.draw(primitive, numVertices, this.flatOffset);
+                this.flatOffset += numVertices;
             }
             points = currentSubPath;
             numPoints = points.length;
             if(numPoints > 0) {
+                if(needToSimplifyPath[numSubPaths]) {
+                    needToSimplifyPath[numSubPaths] = false;
+                    if(numPoints > 2) {
+                        numPoints = (1 + this.simplifyShape(points));
+                    }
+                }
                 if(thinLines) {
-                    primitive = this.lineStripPrimitive;
                     numVertices = numPoints;
                     this.fillFlatVertices(points, numPoints);
                 } else if(numPoints > 1) {
-                    primitive = this.triangleStripPrimitive;
                     numVertices = this.fillFatStrip(points, numPoints, lineWidth);
                 } else {
                     return;
                 }
                 if(this.setShadowStyle(style)) {
-                    gd.draw(primitive, numVertices);
+                    gd.draw(primitive, numVertices, this.flatOffset);
                 }
                 this.setStyle(style);
-                gd.draw(primitive, numVertices);
+                gd.draw(primitive, numVertices, this.flatOffset);
+                this.flatOffset += numVertices;
             }
         }
     };
@@ -3012,7 +3296,7 @@ var CanvasContext = (function () {
         }
         var currentSubPath = this.currentSubPath;
         if(currentSubPath.length > 2) {
-            clipSubPaths[numClipSubPaths] = currentSubPath.slice();
+            clipSubPaths[numClipSubPaths] = currentSubPath.slice(0);
             numClipSubPaths += 1;
         }
         if(numClipSubPaths === 0) {
@@ -3121,9 +3405,7 @@ var CanvasContext = (function () {
         if(!technique) {
             throw "Unknown composite operation: " + this.globalCompositeOperation;
         }
-        var gd = this.gd;
-        gd.setTechnique(technique);
-        technique['color'] = color;
+        this.setTechniqueWithColor(technique, this.screen, color);
         var rect = this.transformRect(x, y, maxWidth, maxWidth, this.tempRect);
         x = rect[4];
         y = rect[5];
@@ -3156,6 +3438,8 @@ var CanvasContext = (function () {
             params.alignment = 1;
         }
         font.drawTextRect(text, params);
+        // Clear stream cache because drawTextRect sets its own
+        this.activeVertexBuffer = null;
     };
     CanvasContext.prototype.strokeText = function () {
         /* text, x, y, maxWidth */ // TODO
@@ -3245,14 +3529,13 @@ var CanvasContext = (function () {
                 if(!technique) {
                     throw "Unknown composite operation: " + this.globalCompositeOperation;
                 }
-                gd.setTechnique(technique);
-                technique['texture'] = image;
+                var color = this.parseColor(this.imageColor);
                 var globalAlpha = this.globalAlpha;
                 if(globalAlpha < 1.0) {
-                    technique['color'] = this.md.v4Build(1.0, 1.0, 1.0, globalAlpha, this.tempColor);
-                } else {
-                    technique['color'] = this.v4One;
+                    color = this.md.v4Build(color[0], color[1], color[2], (color[3] * globalAlpha), this.tempColor);
                 }
+                this.setTechniqueWithColor(technique, this.screen, color);
+                technique['texture'] = image;
                 gd.draw(primitive, 4);
             }
         }
@@ -3359,6 +3642,7 @@ var CanvasContext = (function () {
                 this.fillTextureBuffer(bufferData, 4);
                 var technique = this.imageTechnique;
                 gd.setTechnique(technique);
+                this.activeTechnique = null;
                 technique['image'] = tempImage;
                 gd.draw(this.triangleStripPrimitive, 4);
             }
@@ -3377,6 +3661,7 @@ var CanvasContext = (function () {
             target = gd;
         }
         this.target = target;
+        gd.setViewport(0, 0, target.width, target.height);
         var viewport = this.viewport;
         if(viewportRect) {
             viewport[0] = viewportRect[0];
@@ -3389,53 +3674,48 @@ var CanvasContext = (function () {
             viewport[2] = target.width;
             viewport[3] = target.height;
         }
-        gd.setViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-        /* This code is required if Object.defineProperty does not work */
         var canvas = this.canvas;
         var width = canvas.width;
         var height = canvas.height;
+        this.updateScreenScale();
+        this.updateScissor();
+        this.pixelRatio = Math.max((viewport[2] / width), (viewport[3] / height));
+        this.activeVertexBuffer = null;
+        this.activeTechnique = null;
+        this.flatOffset = 0;
+        /* This code is required if Object.defineProperty does not work */
         if(width !== this.width || height !== this.height) {
             this.width = width;
             this.height = height;
-            this.screen[0] = (2 / width);
-            this.screen[1] = (-2 / height);
             this.resetState();
             this.clearRect(0, 0, width, height);
         }
-        this.forceFatLines = ((2 * width) <= viewport[2] || (2 * height) <= viewport[3]);
-        this.updateScissor();
         return true;
     };
     CanvasContext.prototype.endFrame = function () {
-        if(!this.target) {
+        var target = this.target;
+        if(!target) {
             throw '"beginFrame" was never called!';
         }
         this.target = null;
-        var viewport = this.viewport;
-        var v0 = viewport[0];
-        var v1 = viewport[1];
-        var v2 = viewport[2];
-        var v3 = viewport[3];
-        var gd = this.gd;
-        gd.setViewport(v0, v1, v2, v3);
-        gd.setScissor(v0, v1, v2, v3);
+        this.gd.setScissor(0, 0, target.width, target.height);
     };
     CanvasContext.prototype.setWidth = //
     // Private API
     //
     function (width) {
         this.width = width;
-        this.screen[0] = (2 / width);
         this.resetState();
         if(this.target) {
+            this.updateScreenScale();
             this.clearRect(0, 0, width, this.height);
         }
     };
     CanvasContext.prototype.setHeight = function (height) {
         this.height = height;
-        this.screen[1] = (-2 / height);
         this.resetState();
         if(this.target) {
+            this.updateScreenScale();
             this.clearRect(0, 0, this.width, height);
         }
     };
@@ -3457,14 +3737,15 @@ var CanvasContext = (function () {
             font: null,
             textAlign: null,
             textBaseline: null,
-            matrix: new this.arrayConstructor(6),
+            imageColor: null,
+            matrix: new this.floatArrayConstructor(6),
             scale: null,
             translate: null,
             transform: null,
             setTransform: null,
             transformPoint: null,
             transformRect: null,
-            clipExtents: new this.arrayConstructor(4)
+            clipExtents: new this.floatArrayConstructor(4)
         };
     };
     CanvasContext.prototype.setStates = function (dest, src) {
@@ -3483,6 +3764,7 @@ var CanvasContext = (function () {
         dest.font = src.font;
         dest.textAlign = src.textAlign;
         dest.textBaseline = src.textBaseline;
+        dest.imageColor = src.imageColor;
         // Have to copy array elements because if we keep a reference we modify the default ones
         var destMatrix = dest.matrix;
         var srcMatrix = src.matrix;
@@ -3515,17 +3797,20 @@ var CanvasContext = (function () {
         clipExtents[1] = 0;
         clipExtents[2] = this.width;
         clipExtents[3] = this.height;
-        this.resetTechniqueParameters();
-    };
-    CanvasContext.prototype.resetTechniqueParameters = function () {
-        // The screen value of texture techniques is updated here
-        var screen = this.screen;
-        var textureTechniques = this.textureTechniques;
-        for(var p in textureTechniques) {
-            if(textureTechniques.hasOwnProperty(p)) {
-                textureTechniques[p]['screen'] = screen;
-            }
+        if(this.target) {
+            this.updateScissor();
         }
+    };
+    CanvasContext.prototype.updateScreenScale = function () {
+        var screen = this.screen;
+        var target = this.target;
+        var viewport = this.viewport;
+        var targetWidth = target.width;
+        var targetHeight = target.height;
+        screen[0] = (2 * viewport[2]) / (this.width * targetWidth);
+        screen[1] = (-2 * viewport[3]) / (this.height * targetHeight);
+        screen[2] = -1 + (2 * viewport[0] / targetWidth);
+        screen[3] = 1 - (2 * (viewport[1] + viewport[3] - targetHeight) / targetHeight);
     };
     CanvasContext.prototype.updateScissor = function () {
         // Set scissor rectangle to intersection of viewport with clipExtents,
@@ -3542,7 +3827,24 @@ var CanvasContext = (function () {
         var minClipY = (clipExtents[1] * deviceScaleY);
         var maxClipX = (clipExtents[2] * deviceScaleX);
         var maxClipY = (clipExtents[3] * deviceScaleY);
-        this.gd.setScissor((viewportX + minClipX), (viewportY + (viewportHeight - maxClipY)), (maxClipX - minClipX), (maxClipY - minClipY));
+        var x = (viewportX + minClipX);
+        var y = (viewportY + (viewportHeight - maxClipY));
+        var w = (maxClipX - minClipX);
+        var h = (maxClipY - minClipY);
+        if(x < 0) {
+            x = 0;
+        }
+        if(y < 0) {
+            y = 0;
+        }
+        var target = this.target;
+        if((x + w) > target.width) {
+            w = (target.width - x);
+        }
+        if((y + h) > target.height) {
+            h = (target.height - y);
+        }
+        this.gd.setScissor(x, y, w, h);
     };
     CanvasContext.prototype.setFontManager = function (fm) {
         this.fm = fm;
@@ -3595,16 +3897,67 @@ var CanvasContext = (function () {
         rect[7] = (by + dx1);
         return rect;
     };
-    CanvasContext.prototype.untransformPoint = function (p) {
+    CanvasContext.prototype.transformPointTranslate = function (x, y) {
         var m = this.matrix;
+        return [
+            (x + m[2]), 
+            (y + m[5])
+        ];
+    };
+    CanvasContext.prototype.transformRectTranslate = function (x, y, w, h, rect) {
+        var m = this.matrix;
+        var x0 = (x + m[2]);
+        var y0 = (y + m[5]);
+        var x1 = (x0 + w);
+        var y1 = (y0 + h);
+        rect[0] = x0;
+        rect[1] = y1;
+        rect[2] = x1;
+        rect[3] = y1;
+        rect[4] = x0;
+        rect[5] = y0;
+        rect[6] = x1;
+        rect[7] = y0;
+        return rect;
+    };
+    CanvasContext.prototype.transformPointIdentity = function (x, y) {
+        return [
+            x, 
+            y
+        ];
+    };
+    CanvasContext.prototype.transformRectIdentity = function (x, y, w, h, rect) {
+        var x1 = (x + w);
+        var y1 = (y + h);
+        rect[0] = x;
+        rect[1] = y1;
+        rect[2] = x1;
+        rect[3] = y1;
+        rect[4] = x;
+        rect[5] = y;
+        rect[6] = x1;
+        rect[7] = y;
+        return rect;
+    };
+    CanvasContext.prototype.untransformPoint = function (p) {
+        if(this.transformPoint === this.transformPointIdentity) {
+            return p;
+        }
+        var m = this.matrix;
+        var x = p[0];
+        var y = p[1];
+        if(this.transformPoint === this.transformPointTranslate) {
+            return [
+                (x - m[2]), 
+                (y - m[5])
+            ];
+        }
         var m0 = m[0];
         var m1 = m[1];
         var m2 = m[2];
         var m3 = m[3];
         var m4 = m[4];
         var m5 = m[5];
-        var x = p[0];
-        var y = p[1];
         // invert matrix
                 var r0, r1, r2, r3, r4, r5;
         var det = (m0 * m4 - m1 * m3);
@@ -3754,24 +4107,23 @@ var CanvasContext = (function () {
         var screenScaleX = screen[0];
         var screenScaleY = screen[1];
         screen = this.md.v4Build(screenScaleX, screenScaleY, (screen[2] + (shadowOffsetX * screenScaleX)), (screen[3] + (shadowOffsetY * screenScaleY)), this.tempScreen);
-        var gd = this.gd;
         var technique;
         if(typeof style !== 'string' && !style.opaque) {
             if(onlyTexture)// drawImage
              {
                 technique = this.textureShadowTechnique;
-                gd.setTechnique(technique);
+                this.setTechniqueWithColor(technique, screen, color);
                 technique.texture = style;
             } else if(style.stops)// Gradient
              {
-                var texture = style.updateTexture(gd);
+                var texture = style.updateTexture(this.gd);
                 var gradientWidth = texture.width;
                 var gradientHeight = texture.height;
                 if(!gradientWidth || !gradientHeight) {
                     throw 'INVALID_STATE_ERR';
                 }
                 technique = this.gradientShadowTechnique;
-                gd.setTechnique(technique);
+                this.setTechniqueWithColor(technique, screen, color);
                 technique.uvtransform = this.calculateGradientUVtransform(style.matrix);
                 technique.gradient = texture;
             } else// Pattern
@@ -3782,7 +4134,7 @@ var CanvasContext = (function () {
                     throw 'INVALID_STATE_ERR';
                 }
                 technique = this.patternShadowTechnique;
-                gd.setTechnique(technique);
+                this.setTechniqueWithColor(technique, screen, color);
                 technique.uvtransform = this.calculatePatternUVtransform(imageWidth, imageHeight);
                 technique.pattern = style;
             }
@@ -3792,10 +4144,8 @@ var CanvasContext = (function () {
             } else {
                 technique = this.flatTechniques['copy'];
             }
-            gd.setTechnique(technique);
+            this.setTechniqueWithColor(technique, screen, color);
         }
-        technique.screen = screen;
-        technique.color = color;
         return true;
     };
     CanvasContext.prototype.setStyle = function (style) {
@@ -3804,7 +4154,6 @@ var CanvasContext = (function () {
         }
         var globalCompositeOperation = this.globalCompositeOperation;
         var screen = this.screen;
-        var gd = this.gd;
         var technique;
         if(typeof style === 'string')// CSS Color
          {
@@ -3821,12 +4170,10 @@ var CanvasContext = (function () {
             } else {
                 technique = this.flatTechniques['copy'];
             }
-            gd.setTechnique(technique);
-            technique.screen = screen;
-            technique.color = color;
+            this.setTechniqueWithColor(technique, screen, color);
         } else if(style.stops)// Gradient
          {
-            var texture = style.updateTexture(gd);
+            var texture = style.updateTexture(this.gd);
             var gradientWidth = texture.width;
             var gradientHeight = texture.height;
             if(!gradientWidth || !gradientHeight) {
@@ -3841,11 +4188,9 @@ var CanvasContext = (function () {
             } else {
                 technique = this.gradientTechniques['copy'];
             }
-            gd.setTechnique(technique);
-            technique.screen = screen;
+            this.setTechniqueWithAlpha(technique, screen, globalAlpha);
             technique.uvtransform = this.calculateGradientUVtransform(style.matrix);
             technique.gradient = texture;
-            technique.alpha = globalAlpha;
         } else// Pattern
          {
             var imageWidth = style.width;
@@ -3857,11 +4202,75 @@ var CanvasContext = (function () {
             if(!technique) {
                 throw "Unknown composite operation: " + globalCompositeOperation;
             }
-            gd.setTechnique(technique);
-            technique.screen = screen;
+            this.setTechniqueWithAlpha(technique, screen, this.globalAlpha);
             technique.uvtransform = this.calculatePatternUVtransform(imageWidth, imageHeight);
             technique.pattern = style;
-            technique.alpha = this.globalAlpha;
+        }
+    };
+    CanvasContext.prototype.setStream = function (vertexBuffer, semantics) {
+        if(this.activeVertexBuffer !== vertexBuffer) {
+            this.activeVertexBuffer = vertexBuffer;
+            this.gd.setStream(vertexBuffer, semantics, 0);
+        }
+    };
+    CanvasContext.prototype.setTechniqueWithAlpha = function (technique, screen, alpha) {
+        var activeScreen = this.activeScreen;
+        var activeColor = this.activeColor;
+        if(this.activeTechnique !== technique) {
+            this.activeTechnique = technique;
+            this.gd.setTechnique(technique);
+            technique['screen'] = screen;
+            technique['alpha'] = alpha;
+            activeScreen[0] = screen[0];
+            activeScreen[1] = screen[1];
+            activeScreen[2] = screen[2];
+            activeScreen[3] = screen[3];
+            activeColor[3] = alpha;
+        } else {
+            if(activeScreen[0] !== screen[0] || activeScreen[1] !== screen[1] || activeScreen[2] !== screen[2] || activeScreen[3] !== screen[3]) {
+                activeScreen[0] = screen[0];
+                activeScreen[1] = screen[1];
+                activeScreen[2] = screen[2];
+                activeScreen[3] = screen[3];
+                technique['screen'] = screen;
+            }
+            if(activeColor[3] !== alpha) {
+                activeColor[3] = alpha;
+                technique['alpha'] = alpha;
+            }
+        }
+    };
+    CanvasContext.prototype.setTechniqueWithColor = function (technique, screen, color) {
+        var activeScreen = this.activeScreen;
+        var activeColor = this.activeColor;
+        if(this.activeTechnique !== technique) {
+            this.activeTechnique = technique;
+            this.gd.setTechnique(technique);
+            technique['screen'] = screen;
+            technique['color'] = color;
+            activeScreen[0] = screen[0];
+            activeScreen[1] = screen[1];
+            activeScreen[2] = screen[2];
+            activeScreen[3] = screen[3];
+            activeColor[0] = color[0];
+            activeColor[1] = color[1];
+            activeColor[2] = color[2];
+            activeColor[3] = color[3];
+        } else {
+            if(activeScreen[0] !== screen[0] || activeScreen[1] !== screen[1] || activeScreen[2] !== screen[2] || activeScreen[3] !== screen[3]) {
+                activeScreen[0] = screen[0];
+                activeScreen[1] = screen[1];
+                activeScreen[2] = screen[2];
+                activeScreen[3] = screen[3];
+                technique['screen'] = screen;
+            }
+            if(activeColor[0] !== color[0] || activeColor[1] !== color[1] || activeColor[2] !== color[2] || activeColor[3] !== color[3]) {
+                activeColor[0] = color[0];
+                activeColor[1] = color[1];
+                activeColor[2] = color[2];
+                activeColor[3] = color[3];
+                technique['color'] = color;
+            }
         }
     };
     CanvasContext.prototype.parseColor = function (colorText) {
@@ -3869,7 +4278,7 @@ var CanvasContext = (function () {
         if(color !== undefined) {
             return color;
         }
-        if(this.numCachedColors > 1024) {
+        if(this.numCachedColors >= 1024) {
             this.cachedColors = {
             };
             this.numCachedColors = 0;
@@ -3890,7 +4299,7 @@ var CanvasContext = (function () {
         var points = this.currentSubPath;
         var numPoints = points.length;
         var angle, angleDiff, i, j;
-        var angleStep = (2.0 / radius);
+        var angleStep = (2.0 / (radius * this.pixelRatio));
         var m = this.matrix;
         var m0 = (m[0] * radius);
         var m1 = (m[1] * radius);
@@ -3938,8 +4347,18 @@ var CanvasContext = (function () {
     };
     CanvasContext.prototype.getFlatBuffer = function (numVertices) {
         var bufferData = this.bufferData;
-        if(bufferData.length < (numVertices * 2)) {
-            this.bufferData = bufferData = new this.arrayConstructor(numVertices * 2);
+        var numFloats = (2 * numVertices);
+        if(bufferData.length < numFloats) {
+            this.bufferData = bufferData = new this.floatArrayConstructor(numFloats);
+            this.subBufferDataCache = {
+            };
+        } else if(numFloats < bufferData.length) {
+            var subBuffer = this.subBufferDataCache[numFloats];
+            if(subBuffer === undefined) {
+                subBuffer = bufferData.subarray(0, numFloats);
+                this.subBufferDataCache[numFloats] = subBuffer;
+            }
+            bufferData = subBuffer;
         }
         return bufferData;
     };
@@ -3947,21 +4366,33 @@ var CanvasContext = (function () {
         var flatVertexBuffer = this.flatVertexBuffer;
         if(flatVertexBuffer.numVertices < numVertices) {
             flatVertexBuffer.destroy();
-            this.flatVertexBuffer = flatVertexBuffer = null;
             this.flatVertexBuffer = flatVertexBuffer = this.gd.createVertexBuffer({
                 numVertices: numVertices,
                 attributes: this.flatVertexFormats,
                 dynamic: true,
                 'transient': true
             });
+            this.flatOffset = 0;
+        } else if((this.flatOffset + numVertices) > flatVertexBuffer.numVertices) {
+            this.flatOffset = 0;
         }
-        flatVertexBuffer.setData(bufferData, 0, numVertices);
-        this.gd.setStream(flatVertexBuffer, this.flatSemantics);
+        flatVertexBuffer.setData(bufferData, this.flatOffset, numVertices);
+        this.setStream(flatVertexBuffer, this.flatSemantics);
     };
     CanvasContext.prototype.getTextureBuffer = function (numVertices) {
         var bufferData = this.bufferData;
-        if(bufferData.length < (numVertices * 4)) {
-            this.bufferData = bufferData = new this.arrayConstructor(numVertices * 4);
+        var numFloats = (4 * numVertices);
+        if(bufferData.length < numFloats) {
+            this.bufferData = bufferData = new this.floatArrayConstructor(numFloats);
+            this.subBufferDataCache = {
+            };
+        } else if(numFloats < bufferData.length) {
+            var subBuffer = this.subBufferDataCache[numFloats];
+            if(subBuffer === undefined) {
+                subBuffer = bufferData.subarray(0, numFloats);
+                this.subBufferDataCache[numFloats] = subBuffer;
+            }
+            bufferData = subBuffer;
         }
         return bufferData;
     };
@@ -3978,16 +4409,16 @@ var CanvasContext = (function () {
             });
         }
         textureVertexBuffer.setData(bufferData, 0, numVertices);
-        this.gd.setStream(textureVertexBuffer, this.textureSemantics);
+        this.setStream(textureVertexBuffer, this.textureSemantics);
     };
     CanvasContext.prototype.fillFatStrip = function (points, numPoints, lineWidth) {
         var numVertices = 0;
         var bufferData = this.getFlatBuffer(numPoints * 2);
         if(bufferData) {
-            var p, point, xB, yB, xC, yC, xAB, yAB, xBC, yBC, ln, dx, dy, n;
+            var p, point, xB, yB, xC, yC, xAB, yAB, xBC, yBC, ln, dx, dy, n, inl, outl;
             var sqrt = Math.sqrt;
             var abs = Math.abs;
-            lineWidth *= 0.5;
+            var halfLineWidth = (lineWidth * 0.5);
             point = points[0];
             xB = point[0];
             yB = point[1];
@@ -4000,15 +4431,16 @@ var CanvasContext = (function () {
                 point = points[numPoints - 2];
                 xAB = (xB - point[0]);
                 yAB = (yB - point[1]);
-                ln = ((xAB * xAB) + (yAB * yAB));
-                if(ln > 0.0) {
-                    ln = (1.0 / sqrt(ln));
-                    xAB *= ln;
-                    yAB *= ln;
-                }
             } else {
-                xAB = 0;
-                yAB = 0;
+                point = points[1];
+                xAB = (point[0] - xB);
+                yAB = (point[1] - yB);
+            }
+            ln = ((xAB * xAB) + (yAB * yAB));
+            if(ln > 0.0) {
+                ln = (1.0 / sqrt(ln));
+                xAB *= ln;
+                yAB *= ln;
             }
             p = 0;
             n = 0;
@@ -4024,8 +4456,8 @@ var CanvasContext = (function () {
                     yC = point[1];
                 } else {
                     // use perpendicular vector to (xAB, yAB) -> (yAB, -xAB)
-                    xAB *= lineWidth;
-                    yAB *= lineWidth;
+                    xAB *= halfLineWidth;
+                    yAB *= halfLineWidth;
                     bufferData[n + 0] = xB - yAB;
                     bufferData[n + 1] = yB + xAB;
                     bufferData[n + 2] = xB + yAB;
@@ -4044,18 +4476,27 @@ var CanvasContext = (function () {
                     dx = (xAB + xBC);
                     dy = (yAB + yBC);
                     ln = ((dx * dx) + (dy * dy));
-                    if(ln > 0.0) {
-                        ln = (lineWidth / sqrt(ln));
-                        dx *= ln;
-                        dy *= ln;
-                        // use perpendicular vector to (dx, dy) -> (dy, -dx)
-                        bufferData[n + 0] = xB - dy;
-                        bufferData[n + 1] = yB + dx;
-                        bufferData[n + 2] = xB + dy;
-                        bufferData[n + 3] = yB - dx;
-                        n += 4;
-                        numVertices += 2;
+                    if(ln > 0.001) {
+                        inl = (lineWidth / ln);
+                        outl = (halfLineWidth / sqrt(ln));
+                        if((yAB * xBC) > (xAB * yBC)) {
+                            ln = inl;
+                            inl = outl;
+                            outl = ln;
+                        }
+                    } else {
+                        dx = -yAB;
+                        dy = xAB;
+                        inl = halfLineWidth;
+                        outl = halfLineWidth;
                     }
+                    // use perpendicular vector to (dx, dy) -> (dy, -dx)
+                    bufferData[n + 0] = (xB - (dy * inl));
+                    bufferData[n + 1] = (yB + (dx * inl));
+                    bufferData[n + 2] = (xB + (dy * outl));
+                    bufferData[n + 3] = (yB - (dx * outl));
+                    n += 4;
+                    numVertices += 2;
                     xB = xC;
                     yB = yC;
                     xAB = xBC;
@@ -4089,24 +4530,28 @@ var CanvasContext = (function () {
         }
         return false;
     };
-    CanvasContext.prototype.isConvex = function (points, numSegments) {
+    CanvasContext.prototype.canTriangulateAsFan = function (points, numSegments) {
         if(numSegments < 4) {
             return true;
         }
         var flag = 0;
         /*jshint bitwise: false*/
-        var p0 = points[numSegments - 2];
-        var p1 = points[numSegments - 1];
+        var p0 = points[0];
+        var p1 = points[1];
         var p0x = p0[0];
         var p0y = p0[1];
         var p1x = p1[0];
         var p1y = p1[1];
-        var n = 0;
+        var d10x = (p1x - p0x);
+        var d10y = (p1y - p0y);
+        var n = 2;
         do {
             var p2 = points[n];
             var p2x = p2[0];
             var p2y = p2[1];
-            var z = (((p1x - p0x) * (p2y - p1y)) - ((p1y - p0y) * (p2x - p1x)));
+            var d20x = (p2x - p0x);
+            var d20y = (p2y - p0y);
+            var z = ((d10x * d20y) - (d10y * d20x));
             if(z < 0) {
                 flag |= 1;
             } else if(z > 0) {
@@ -4115,10 +4560,8 @@ var CanvasContext = (function () {
             if(flag === 3) {
                 return false;
             }
-            p0x = p1x;
-            p0y = p1y;
-            p1x = p2x;
-            p1y = p2y;
+            d10x = d20x;
+            d10y = d20y;
             n += 1;
         }while(n < numSegments);
         /*jshint bitwise: true*/
@@ -4126,6 +4569,106 @@ var CanvasContext = (function () {
             return true;
         }
         return false;
+    };
+    CanvasContext.prototype.simplifyShape = function (points) {
+        var abs = Math.abs;
+        var epsilon = (0.5 / this.pixelRatio);
+        var stack = this.tempStack;
+        var stackSize = 0;
+        var first = 0;
+        var last = (points.length - 1);
+        var p2 = points[last];
+        var p2x = p2[0];
+        var p2y = p2[1];
+        var n, dist;
+        for(; ; ) {
+            var p0 = points[first];
+            var p0x = p0[0];
+            var p0y = p0[1];
+            var d20x = (p2x - p0x);
+            var d20y = (p2y - p0y);
+            var second = (first + 1);
+            var maxDist = epsilon;
+            var middle = -1;
+            if(abs(d20x) < epsilon) {
+                for(n = second; n < last; n += 1) {
+                    dist = abs(points[n][0] - p2x);
+                    if(maxDist < dist) {
+                        maxDist = dist;
+                        middle = n;
+                    }
+                }
+            } else if(abs(d20y) < epsilon) {
+                for(n = second; n < last; n += 1) {
+                    dist = abs(points[n][1] - p2y);
+                    if(maxDist < dist) {
+                        maxDist = dist;
+                        middle = n;
+                    }
+                }
+            } else {
+                var slope = (d20y / d20x);
+                var intercept = (p0y - (slope * p0x));
+                var p1;
+                maxDist *= Math.sqrt((slope * slope) + 1);
+                for(n = second; n < last; n += 1) {
+                    p1 = points[n];
+                    dist = abs((slope * p1[0]) - p1[1] + intercept);
+                    if(maxDist < dist) {
+                        maxDist = dist;
+                        middle = n;
+                    }
+                }
+            }
+            if(middle === -1) {
+                if(last === (points.length - 1)) {
+                    points[second] = p2;
+                    points.length = (second + 1);
+                } else {
+                    points.splice(second, (last - second));
+                }
+                if(stackSize === 0) {
+                    break;
+                } else {
+                    stackSize -= 2;
+                    first = stack[stackSize];
+                    last = stack[stackSize + 1];
+                    p2 = points[last];
+                    p2x = p2[0];
+                    p2y = p2[1];
+                }
+            } else {
+                if(second < middle) {
+                    if((middle + 1) < last) {
+                        stack[stackSize] = first;
+                        stack[stackSize + 1] = middle;
+                        stackSize += 2;
+                        first = middle;
+                    } else {
+                        last = middle;
+                        p2 = points[last];
+                        p2x = p2[0];
+                        p2y = p2[1];
+                    }
+                } else {
+                    if((middle + 1) < last) {
+                        first = middle;
+                    } else {
+                        if(stackSize === 0) {
+                            break;
+                        } else {
+                            stackSize -= 2;
+                            first = stack[stackSize];
+                            last = stack[stackSize + 1];
+                            p2 = points[last];
+                            p2x = p2[0];
+                            p2y = p2[1];
+                        }
+                    }
+                }
+            }
+        }
+        return (points.length - 1);
     };
     CanvasContext.prototype.calculateArea = function (points, numPoints) {
         // Dan Sunday, "Fast Polygon Area and Newell Normal Computation"
@@ -4142,7 +4685,7 @@ var CanvasContext = (function () {
         }while(p < numPoints);
         return (area * 0.5);
     };
-    CanvasContext.prototype.triangulateConvex = function (points, numSegments, vertices, numVertices) {
+    CanvasContext.prototype.triangulateAsFan = function (points, numSegments, vertices, numVertices) {
         var p0 = points[0];
         var p1 = points[1];
         var p = 2;
@@ -4157,12 +4700,127 @@ var CanvasContext = (function () {
         }while(p < numSegments);
         return numVertices;
     };
-    CanvasContext.prototype.triangulateConcave = function (points, numSegments, vertices, numVertices, ownPoints) {
-        var isConvex = this.isConvex;
-        var totalArea = this.calculateArea(points, numSegments);
-        if(totalArea === 0) {
-            return numVertices;
+    CanvasContext.prototype.getAngles = function (points, numSegments, angles) {
+        var p0 = points[0];
+        var p1 = points[1];
+        var p0x = p0[0];
+        var p0y = p0[1];
+        var p1x = p1[0];
+        var p1y = p1[1];
+        var d10x = (p1x - p0x);
+        var d10y = (p1y - p0y);
+        var d10l = ((d10x * d10x) + (d10y * d10y));
+        var n = 2;
+        var sqrt = Math.sqrt;
+        var abs = Math.abs;
+        var angle;
+        do {
+            var p2 = points[n];
+            var p2x = p2[0];
+            var p2y = p2[1];
+            var d20x = (p2x - p0x);
+            var d20y = (p2y - p0y);
+            var d20l = ((d20x * d20x) + (d20y * d20y));
+            angle = (((d10x * d20y) - (d10y * d20x)) / sqrt(d10l * d20l));
+            angles[n - 2] = ((angle * 100) | 0);
+            // Increase the 100 to increase precision if caching matches too dissimilar shapes
+            d10x = d20x;
+            d10y = d20y;
+            d10l = d20l;
+            n += 1;
+        }while(n < numSegments);
+        return (n - 2);
+    };
+    CanvasContext.prototype.lowerBound = function (bin, data, length) {
+        var first = 0;
+        var count = (bin.length >>> 1);// Bin elements ocupy two slots, divide by 2
+        
+        var step, middle, binIndex, diff;
+        var diff, n;
+        var a;
+        while(0 < count) {
+            step = (count >>> 1);
+            middle = (first + step);
+            binIndex = ((middle << 1) + 1)// Bin elements have the data on the second slot
+            ;
+            n = 0;
+            a = bin[binIndex];
+            for(; ; ) {
+                diff = (a[n] - data[n]);
+                if(diff < 0) {
+                    first = (middle + 1);
+                    count -= (step + 1);
+                    break;
+                } else if(diff > 0) {
+                    count = step;
+                    break;
+                }
+                n += 1;
+                if(n >= length) {
+                    // This would be a non-zero negative value to signal that we found an identical copy
+                    return -binIndex;
+                }
+            }
         }
+        return (first << 1);// Bin elements ocupy two slots, multiply by 2
+        
+    };
+    CanvasContext.prototype.triangulateConcaveCached = function (points, numSegments, vertices, numVertices) {
+        var lowerIndex;
+        var angles = this.tempAngles;
+        var numAngles = this.getAngles(points, numSegments, angles);
+        var dataBins = this.cachedTriangulation;
+        var dataBin = dataBins[numAngles];
+        if(dataBin === undefined) {
+            dataBins[numAngles] = dataBin = [];
+            lowerIndex = 0;
+        } else {
+            lowerIndex = this.lowerBound(dataBin, angles, numAngles);
+        }
+        // Check if we found an identical copy
+        if(lowerIndex < 0) {
+            lowerIndex = ((-lowerIndex) - 1);
+            numVertices = this.expandIndices(points, vertices, numVertices, dataBin[lowerIndex]);
+        } else {
+            var totalArea = this.calculateArea(points, numSegments);
+            if(totalArea === 0) {
+                return numVertices;
+            }
+            var numPoints = (numSegments + 1);
+            var n;
+            for(n = 0; n < numPoints; n += 1) {
+                points[n][2] = n;
+            }
+            var oldNumVertices = numVertices;
+            numVertices = this.triangulateConcave(points, numSegments, vertices, numVertices, false, totalArea);
+            var numCachedIndices = (numVertices - oldNumVertices);
+            var cachedIndices = (numPoints < 256 ? new this.byteArrayConstructor(numCachedIndices) : new this.shortArrayConstructor(numCachedIndices));
+            for(n = 0; n < numCachedIndices; n += 1) {
+                cachedIndices[n] = vertices[oldNumVertices + n][2];
+            }
+            if(dataBin.length >= 1024) {
+                dataBin.length = 0;
+                lowerIndex = 0;
+            }
+            var clonedAngles = angles.slice(0, numAngles);
+            if(lowerIndex < dataBin.length) {
+                dataBin.splice(lowerIndex, 0, cachedIndices, clonedAngles);
+            } else {
+                dataBin.push(cachedIndices, clonedAngles);
+            }
+        }
+        return numVertices;
+    };
+    CanvasContext.prototype.expandIndices = function (points, vertices, numVertices, indices) {
+        var numIndices = indices.length;
+        var n, v;
+        for(n = 0 , v = numVertices; n < numIndices; n += 1 , v += 1) {
+            vertices[v] = points[indices[n]];
+        }
+        return v;
+    };
+    CanvasContext.prototype.triangulateConcave = function (points, numSegments, vertices, numVertices, ownPoints, totalArea) {
+        var canTriangulateAsFan = this.canTriangulateAsFan;
         if(ownPoints) {
             points.length = numSegments;
         } else {
@@ -4175,6 +4833,7 @@ var CanvasContext = (function () {
         var ax, ay, bx, by, cx, cy;
         var v0x, v0y, v1x, v1y;
         var minX, maxX, minY, maxY;
+        var ABx, ABy, ABxy, BCx, BCy, BCxy, CAx, CAy, CAxy;
         var valid, deletePoint;
         do {
             i0 = (numSegments - 2);
@@ -4199,7 +4858,7 @@ var CanvasContext = (function () {
                 // Calculate triangle area
                 tarea = ((v1x * v0y) - (v0x * v1y))// * 0.5);
                 ;
-                if((totalArea * tarea) >= 0)// same winding order
+                if((totalArea * tarea) > 0)// same winding order
                  {
                     // Calculate triangle extents
                     minX = (ax < bx ? ax : bx);
@@ -4210,153 +4869,152 @@ var CanvasContext = (function () {
                     minY = (minY < cy ? minY : cy);
                     maxY = (ay > by ? ay : by);
                     maxY = (maxY > cy ? maxY : cy);
-                    // Compute dot products
-                    var dot00 = ((v0x * v0x) + (v0y * v0y));
-                    var dot01 = ((v0x * v1x) + (v0y * v1y));
-                    var dot11 = ((v1x * v1x) + (v1y * v1y));
-                    var denom = ((dot00 * dot11) - (dot01 * dot01));
-                    if(denom !== 0) {
-                        var invDenom = (1.0 / denom);
-                        dot00 *= invDenom;
-                        dot01 *= invDenom;
-                        dot11 *= invDenom;
-                        var overlappingPointArea = 0;
-                        var overlappingPoint = -1;
-                        // Check if triangle overlaps any other point
-                        j = 0;
-                        do {
-                            if(j !== i0 && j !== i1 && j !== i2) {
-                                var p = points[j];
-                                var px = p[0];
-                                if(minX <= px && px <= maxX) {
-                                    var py = p[1];
-                                    if(minY <= py && py <= maxY) {
-                                        var v2x = (px - ax);
-                                        var v2y = (py - ay);
-                                        var dot02 = ((v0x * v2x) + (v0y * v2y));
-                                        var dot12 = ((v1x * v2x) + (v1y * v2y));
-                                        // Barycentric coordinates
-                                        var u = ((dot11 * dot02) - (dot01 * dot12));
-                                        if(u > 0) {
-                                            var v = ((dot00 * dot12) - (dot01 * dot02));
-                                            if(v > 0 && (u + v) < 1) {
-                                                // There is at least one vertex inside the triangle, if there are more
-                                                // find the one closer to i1 vertically by finding the one that has the
-                                                // biggest triangle area with i0 and i2
-                                                var parea = ((v0y * v2x) - (v0x * v2y));
-                                                parea *= parea// Make sure is a positive value
-                                                ;
-                                                if(overlappingPointArea < parea) {
-                                                    overlappingPointArea = parea;
-                                                    overlappingPoint = j;
-                                                }
-                                            }
-                                        }
-                                    }
+                    // Compute edge functions constants
+                    if(0 < tarea) {
+                        ABx = (bx - ax);
+                        ABy = (ay - by);
+                        ABxy = ((ax * by) - (ay * bx));
+                        BCx = (cx - bx);
+                        BCy = (by - cy);
+                        BCxy = ((bx * cy) - (by * cx));
+                        CAx = (ax - cx);
+                        CAy = (cy - ay);
+                        CAxy = ((cx * ay) - (cy * ax));
+                    } else {
+                        ABx = (ax - bx);
+                        ABy = (by - ay);
+                        ABxy = ((ay * bx) - (ax * by));
+                        BCx = (bx - cx);
+                        BCy = (cy - by);
+                        BCxy = ((by * cx) - (bx * cy));
+                        CAx = (cx - ax);
+                        CAy = (ay - cy);
+                        CAxy = ((cy * ax) - (cx * ay));
+                    }
+                    var overlappingPointArea = 0.1;
+                    var overlappingPoint = -1;
+                    // Check if triangle overlaps any other point
+                    j = 0;
+                    do {
+                        var p = points[j];
+                        var px = p[0];
+                        if(minX < px && px < maxX) {
+                            var py = p[1];
+                            if(minY < py && py < maxY) {
+                                // Edge functions
+                                var parea = ((CAy * px) + (CAx * py) + CAxy);
+                                if(overlappingPointArea < parea && 0.1 < ((ABy * px) + (ABx * py) + ABxy) && 0.1 < ((BCy * px) + (BCx * py) + BCxy)) {
+                                    // If there is at least one vertex inside the triangle,
+                                    // find the one closer to i1 vertically by finding the one that has the
+                                    // biggest triangle area with i0 and i2
+                                    overlappingPointArea = parea;
+                                    overlappingPoint = j;
                                 }
-                            }
-                            j += 1;
-                        }while(j < numSegments);
-                        if(overlappingPoint < 0) {
-                            vertices[numVertices] = p0;
-                            vertices[numVertices + 1] = p1;
-                            vertices[numVertices + 2] = p2;
-                            numVertices += 3;
-                            deletePoint = true;
-                        } else if(overlappingPoint === ((i1 + 2) % numSegments)) {
-                            // The diagonal is only splitting the next triangle
-                            // Remove the point an keep going
-                            i0 = i1;
-                            i1 = i2;
-                            i2 = overlappingPoint;
-                            p0 = p1;
-                            ax = bx;
-                            ay = by;
-                            p1 = p2;
-                            p2 = points[i2];
-                            cx = p2[0];
-                            cy = p2[1];
-                            v0x = (cx - ax);
-                            v0y = (cy - ay);
-                            vertices[numVertices] = p0;
-                            vertices[numVertices + 1] = p1;
-                            vertices[numVertices + 2] = p2;
-                            numVertices += 3;
-                            deletePoint = true;
-                        } else if(i1 === ((overlappingPoint + 2) % numSegments)) {
-                            // The diagonal is only splitting the previous triangle
-                            // Remove the point an keep going
-                            i2 = i1;
-                            i1 = i0;
-                            i0 = overlappingPoint;
-                            p2 = p1;
-                            cx = bx;
-                            cy = by;
-                            p1 = p0;
-                            p0 = points[i0];
-                            ax = p0[0];
-                            ay = p0[1];
-                            v0x = (cx - ax);
-                            v0y = (cy - ay);
-                            vertices[numVertices] = p0;
-                            vertices[numVertices + 1] = p1;
-                            vertices[numVertices + 2] = p2;
-                            numVertices += 3;
-                            deletePoint = true;
-                        } else {
-                            // Found a diagonal
-                            var d0 = i1;
-                            var d1 = overlappingPoint;
-                            var pointsA, pointsB;
-                            if(d0 < d1) {
-                                pointsA = points.splice(d0, (d1 - d0 + 1), points[d0], points[d1]);
-                                pointsB = points;
-                            } else {
-                                pointsB = points.splice(d1, (d0 - d1 + 1), points[d1], points[d0]);
-                                pointsA = points;
-                            }
-                            points = null;
-                            var numSegmentsA = pointsA.length;
-                            if(numSegmentsA === 3) {
-                                vertices[numVertices] = pointsA[0];
-                                vertices[numVertices + 1] = pointsA[1];
-                                vertices[numVertices + 2] = pointsA[2];
-                                numVertices += 3;
-                            } else {
-                                pointsA[numSegmentsA] = pointsA[0];
-                                if(isConvex(pointsA, numSegmentsA)) {
-                                    numVertices = this.triangulateConvex(pointsA, numSegmentsA, vertices, numVertices);
-                                } else {
-                                    numVertices = this.triangulateConcave(pointsA, numSegmentsA, vertices, numVertices, true);
-                                }
-                            }
-                            pointsA = null;
-                            var numSegmentsB = pointsB.length;
-                            if(numSegmentsB === 3) {
-                                vertices[numVertices] = pointsB[0];
-                                vertices[numVertices + 1] = pointsB[1];
-                                vertices[numVertices + 2] = pointsB[2];
-                                numVertices += 3;
-                                return numVertices;
-                            } else {
-                                pointsB[numSegmentsB] = pointsB[0];
-                                // Avoid recursion by restarting the loop
-                                points = pointsB;
-                                numSegments = numSegmentsB;
-                                pointsB = null;
-                                totalArea = this.calculateArea(points, numSegments);
-                                if(totalArea === 0) {
-                                    return numVertices;
-                                }
-                                points.length = numSegments;
-                                valid = true;
-                                break;
                             }
                         }
-                    } else// Zero-area triangle
-                     {
+                        j += 1;
+                    }while(j < numSegments);
+                    if(overlappingPoint < 0) {
+                        vertices[numVertices] = p0;
+                        vertices[numVertices + 1] = p1;
+                        vertices[numVertices + 2] = p2;
+                        numVertices += 3;
                         deletePoint = true;
+                    } else if(overlappingPoint === ((i1 + 2) % numSegments)) {
+                        // The diagonal is only splitting the next triangle
+                        // Remove the point and keep going
+                        i0 = i1;
+                        i1 = i2;
+                        i2 = overlappingPoint;
+                        p0 = p1;
+                        ax = bx;
+                        ay = by;
+                        p1 = p2;
+                        p2 = points[i2];
+                        cx = p2[0];
+                        cy = p2[1];
+                        v0x = (cx - ax);
+                        v0y = (cy - ay);
+                        vertices[numVertices] = p0;
+                        vertices[numVertices + 1] = p1;
+                        vertices[numVertices + 2] = p2;
+                        numVertices += 3;
+                        deletePoint = true;
+                    } else if(i1 === ((overlappingPoint + 2) % numSegments)) {
+                        // The diagonal is only splitting the previous triangle
+                        // Remove the point and keep going
+                        i2 = i1;
+                        i1 = i0;
+                        i0 = overlappingPoint;
+                        p2 = p1;
+                        cx = bx;
+                        cy = by;
+                        p1 = p0;
+                        p0 = points[i0];
+                        ax = p0[0];
+                        ay = p0[1];
+                        v0x = (cx - ax);
+                        v0y = (cy - ay);
+                        vertices[numVertices] = p0;
+                        vertices[numVertices + 1] = p1;
+                        vertices[numVertices + 2] = p2;
+                        numVertices += 3;
+                        deletePoint = true;
+                    } else {
+                        // Found a diagonal
+                                                var d0, d1;
+                        if(i1 < overlappingPoint) {
+                            d0 = i1;
+                            d1 = overlappingPoint;
+                        } else {
+                            d0 = overlappingPoint;
+                            d1 = i1;
+                        }
+                        var dn = (d1 - d0 + 1);
+                        var pointsA, pointsB;
+                        if(dn <= (points.length - dn + 2)) {
+                            pointsA = points.splice(d0, dn, points[d0], points[d1]);
+                            pointsB = points;
+                        } else {
+                            pointsB = points.splice(d0, dn, points[d0], points[d1]);
+                            pointsA = points;
+                        }
+                        points = null;
+                        var numSegmentsA = pointsA.length;
+                        if(numSegmentsA === 3) {
+                            vertices[numVertices] = pointsA[0];
+                            vertices[numVertices + 1] = pointsA[1];
+                            vertices[numVertices + 2] = pointsA[2];
+                            numVertices += 3;
+                        } else {
+                            pointsA[numSegmentsA] = pointsA[0];
+                            if(canTriangulateAsFan(pointsA, numSegmentsA)) {
+                                numVertices = this.triangulateAsFan(pointsA, numSegmentsA, vertices, numVertices);
+                            } else {
+                                numVertices = this.triangulateConcave(pointsA, numSegmentsA, vertices, numVertices, true, totalArea);
+                            }
+                        }
+                        pointsA = null;
+                        var numSegmentsB = pointsB.length;
+                        if(numSegmentsB === 3) {
+                            vertices[numVertices] = pointsB[0];
+                            vertices[numVertices + 1] = pointsB[1];
+                            vertices[numVertices + 2] = pointsB[2];
+                            numVertices += 3;
+                            return numVertices;
+                        } else {
+                            pointsB[numSegmentsB] = pointsB[0];
+                            // Avoid recursion by restarting the loop
+                            points = pointsB;
+                            numSegments = numSegmentsB;
+                            pointsB = null;
+                            points.length = numSegments;
+                            valid = true;
+                            break;
+                        }
                     }
+                } else if(tarea === 0) {
+                    deletePoint = true;
                 }
                 if(deletePoint) {
                     valid = true;
@@ -4397,7 +5055,7 @@ var CanvasContext = (function () {
                 v1x = (bx - ax);
                 v1y = (by - ay);
             }while(i2 < numSegments);
-        }while(valid && !isConvex(points, numSegments));
+        }while(valid && !canTriangulateAsFan(points, numSegments));
         if(!valid) {
             return numVertices;
         }
@@ -4418,7 +5076,8 @@ var CanvasContext = (function () {
             v0x = (cx - ax);
             v0y = (cy - ay);
             // Calculate triangle area
-            tarea = (((v1x * v0y) - (v0x * v1y)) * 0.5);
+            tarea = ((v1x * v0y) - (v0x * v1y))// * 0.5);
+            ;
             if((totalArea * tarea) > 0)// same winding order
              {
                 vertices[numVertices] = p0;
@@ -4499,6 +5158,7 @@ var CanvasContext = (function () {
         c.font = '10px sans-serif';
         c.textAlign = 'start';
         c.textBaseline = 'alphabetic';
+        c.imageColor = '#fff';
         // private variables
         c.gd = gd;
         c.md = md;
@@ -4510,7 +5170,7 @@ var CanvasContext = (function () {
             width, 
             height
         ];
-        c.forceFatLines = false;
+        c.pixelRatio = 1;
         c.width = width;
         c.height = height;
         c.screen = md.v4Build((2 / width), (-2 / height), -1, 1);
@@ -4520,7 +5180,14 @@ var CanvasContext = (function () {
         ;
         c.numStatesInStack = 0;
         c.subPaths = [];
+        c.needToSimplifyPath = [];
         c.currentSubPath = [];
+        /*jshint newcap: false*/
+        var floatArrayConstructor = c.floatArrayConstructor;
+        c.activeVertexBuffer = null;
+        c.activeTechnique = null;
+        c.activeScreen = new floatArrayConstructor(4);
+        c.activeColor = new floatArrayConstructor(4);
         var shader = gd.createShader(c.shaderDefinition);
         c.shader = shader;
         c.triangleStripPrimitive = gd.PRIMITIVE_TRIANGLE_STRIP;
@@ -4554,19 +5221,21 @@ var CanvasContext = (function () {
             dynamic: true,
             'transient': true
         });
-        /*jshint newcap: false*/
-        var arrayConstructor = c.arrayConstructor;
-        c.bufferData = new arrayConstructor(512);
-        c.tempRect = new arrayConstructor(8);
+        c.flatOffset = 0;
+        c.bufferData = new floatArrayConstructor(512);
+        c.subBufferDataCache = {
+        };
+        c.tempRect = new floatArrayConstructor(8);
         /*jshint newcap: true*/
         c.tempVertices = [];
+        c.tempStack = [];
         c.v4Zero = md.v4BuildZero();
         c.v4One = md.v4BuildOne();
         c.cachedColors = {
         };
         c.numCachedColors = 0;
         /*jshint newcap: false*/
-        c.uvtransform = new arrayConstructor(6);
+        c.uvtransform = new floatArrayConstructor(6);
         /*jshint newcap: true*/
         c.uvtransform[0] = 1;
         c.uvtransform[1] = 0;
@@ -4603,7 +5272,6 @@ var CanvasContext = (function () {
         c.textureShadowTechnique = shader.getTechnique('texture_shadow');
         c.patternShadowTechnique = shader.getTechnique('pattern_shadow');
         c.gradientShadowTechnique = shader.getTechnique('gradient_shadow');
-        c.resetTechniqueParameters();
         /*
         c.renderTexture = gd.createTexture({
         name       : "canvas.backbuffer",
@@ -4624,7 +5292,7 @@ var CanvasContext = (function () {
         // Transformation matrix and related operations
         //
         /*jshint newcap: false*/
-        c.matrix = new arrayConstructor(6);
+        c.matrix = new floatArrayConstructor(6);
         /*jshint newcap: true*/
         c.matrix[0] = 1;
         c.matrix[1] = 0;
@@ -4657,29 +5325,6 @@ var CanvasContext = (function () {
             m[5] = (f + m[5]);
             resetTransformMethods();
         };
-        var transformPointTranslate = function transformPointTranslateFn(x, y) {
-            var m = this.matrix;
-            return [
-                (x + m[2]), 
-                (y + m[5])
-            ];
-        };
-        var transformRectTranslate = function transformRectTranslateFn(x, y, w, h, rect) {
-            var m = this.matrix;
-            var x0 = (x + m[2]);
-            var y0 = (y + m[5]);
-            var x1 = (x0 + w);
-            var y1 = (y0 + h);
-            rect[0] = x0;
-            rect[1] = y1;
-            rect[2] = x1;
-            rect[3] = y1;
-            rect[4] = x0;
-            rect[5] = y0;
-            rect[6] = x1;
-            rect[7] = y0;
-            return rect;
-        };
         var scaleIdentity = function scaleIdentityFn(x, y) {
             if(x !== 1 || y !== 1) {
                 var m = this.matrix;
@@ -4695,8 +5340,8 @@ var CanvasContext = (function () {
                 m[5] = y;
                 this.translate = translate;
                 this.transform = transformTranslate;
-                this.transformPoint = transformPointTranslate;
-                this.transformRect = transformRectTranslate;
+                this.transformPoint = this.transformPointTranslate;
+                this.transformRect = this.transformRectTranslate;
             }
         };
         var setTransformIdentity = function setTransformIdentityFn(a, b, c, d, e, f) {
@@ -4709,36 +5354,17 @@ var CanvasContext = (function () {
             m[5] = f;
             resetTransformMethods();
         };
-        var transformPointIdentity = function transformPointIdentityFn(x, y) {
-            return [
-                x, 
-                y
-            ];
-        };
-        var transformRectIdentity = function transformRectIdentityFn(x, y, w, h, rect) {
-            var x1 = (x + w);
-            var y1 = (y + h);
-            rect[0] = x;
-            rect[1] = y1;
-            rect[2] = x1;
-            rect[3] = y1;
-            rect[4] = x;
-            rect[5] = y;
-            rect[6] = x1;
-            rect[7] = y;
-            return rect;
-        };
         c.scale = scaleIdentity;
         c.translate = translateIdentity;
         c.transform = setTransformIdentity;
         c.setTransform = setTransformIdentity;
-        c.transformPoint = transformPointIdentity;
-        c.transformRect = transformRectIdentity;
+        c.transformPoint = c.transformPointIdentity;
+        c.transformRect = c.transformRectIdentity;
         //
         // Clipping
         //
         /*jshint newcap: false*/
-        c.clipExtents = new arrayConstructor(4);
+        c.clipExtents = new floatArrayConstructor(4);
         /*jshint newcap: true*/
         c.clipExtents[0] = 0;
         c.clipExtents[1] = 0;
@@ -4746,6 +5372,12 @@ var CanvasContext = (function () {
         c.clipExtents[3] = height;
         //
         c.defaultStates = c.setStates(c.createStatesObject(), c);
+        c.cachedTriangulation = {
+        };
+        c.tempAngles = [];
+        c.cachedPaths = {
+        };
+        c.numCachedPaths = 0;
         return c;
     };
     return CanvasContext;
@@ -4844,12 +5476,25 @@ var Canvas = (function () {
 
 // Detect correct typed arrays
 ((function () {
-    CanvasContext.prototype.arrayConstructor = Array;
+    CanvasContext.prototype.floatArrayConstructor = Array;
+    CanvasContext.prototype.byteArrayConstructor = Array;
+    CanvasContext.prototype.shortArrayConstructor = Array;
     if(typeof Float32Array !== "undefined") {
-        var testArray = new Float32Array(4);
-        var textDescriptor = Object.prototype.toString.call(testArray);
+        var textDescriptor = Object.prototype.toString.call(new Float32Array(4));
         if(textDescriptor === '[object Float32Array]') {
-            CanvasContext.prototype.arrayConstructor = Float32Array;
+            CanvasContext.prototype.floatArrayConstructor = Float32Array;
+        }
+    }
+    if(typeof Uint8Array !== "undefined") {
+        var textDescriptor = Object.prototype.toString.call(new Uint8Array(4));
+        if(textDescriptor === '[object Uint8Array]') {
+            CanvasContext.prototype.byteArrayConstructor = Uint8Array;
+        }
+    }
+    if(typeof Uint16Array !== "undefined") {
+        var textDescriptor = Object.prototype.toString.call(new Uint16Array(4));
+        if(textDescriptor === '[object Uint16Array]') {
+            CanvasContext.prototype.shortArrayConstructor = Uint16Array;
         }
     }
 })());

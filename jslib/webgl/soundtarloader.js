@@ -228,7 +228,7 @@ SoundTARLoader.create = function tgaLoaderFn(params) {
                             buffer = [];
                             buffer.length = numChars;
                             for(i = 0; i < numChars; i += 1) {
-                                buffer[i] = (text.charCodeAt(i) & 255);
+                                buffer[i] = (text.charCodeAt(i) & 0xff);
                             }
                             /*jshint bitwise: true*/
                                                     }

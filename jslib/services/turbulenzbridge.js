@@ -1,6 +1,6 @@
 /* This file was generated from TypeScript source tslib/services/turbulenzbridge.ts */
 
-// Copyright (c) 2011-2012 Turbulenz Limited
+// Copyright (c) 2011-2013 Turbulenz Limited
 /*global window: false*/
 /*global TurbulenzServices: false*/
 /*global debug: false*/
@@ -14,7 +14,6 @@
 * It wraps an EventEmitter instance that is stored on the page and provides
 * methods that manually display the 'loading'-flag, post certain events to
 * the page or request information about a player's settings.
-*
 */
 var TurbulenzBridge = (function () {
     function TurbulenzBridge() { }
@@ -33,8 +32,8 @@ var TurbulenzBridge = (function () {
             this.emit = bridge.emit;
             // TODO can remove all of these or's after gamesite and hub updates
             this.on = bridge.gameListenerOn || bridge.addListener || bridge.setListener;
-            // we cant use off yet becuase the function recieved on the other VM is re-wrapped each time
-            //this.off = bridge.gameListenerOff;
+            // we cant use off yet because the function received on the other VM is re-wrapped each time
+            // this.off = bridge.gameListenerOff;
             // Legacy functions addListener/setListener
             this.addListener = bridge.gameListenerOn || bridge.addListener || bridge.setListener;
             this.setListener = bridge.gameListenerOn || bridge.setListener;
@@ -46,7 +45,7 @@ var TurbulenzBridge = (function () {
         }
     };
     TurbulenzBridge.isInitialised = function isInitialised() {
-        return this._bridge !== undefined;
+        return (this._bridge !== undefined);
     };
     TurbulenzBridge.emit = function emit(serviceName, request) {
     };
@@ -153,6 +152,33 @@ var TurbulenzBridge = (function () {
     };
     TurbulenzBridge.setOnStoreMeta = function setOnStoreMeta(callback) {
         this.on('store.meta.v2', callback);
+    };
+    TurbulenzBridge.triggerSendInstantNotification = /**
+    * Handle in-game notification events
+    */
+    function triggerSendInstantNotification(notification) {
+        this.emit('notifications.ingame.sendInstant', notification);
+    };
+    TurbulenzBridge.triggerSendDelayedNotification = function triggerSendDelayedNotification(notification) {
+        this.emit('notifications.ingame.sendDelayed', notification);
+    };
+    TurbulenzBridge.setOnNotificationSent = function setOnNotificationSent(callback) {
+        this.on('notifications.ingame.sent', callback);
+    };
+    TurbulenzBridge.triggerCancelNotificationByID = function triggerCancelNotificationByID(params) {
+        this.emit('notifications.ingame.cancelByID', params);
+    };
+    TurbulenzBridge.triggerCancelNotificationsByKey = function triggerCancelNotificationsByKey(params) {
+        this.emit('notifications.ingame.cancelByKey', params);
+    };
+    TurbulenzBridge.triggerCancelAllNotifications = function triggerCancelAllNotifications(params) {
+        this.emit('notifications.ingame.cancelAll', params);
+    };
+    TurbulenzBridge.triggerInitNotificationManager = function triggerInitNotificationManager(params) {
+        this.emit('notifications.ingame.initNotificationManager', params);
+    };
+    TurbulenzBridge.setOnReceiveNotification = function setOnReceiveNotification(callback) {
+        this.on('notifications.ingame.receive', callback);
     };
     TurbulenzBridge.changeAspectRatio = /**
     * Methods to signal changes of the viewport's aspect ratio to the page.

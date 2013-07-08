@@ -363,7 +363,8 @@ WebGLSoundSource.prototype = {
                 try  {
                     audio.currentTime = seek;
                 } catch (e) {
-                }
+                    // There does not seem to be any reliable way of seeking
+                                    }
             }
             if(sound.data) {
                 audio.mozWriteAudio(sound.data);
@@ -448,7 +449,8 @@ WebGLSoundSource.prototype = {
                         try  {
                             audio.currentTime = seek;
                         } catch (e) {
-                        }
+                            // There does not seem to be any reliable way of seeking
+                                                    }
                     }
                 }
                 audio.play();
@@ -564,11 +566,17 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params) {
         var gainNode = (audioContext.createGain ? audioContext.createGain() : audioContext.createGainNode());
         source.gainNode = gainNode;
         if(sd.linearDistance) {
-            if(typeof pannerNode.LINEAR_DISTANCE === "number") {
+            if(typeof pannerNode.distanceModel === "string") {
+                pannerNode.distanceModel = "linear";
+            } else if(typeof pannerNode.LINEAR_DISTANCE === "number") {
                 pannerNode.distanceModel = pannerNode.LINEAR_DISTANCE;
             }
         }
-        pannerNode.panningModel = pannerNode.EQUALPOWER;
+        if(typeof pannerNode.panningModel === "string") {
+            pannerNode.panningModel = "equalpower";
+        } else {
+            pannerNode.panningModel = pannerNode.EQUALPOWER;
+        }
         Object.defineProperty(source, "position", {
             get: function getPositionFn() {
                 return position.slice();
@@ -695,6 +703,9 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params) {
                 return pannerNode.refDistance;
             },
             set: function setMinDistanceFn(minDistance) {
+                if(this.pannerNode.maxDistance === minDistance) {
+                    minDistance = this.pannerNode.maxDistance * 0.999;
+                }
                 this.pannerNode.refDistance = minDistance;
             },
             enumerable: true,
@@ -705,6 +716,9 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params) {
                 return pannerNode.maxDistance;
             },
             set: function setMaxDistanceFn(maxDistance) {
+                if(this.pannerNode.refDistance === maxDistance) {
+                    maxDistance = this.pannerNode.refDistance * 1.001;
+                }
                 this.pannerNode.maxDistance = maxDistance;
             },
             enumerable: true,
@@ -772,6 +786,7 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params) {
             },
             set: function setGainFn(newGain) {
                 gain = newGain;
+                source.gainFactor = -1;
             },
             enumerable: true,
             configurable: false
@@ -1123,15 +1138,19 @@ WebGLSoundDevice.create = function webGLSoundDeviceFn(params) {
     sd.listenerGain = (typeof params.listenerGain === "number" ? params.listenerGain : 1);
     // Need a temporary Audio element to test capabilities
     var audio = new Audio();
-    if(audio.mozSetup) {
-        try  {
-            audio.mozSetup(1, 22050);
-        } catch (e) {
-            return null;
+    if(sd.audioContext) {
+        sd.loopingSupported = true;
+    } else {
+        if(audio.mozSetup) {
+            try  {
+                audio.mozSetup(1, 22050);
+            } catch (e) {
+                return null;
+            }
         }
+        // Check for looping support
+        sd.loopingSupported = (typeof audio.loop === 'boolean');
     }
-    // Check for looping support
-    sd.loopingSupported = (typeof audio.loop === 'boolean');
     // Check for supported extensions
     var supportedExtensions = {
         ogg: false,
