@@ -1,335 +1,240 @@
-// Copyright (c) 2011 Turbulenz Limited
+/* This file was generated from TypeScript source tslib/services/userdatamanager.ts */
 
-/*global TurbulenzServices: false*/
 
-//
-// API
-//
-function UserDataManager() {}
-UserDataManager.prototype =
-{
-    version : 1,
-    keyValidate: new RegExp("^[A-Za-z0-9]+([\\-\\.][A-Za-z0-9]+)*$"),
-
-    validateKey: function validateKeyFn(key)
-    {
-        if (!key || typeof(key) !== "string")
-        {
+var UserDataManager = (function () {
+    function UserDataManager() {
+        this.keyValidate = new RegExp("^[A-Za-z0-9]+([\\-\\.][A-Za-z0-9]+)*$");
+    }
+    UserDataManager.version = 1;
+    UserDataManager.prototype.validateKey = function (key) {
+        if(!key || typeof (key) !== "string") {
             this.errorCallbackFn("Invalid key string (Key string is empty or not a string)");
             return false;
         }
-
-        if (!this.keyValidate.test(key))
-        {
+        if(!this.keyValidate.test(key)) {
             this.errorCallbackFn("Invalid key string (Only alphanumeric characters and .- are permitted)");
             return false;
         }
-
         return key;
-    },
-
-    getKeys: function userdataManagerGetKeysFn(callbackFn, errorCallbackFn)
-    {
+    };
+    UserDataManager.prototype.getKeys = function (callbackFn, errorCallbackFn) {
         var that = this;
-        function getKeysCallbackFn(jsonResponse, status)
-        {
-            if (status === 200)
-            {
+        var getKeysCallback = function getKeysCallbackFn(jsonResponse, status) {
+            if(status === 200) {
                 callbackFn(jsonResponse.keys || jsonResponse.array);
-            }
-            else
-            {
+            } else {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.getKeys failed with status " + status + ": " + jsonResponse.msg,
-                              status,
-                              that.getKeys,
-                              [callbackFn]);
+                errorCallback("UserDataManager.getKeys failed with status " + status + ": " + jsonResponse.msg, status, that.getKeys, [
+                    callbackFn
+                ]);
             }
-        }
-
-        var dataSpec = {};
-        dataSpec.gameSessionId = that.gameSessionId;
-
-        if (TurbulenzServices.bridgeServices)
-        {
+        };
+        var dataSpec = {
+            gameSessionId: that.gameSessionId
+        };
+        if(TurbulenzServices.bridgeServices) {
             TurbulenzServices.callOnBridge('userdata.getkeys', null, callbackFn);
-        }
-        else
-        {
+        } else {
             this.service.request({
                 url: '/api/v1/user-data/get-keys',
                 method: 'GET',
                 data: dataSpec,
-                callback: getKeysCallbackFn,
+                callback: getKeysCallback,
                 requestHandler: this.requestHandler,
                 encrypt: true
             });
         }
-    },
-
-    exists: function userdataManagerExistsFn(key, callbackFn, errorCallbackFn)
-    {
-        if (!this.validateKey(key))
-        {
+    };
+    UserDataManager.prototype.exists = function (key, callbackFn, errorCallbackFn) {
+        if(!this.validateKey(key)) {
             return;
         }
-
         var that = this;
-        function existsCallbackFn(jsonResponse, status)
-        {
-            if (status === 200)
-            {
+        var existsCallback = function existsCallbackFn(jsonResponse, status) {
+            if(status === 200) {
                 callbackFn(key, jsonResponse.exists);
-            }
-            else
-            {
+            } else {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.exists failed with status " + status + ": " + jsonResponse.msg,
-                              status,
-                              that.exists,
-                              [key, callbackFn]);
+                errorCallback("UserDataManager.exists failed with status " + status + ": " + jsonResponse.msg, status, that.exists, [
+                    key, 
+                    callbackFn
+                ]);
             }
-        }
-
-        var dataSpec = {};
-        dataSpec.gameSessionId = that.gameSessionId;
-
-        if (TurbulenzServices.bridgeServices)
-        {
-            TurbulenzServices.callOnBridge('userdata.exists', key, function unpackResponse(exists)
-            {
+        };
+        var dataSpec = {
+            gameSessionId: that.gameSessionId
+        };
+        if(TurbulenzServices.bridgeServices) {
+            TurbulenzServices.callOnBridge('userdata.exists', key, function unpackResponse(exists) {
                 callbackFn(key, exists);
             });
-        }
-        else
-        {
+        } else {
             this.service.request({
                 url: '/api/v1/user-data/exists/' + key,
                 method: 'GET',
                 data: dataSpec,
-                callback: existsCallbackFn,
+                callback: existsCallback,
                 requestHandler: this.requestHandler,
                 encrypt: true
             });
         }
-    },
-
-    get: function userdataManagerGetFn(key, callbackFn, errorCallbackFn)
-    {
-        if (!this.validateKey(key))
-        {
+    };
+    UserDataManager.prototype.get = function (key, callbackFn, errorCallbackFn) {
+        if(!this.validateKey(key)) {
             return;
         }
-
         var that = this;
-        function getCallbackFn(jsonResponse, status)
-        {
-            if (status === 200)
-            {
+        var getCallback = function getCallbackFn(jsonResponse, status) {
+            if(status === 200) {
                 callbackFn(key, jsonResponse.value);
-            }
-            else if (status === 404)
-            {
+            } else if(status === 404) {
                 callbackFn(key, null);
-            }
-            else
-            {
+            } else {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.get failed with status " + status + ": " + jsonResponse.msg,
-                              status,
-                              that.get,
-                              [key, callbackFn]);
+                errorCallback("UserDataManager.get failed with status " + status + ": " + jsonResponse.msg, status, that.get, [
+                    key, 
+                    callbackFn
+                ]);
             }
-        }
-
-        var dataSpec = {};
-        dataSpec.gameSessionId = that.gameSessionId;
-
-        if (TurbulenzServices.bridgeServices)
-        {
-            TurbulenzServices.callOnBridge('userdata.get', key, function unpackResponse(value)
-            {
+        };
+        var dataSpec = {
+            gameSessionId: that.gameSessionId
+        };
+        if(TurbulenzServices.bridgeServices) {
+            TurbulenzServices.callOnBridge('userdata.get', key, function unpackResponse(value) {
                 callbackFn(key, value);
             });
-        }
-        else
-        {
+        } else {
             this.service.request({
                 url: '/api/v1/user-data/get/' + key,
                 method: 'GET',
                 data: dataSpec,
-                callback: getCallbackFn,
+                callback: getCallback,
                 requestHandler: this.requestHandler,
                 encrypt: true
             });
         }
-    },
-
-    set: function userdataManagerSetFn(key, value, callbackFn, errorCallbackFn)
-    {
-        if (!this.validateKey(key))
-        {
+    };
+    UserDataManager.prototype.set = function (key, value, callbackFn, errorCallbackFn) {
+        if(!this.validateKey(key)) {
             return;
         }
-
-        if (!value)
-        {
+        if(!value) {
             this.remove(key, callbackFn);
             return;
         }
-
         var that = this;
-        function setCallbackFn(jsonResponse, status)
-        {
-            if (status === 200)
-            {
+        var setCallback = function setCallbackFn(jsonResponse, status) {
+            if(status === 200) {
                 callbackFn(key);
-            }
-            else
-            {
+            } else {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.set failed with status " + status + ": " + jsonResponse.msg,
-                              status,
-                              that.set,
-                              [key, value, callbackFn]);
+                errorCallback("UserDataManager.set failed with status " + status + ": " + jsonResponse.msg, status, that.set, [
+                    key, 
+                    value, 
+                    callbackFn
+                ]);
             }
-        }
-
-        var dataSpec = {};
-        dataSpec.value = value;
-        dataSpec.gameSessionId = that.gameSessionId;
-
+        };
+        var dataSpec = {
+            gameSessionId: that.gameSessionId,
+            value: value
+        };
         var url = '/api/v1/user-data/set/' + key;
-
-        if (TurbulenzServices.bridgeServices)
-        {
+        if(TurbulenzServices.bridgeServices) {
             TurbulenzServices.addSignature(dataSpec, url);
             dataSpec.key = key;
-            TurbulenzServices.callOnBridge('userdata.set', dataSpec, function sendResponse()
-            {
+            TurbulenzServices.callOnBridge('userdata.set', dataSpec, function sendResponse() {
                 callbackFn(key);
             });
-        }
-        else
-        {
+        } else {
             this.service.request({
                 url: url,
                 method: 'POST',
-                data : dataSpec,
-                callback: setCallbackFn,
+                data: dataSpec,
+                callback: setCallback,
                 requestHandler: this.requestHandler,
                 encrypt: true
             });
         }
-    },
-
-    remove: function userdataManagerRemoveFn(key, callbackFn, errorCallbackFn)
-    {
-        if (!this.validateKey(key))
-        {
+    };
+    UserDataManager.prototype.remove = function (key, callbackFn, errorCallbackFn) {
+        if(!this.validateKey(key)) {
             return;
         }
-
         var that = this;
-        function removeCallbackFn(jsonResponse, status)
-        {
-            if (status === 200)
-            {
+        var removeCallback = function removeCallbackFn(jsonResponse, status) {
+            if(status === 200) {
                 callbackFn(key);
-            }
-            else if (status === 404)
-            {
+            } else if(status === 404) {
                 callbackFn(key);
-            }
-            else
-            {
+            } else {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.remove failed with status " + status + ": " + jsonResponse.msg,
-                              status,
-                              that.remove,
-                              [key, callbackFn]);
+                errorCallback("UserDataManager.remove failed with status " + status + ": " + jsonResponse.msg, status, that.remove, [
+                    key, 
+                    callbackFn
+                ]);
             }
-        }
-
-        var dataSpec = {};
-        dataSpec.gameSessionId = that.gameSessionId;
-
-        if (TurbulenzServices.bridgeServices)
-        {
-            TurbulenzServices.callOnBridge('userdata.remove', key, function sendResponse()
-            {
+        };
+        var dataSpec = {
+            gameSessionId: that.gameSessionId
+        };
+        if(TurbulenzServices.bridgeServices) {
+            TurbulenzServices.callOnBridge('userdata.remove', key, function sendResponse() {
                 callbackFn(key);
             });
-        }
-        else
-        {
+        } else {
             this.service.request({
                 url: '/api/v1/user-data/remove/' + key,
                 method: 'POST',
                 data: dataSpec,
-                callback: removeCallbackFn,
+                callback: removeCallback,
                 requestHandler: this.requestHandler,
                 encrypt: true
             });
         }
-    },
-
-    removeAll: function userdataManagerRemoveAllFn(callbackFn, errorCallbackFn)
-    {
+    };
+    UserDataManager.prototype.removeAll = function (callbackFn, errorCallbackFn) {
         var that = this;
-        function removeAllCallbackFn(jsonResponse, status)
-        {
-            if (status === 200)
-            {
+        var removeAllCallback = function removeAllCallbackFn(jsonResponse, status) {
+            if(status === 200) {
                 callbackFn();
-            }
-            else
-            {
+            } else {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.removeAll failed with status " + status + ": " + jsonResponse.msg,
-                              status,
-                              that.removeAll,
-                              [callbackFn]);
+                errorCallback("UserDataManager.removeAll failed with status " + status + ": " + jsonResponse.msg, status, that.removeAll, [
+                    callbackFn
+                ]);
             }
-        }
-
-        var dataSpec = {};
-        dataSpec.gameSessionId = that.gameSessionId;
-
-        if (TurbulenzServices.bridgeServices)
-        {
+        };
+        var dataSpec = {
+            gameSessionId: that.gameSessionId
+        };
+        if(TurbulenzServices.bridgeServices) {
             TurbulenzServices.callOnBridge('userdata.removeall', null, callbackFn);
-        }
-        else
-        {
+        } else {
             this.service.request({
                 url: '/api/v1/user-data/remove-all',
                 method: 'POST',
                 data: dataSpec,
-                callback: removeAllCallbackFn,
+                callback: removeAllCallback,
                 requestHandler: this.requestHandler,
                 encrypt: true
             });
         }
-    }
+    };
+    UserDataManager.create = // Constructor function
+    function create(requestHandler, gameSession, errorCallbackFn) {
+        var userdataManager;
+        if(!TurbulenzServices.available()) {
+            return null;
+        }
+        userdataManager = new UserDataManager();
+        userdataManager.requestHandler = requestHandler;
+        userdataManager.errorCallbackFn = errorCallbackFn || TurbulenzServices.defaultErrorCallback;
+        userdataManager.gameSessionId = gameSession.gameSessionId;
+        userdataManager.service = TurbulenzServices.getService('userdata');
+        return userdataManager;
+    };
+    return UserDataManager;
+})();
 
-};
-
-// Constructor function
-UserDataManager.create = function UserDataManagerCreateFn(requestHandler, gameSession, errorCallbackFn)
-{
-    var userdataManager;
-    if (!TurbulenzServices.available())
-    {
-        return null;
-    }
-
-    userdataManager = new UserDataManager();
-    userdataManager.requestHandler = requestHandler;
-    userdataManager.errorCallbackFn = errorCallbackFn || TurbulenzServices.defaultErrorCallback;
-    userdataManager.gameSessionId = gameSession.gameSessionId;
-
-    userdataManager.service = TurbulenzServices.getService('userdata');
-
-    return userdataManager;
-};

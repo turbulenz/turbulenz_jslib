@@ -1,131 +1,95 @@
-// Copyright (c) 2011-2012 Turbulenz Limited
+/* This file was generated from TypeScript source tslib/services/multiplayersession.ts */
 
+// Copyright (c) 2011-2012 Turbulenz Limited
 /*global TurbulenzEngine: false*/
 /*global TurbulenzServices: false*/
 /*global TurbulenzBridge: false*/
 /*global Utilities: false*/
-
+/// <reference path="turbulenzservices.ts" />
 //
 // API
 //
-function MultiPlayerSession() {}
-MultiPlayerSession.prototype =
-{
-    version: 1,
-
-    // Public API
-    sendTo: function multiPlayerSendToFn(destinationID, messageType, messageData)
-    {
+var MultiPlayerSession = (function () {
+    function MultiPlayerSession() { }
+    MultiPlayerSession.version = 1;
+    MultiPlayerSession.prototype.sendTo = // Public API
+    function (destinationID, messageType, messageData) {
         var packet = (destinationID + ':' + messageType + ':');
-        if (messageData)
-        {
+        if(messageData) {
             packet += messageData;
         }
-
         var socket = this.socket;
-        if (socket)
-        {
+        if(socket) {
             socket.send(packet);
-        }
-        else
-        {
+        } else {
             this.queue.push(packet);
         }
-    },
-
-    sendToGroup: function multiPlayerSendToGroup(destinationIDs, messageType, messageData)
-    {
+    };
+    MultiPlayerSession.prototype.sendToGroup = function (destinationIDs, messageType, messageData) {
         var packet = (destinationIDs.join(',') + ':' + messageType + ':');
-        if (messageData)
-        {
+        if(messageData) {
             packet += messageData;
         }
-
         var socket = this.socket;
-        if (socket)
-        {
+        if(socket) {
             socket.send(packet);
-        }
-        else
-        {
+        } else {
             this.queue.push(packet);
         }
-    },
-
-    sendToAll: function multiPlayerSendToAll(messageType, messageData)
-    {
+    };
+    MultiPlayerSession.prototype.sendToAll = function (messageType, messageData) {
         var packet = (':' + messageType + ':');
-        if (messageData)
-        {
+        if(messageData) {
             packet += messageData;
         }
-
         var socket = this.socket;
-        if (socket)
-        {
+        if(socket) {
             socket.send(packet);
-        }
-        else
-        {
+        } else {
             this.queue.push(packet);
         }
-    },
-
-    makePublic: function multiPlayerMakePublicFn(callbackFn)
-    {
+    };
+    MultiPlayerSession.prototype.makePublic = function (callbackFn) {
         var sessionId = this.sessionId;
         this.service.request({
             url: '/api/v1/multiplayer/session/make-public',
             method: 'POST',
-            data: {'session': sessionId},
-            callback: function ()
-            {
+            data: {
+                'session': sessionId
+            },
+            callback: function () {
                 TurbulenzBridge.triggerMultiplayerSessionMakePublic(sessionId);
-                if (callbackFn)
-                {
+                if(callbackFn) {
                     callbackFn.call(arguments);
                 }
             },
             requestHandler: this.requestHandler
         });
-    },
-
-    destroy: function multiPlayerDestroyFn(callbackFn)
-    {
+    };
+    MultiPlayerSession.prototype.destroy = function (callbackFn) {
         var sessionId = this.sessionId;
-        if (sessionId)
-        {
+        if(sessionId) {
             this.sessionId = null;
-
             var playerId = this.playerId;
             this.playerId = null;
-
             var gameSessionId = this.gameSessionId;
             this.gameSessionId = null;
-
             var socket = this.socket;
-            if (socket)
-            {
+            if(socket) {
                 this.socket = null;
-
                 socket.onopen = null;
                 socket.onmessage = null;
                 socket.onclose = null;
                 socket.onerror = null;
-
                 socket.close();
                 socket = null;
             }
-
             this.queue = null;
-
             this.onmessage = null;
             this.onclose = null;
-
             // we can't wait for the callback as the browser doesn't
             // call async callbacks after onbeforeunload has been called
             TurbulenzBridge.triggerLeaveMultiplayerSession(sessionId);
-
             Utilities.ajax({
                 url: '/api/v1/multiplayer/session/leave',
                 method: 'POST',
@@ -137,185 +101,137 @@ MultiPlayerSession.prototype =
                 callback: callbackFn,
                 requestHandler: this.requestHandler
             });
-        }
-        else
-        {
-            if (callbackFn)
-            {
+        } else {
+            if(callbackFn) {
                 TurbulenzEngine.setTimeout(callbackFn, 0);
             }
         }
-    },
-
-    connected: function multiPlayerConnectedFn()
-    {
+    };
+    MultiPlayerSession.prototype.connected = function () {
         return (!!this.socket);
-    },
-
-    // Private API
-    flushQueue: function multiPlayerFlushQueueFn()
-    {
+    };
+    MultiPlayerSession.prototype.flushQueue = // Private API
+    function () {
         var socket = this.socket;
         var queue = this.queue;
         var numPackets = queue.length;
-        for (var n = 0; n < numPackets; n += 1)
-        {
+        for(var n = 0; n < numPackets; n += 1) {
             socket.send(queue[n]);
         }
-    }
-};
-
-//
-// Constructor
-//
-MultiPlayerSession.create = function multiPlayerCreate(sessionData, createdCB, errorCB)
-{
-    var ms = new MultiPlayerSession();
-    ms.sessionId = sessionData.sessionid;
-    ms.playerId = sessionData.playerid;
-    ms.gameSessionId = sessionData.gameSessionId;
-    ms.socket = null;
-    ms.queue = [];
-    ms.onmessage = null;
-    ms.onclose = null;
-    ms.requestHandler = sessionData.requestHandler;
-    ms.service = TurbulenzServices.getService('multiplayer');
-
-    var numplayers = sessionData.numplayers;
-
-    var serverURL = sessionData.server;
-
-    var socket;
-
-    sessionData = null;
-
-    function multiPlayerOnMessage(packet)
-    {
-        var onmessage = ms.onmessage;
-        if (onmessage)
-        {
-            var message = packet.data;
-            var firstSplitIndex = message.indexOf(':');
-            var secondSplitIndex = message.indexOf(':', (firstSplitIndex + 1));
-            var senderID = message.slice(0, firstSplitIndex);
-            /*jshint bitwise:false*/
-            var messageType = (message.slice((firstSplitIndex + 1), secondSplitIndex) | 0);
-            /*jshint bitwise:true*/
-            var messageData = message.slice(secondSplitIndex + 1);
-
-            onmessage(senderID, messageType, messageData);
-        }
-    }
-
-    function multiPlayerConnect()
-    {
-        function multiPlayerConnectionError()
-        {
-            if (!socket)
-            {
-                socket = ms.socket;
+    };
+    MultiPlayerSession.create = //
+    // Constructor
+    //
+    function create(sessionData, createdCB, errorCB) {
+        var ms = new MultiPlayerSession();
+        ms.sessionId = sessionData.sessionid;
+        ms.playerId = sessionData.playerid;
+        ms.gameSessionId = sessionData.gameSessionId;
+        ms.socket = null;
+        ms.queue = [];
+        ms.onmessage = null;
+        ms.onclose = null;
+        ms.requestHandler = sessionData.requestHandler;
+        ms.service = TurbulenzServices.getService('multiplayer');
+        var numplayers = sessionData.numplayers;
+        var serverURL = sessionData.server;
+        var socket;
+        sessionData = null;
+        var multiPlayerOnMessage = function multiPlayerOnMessageFn(packet) {
+            var onmessage = ms.onmessage;
+            if(onmessage) {
+                var message = packet.data;
+                var firstSplitIndex = message.indexOf(':');
+                var secondSplitIndex = message.indexOf(':', (firstSplitIndex + 1));
+                var senderID = message.slice(0, firstSplitIndex);
+                /*jshint bitwise:false*/
+                // The |0 ensures 'messageType' is an integer
+                var messageType = (message.slice((firstSplitIndex + 1), secondSplitIndex) | 0);
+                /*jshint bitwise:true*/
+                var messageData = message.slice(secondSplitIndex + 1);
+                onmessage(senderID, messageType, messageData);
             }
-
-            ms.socket = null;
-
-            if (socket)
-            {
-                socket.onopen = null;
-                socket.onmessage = null;
-                socket.onclose = null;
-                socket.onerror = null;
-                socket = null;
-            }
-
-            // current server URL does not respond, ask for a new one
-            var requestCallback = function requestCallbackFn(jsonResponse, status)
-            {
-                if (status === 200)
-                {
-                    var reconnectData = jsonResponse.data;
-                    numplayers = reconnectData.numplayers;
-                    serverURL = reconnectData.server;
-                    ms.sessionId = reconnectData.sessionid;
-                    ms.playerId = reconnectData.playerid;
-
-                    TurbulenzEngine.setTimeout(multiPlayerConnect, 0);
+        };
+        var multiPlayerConnect = function multiPlayerConnectFn() {
+            var multiPlayerConnectionError = function multiPlayerConnectionErrorFn() {
+                if(!socket) {
+                    socket = ms.socket;
                 }
-                else
-                {
-                    if (errorCB)
-                    {
-                        errorCB("MultiPlayerSession failed: Server not available", 0);
-                        errorCB = null;
-                        createdCB = null;
-                    }
-                    else
-                    {
-                        var onclose = ms.onclose;
-                        if (onclose)
-                        {
-                            ms.onclose = null;
-                            onclose();
+                ms.socket = null;
+                if(socket) {
+                    socket.onopen = null;
+                    socket.onmessage = null;
+                    socket.onclose = null;
+                    socket.onerror = null;
+                    socket = null;
+                }
+                // current server URL does not respond, ask for a new one
+                var requestCallback = function requestCallbackFn(jsonResponse, status) {
+                    if(status === 200) {
+                        var reconnectData = jsonResponse.data;
+                        numplayers = reconnectData.numplayers;
+                        serverURL = reconnectData.server;
+                        ms.sessionId = reconnectData.sessionid;
+                        ms.playerId = reconnectData.playerid;
+                        TurbulenzEngine.setTimeout(multiPlayerConnect, 0);
+                    } else {
+                        if(errorCB) {
+                            errorCB("MultiPlayerSession failed: Server not available", 0);
+                            errorCB = null;
+                            createdCB = null;
+                        } else {
+                            var onclose = ms.onclose;
+                            if(onclose) {
+                                ms.onclose = null;
+                                onclose();
+                            }
                         }
                     }
-                }
-            };
-
-            ms.service.request({
-                url: '/api/v1/multiplayer/session/join',
-                method: 'POST',
-                data: {'session': ms.sessionId,
-                    'gameSessionId': ms.gameSessionId},
-                callback: requestCallback,
-                requestHandler: ms.requestHandler
-            });
-        }
-
-        try
-        {
-            var nd = TurbulenzEngine.getNetworkDevice();
-            if (!nd)
-            {
-                nd = TurbulenzEngine.createNetworkDevice({});
-            }
-
-            socket = nd.createWebSocket(serverURL);
-
-            socket.onopen = function multiPlayerOnOpen()
-            {
-                ms.socket = socket;
-
-                socket.onopen = null;
-
-                socket.onmessage = multiPlayerOnMessage;
-
-                socket = null;
-
-                ms.flushQueue();
-
-                TurbulenzBridge.triggerJoinedMultiplayerSession({
-                    sessionId: ms.sessionId,
-                    playerId: ms.playerId,
-                    serverURL: serverURL,
-                    numplayers: numplayers
+                };
+                ms.service.request({
+                    url: '/api/v1/multiplayer/session/join',
+                    method: 'POST',
+                    data: {
+                        'session': ms.sessionId,
+                        'gameSessionId': ms.gameSessionId
+                    },
+                    callback: requestCallback,
+                    requestHandler: ms.requestHandler
                 });
-
-                if (createdCB)
-                {
-                    createdCB(ms, numplayers);
-                    createdCB = null;
-                    errorCB = null;
-                }
             };
+            try  {
+                var nd = TurbulenzEngine.getNetworkDevice();
+                if(!nd) {
+                    nd = TurbulenzEngine.createNetworkDevice({
+                    });
+                }
+                socket = nd.createWebSocket(serverURL);
+                socket.onopen = function multiPlayerOnOpen() {
+                    ms.socket = socket;
+                    socket.onopen = null;
+                    socket.onmessage = multiPlayerOnMessage;
+                    socket = null;
+                    ms.flushQueue();
+                    TurbulenzBridge.triggerJoinedMultiplayerSession({
+                        sessionId: ms.sessionId,
+                        playerId: ms.playerId,
+                        serverURL: serverURL,
+                        numplayers: numplayers
+                    });
+                    if(createdCB) {
+                        createdCB(ms, numplayers);
+                        createdCB = null;
+                        errorCB = null;
+                    }
+                };
+                socket.onclose = socket.onerror = multiPlayerConnectionError;
+            } catch (exc) {
+                multiPlayerConnectionError();
+            }
+        };
+        multiPlayerConnect();
+        return ms;
+    };
+    return MultiPlayerSession;
+})();
 
-            socket.onclose = socket.onerror = multiPlayerConnectionError;
-        }
-        catch (exc)
-        {
-            multiPlayerConnectionError();
-        }
-    }
-
-    multiPlayerConnect();
-
-    return ms;
-};

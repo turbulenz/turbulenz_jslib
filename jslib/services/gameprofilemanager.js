@@ -1,115 +1,78 @@
-// Copyright (c) 2012 Turbulenz Limited
+/* This file was generated from TypeScript source tslib/services/gameprofilemanager.ts */
 
-/*global TurbulenzServices: false*/
-
-//
-// API
-//
-function GameProfileManager() {}
-GameProfileManager.prototype =
-{
-    version : 1,
-    maxValueSize : 1024,
-    maxGetListUsernames : 64,
-
-    set: function gameProfileManagerSetFn(value, callbackFn, errorCallbackFn)
-    {
-        if (!value)
-        {
+var GameProfileManager = (function () {
+    function GameProfileManager() {
+        this.maxValueSize = 1024;
+        this.maxGetListUsernames = 64;
+    }
+    GameProfileManager.version = 1;
+    GameProfileManager.prototype.set = function (value, callbackFn, errorCallbackFn) {
+        if(!value) {
             return this.remove(callbackFn, errorCallbackFn);
         }
-
-        if (value.length > this.maxValueSize)
-        {
+        if(value.length > this.maxValueSize) {
             return false;
         }
-
         var that = this;
-        function setCallbackFn(jsonResponse, status)
-        {
-            if (status === 200)
-            {
-                if (callbackFn)
-                {
+        var setCallback = function setCallbackFn(jsonResponse, status) {
+            if(status === 200) {
+                if(callbackFn) {
                     callbackFn();
                 }
-            }
-            else
-            {
+            } else {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("GameProfileManager.set failed with status " + status + ": " + jsonResponse.msg,
-                              status,
-                              that.set,
-                              [value, callbackFn]);
+                errorCallback("GameProfileManager.set failed with status " + status + ": " + jsonResponse.msg, status, that.set, [
+                    value, 
+                    callbackFn
+                ]);
             }
-        }
-
-        var dataSpec = {};
-        dataSpec.value = value;
-        dataSpec.gameSessionId = that.gameSessionId;
-
+        };
+        var dataSpec = {
+            value: value,
+            gameSessionId: that.gameSessionId
+        };
         var url = '/api/v1/game-profile/set';
-
-        if (TurbulenzServices.bridgeServices)
-        {
+        if(TurbulenzServices.bridgeServices) {
             TurbulenzServices.addSignature(dataSpec, url);
-            TurbulenzServices.callOnBridge('gameprofile.set', dataSpec, function unpackResponse(response)
-            {
-                setCallbackFn(response, response.status);
+            TurbulenzServices.callOnBridge('gameprofile.set', dataSpec, function unpackResponse(response) {
+                setCallback(response, response.status);
             });
-        }
-        else
-        {
+        } else {
             this.service.request({
                 url: url,
                 method: 'POST',
-                data : dataSpec,
-                callback: setCallbackFn,
+                data: dataSpec,
+                callback: setCallback,
                 requestHandler: this.requestHandler,
                 encrypt: true
             });
         }
-
         return true;
-    },
-
-    remove: function gameProfileManagerRemoveFn(callbackFn, errorCallbackFn)
-    {
+    };
+    GameProfileManager.prototype.remove = function (callbackFn, errorCallbackFn) {
         var that = this;
-        function removeCallbackFn(jsonResponse, status)
-        {
-            if (status === 200 || status === 404)
-            {
-                if (callbackFn)
-                {
+        function removeCallbackFn(jsonResponse, status) {
+            if(status === 200 || status === 404) {
+                if(callbackFn) {
                     callbackFn();
                 }
-            }
-            else
-            {
+            } else {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("GameProfileManager.remove failed with status " + status + ": " + jsonResponse.msg,
-                              status,
-                              that.remove,
-                              [callbackFn]);
+                errorCallback("GameProfileManager.remove failed with status " + status + ": " + jsonResponse.msg, status, that.remove, [
+                    callbackFn
+                ]);
             }
         }
-
-        var dataSpec = {};
-        dataSpec.gameSessionId = that.gameSessionId;
-
+        var dataSpec = {
+            gameSessionId: that.gameSessionId
+        };
         var url = '/api/v1/game-profile/remove';
-
-        if (TurbulenzServices.bridgeServices)
-        {
+        if(TurbulenzServices.bridgeServices) {
             TurbulenzServices.addSignature(dataSpec, url);
-            TurbulenzServices.callOnBridge('gameprofile.remove', dataSpec, function unpackResponse(response)
-            {
+            TurbulenzServices.callOnBridge('gameprofile.remove', dataSpec, function unpackResponse(response) {
                 removeCallbackFn(response, response.status);
             });
-        }
-        else
-        {
+        } else {
             this.service.request({
                 url: url,
                 method: 'POST',
@@ -119,84 +82,62 @@ GameProfileManager.prototype =
                 encrypt: true
             });
         }
-
         return true;
-    },
-
-    get: function gameProfileManagerGetFn(username, callbackFn, errorCallbackFn)
-    {
-        function callbackWrapper(gameProfiles)
-        {
-            if (gameProfiles.hasOwnProperty(username))
-            {
+    };
+    GameProfileManager.prototype.get = function (username, callbackFn, errorCallbackFn) {
+        var callbackWrapper = function callbackWrapperFn(gameProfiles) {
+            if(gameProfiles.hasOwnProperty(username)) {
                 callbackFn(username, gameProfiles[username]);
-            }
-            else
-            {
+            } else {
                 callbackFn(username, null);
             }
-        }
-        return this.getList([username], callbackWrapper, errorCallbackFn);
-    },
-
-    getList: function gameProfileManagerGetListFn(usernames, callbackFn, errorCallbackFn)
-    {
-        if (usernames.length > this.maxGetListUsernames)
-        {
+        };
+        return this.getList([
+            username
+        ], callbackWrapper, errorCallbackFn);
+    };
+    GameProfileManager.prototype.getList = function (usernames, callbackFn, errorCallbackFn) {
+        if(usernames.length > this.maxGetListUsernames) {
             return false;
         }
-
         var that = this;
-        function getCallbackFn(jsonResponse, status)
-        {
-            if (status === 200)
-            {
+        var getCallback = function getCallbackFn(jsonResponse, status) {
+            if(status === 200) {
                 callbackFn(jsonResponse.data.profiles);
-            }
-            else if (status === 404)
-            {
+            } else if(status === 404) {
                 callbackFn(null);
-            }
-            else
-            {
+            } else {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("GameProfileManager.getList failed with status " + status + ": " + jsonResponse.msg,
-                              status,
-                              that.getList,
-                              [callbackFn]);
+                errorCallback("GameProfileManager.getList failed with status " + status + ": " + jsonResponse.msg, status, that.getList, [
+                    callbackFn
+                ]);
             }
-        }
-
-        var dataSpec = {};
-        dataSpec.gameSessionId = that.gameSessionId;
-        dataSpec.usernames = JSON.stringify(usernames);
-
+        };
+        var dataSpec = {
+            gameSessionId: that.gameSessionId,
+            usernames: JSON.stringify(usernames)
+        };
         this.service.request({
             url: '/api/v1/game-profile/read',
             method: 'GET',
             data: dataSpec,
-            callback: getCallbackFn,
+            callback: getCallback,
             requestHandler: this.requestHandler
         });
-
         return true;
-    }
-};
+    };
+    GameProfileManager.create = // Constructor function
+    function create(requestHandler, gameSession, errorCallbackFn) {
+        if(!TurbulenzServices.available()) {
+            return null;
+        }
+        var gameProfileManager = new GameProfileManager();
+        gameProfileManager.requestHandler = requestHandler;
+        gameProfileManager.errorCallbackFn = errorCallbackFn || TurbulenzServices.defaultErrorCallback;
+        gameProfileManager.gameSessionId = gameSession.gameSessionId;
+        gameProfileManager.service = TurbulenzServices.getService('gameProfile');
+        return gameProfileManager;
+    };
+    return GameProfileManager;
+})();
 
-// Constructor function
-GameProfileManager.create = function gameProfileManagerCreateFn(requestHandler, gameSession, errorCallbackFn)
-{
-    if (!TurbulenzServices.available())
-    {
-        return null;
-    }
-
-    var gameProfileManager = new GameProfileManager();
-    gameProfileManager.requestHandler = requestHandler;
-    gameProfileManager.errorCallbackFn = errorCallbackFn || TurbulenzServices.defaultErrorCallback;
-    gameProfileManager.gameSessionId = gameSession.gameSessionId;
-
-    gameProfileManager.service = TurbulenzServices.getService('gameProfile');
-
-    return gameProfileManager;
-};

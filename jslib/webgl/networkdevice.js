@@ -1,35 +1,26 @@
+/* This file was generated from TypeScript source tslib/webgl/networkdevice.ts */
+
 // Copyright (c) 2011-2012 Turbulenz Limited
 /*global window*/
 "use strict";
 
-//
-// WebGLNetworkDevice
-//
-function WebGLNetworkDevice() {}
+function WebGLNetworkDevice() {
+    return this;
+}
 WebGLNetworkDevice.prototype = {
-
-    version : 1,
-
-    WebSocketConstructor : (window.WebSocket ? window.WebSocket : window.MozWebSocket),
-
-    createWebSocket : function createWebSocketdFn(url, protocol)
-    {
+    version: 1,
+    WebSocketConstructor: (window.WebSocket ? window.WebSocket : window.MozWebSocket),
+    createWebSocket: function createWebSocketdFn(url, protocol) {
         var WebSocketConstructor = this.WebSocketConstructor;
-        if (WebSocketConstructor)
-        {
+        if(WebSocketConstructor) {
             var ws;
-            if (protocol)
-            {
+            if(protocol) {
                 ws = new WebSocketConstructor(url, protocol);
-            }
-            else
-            {
+            } else {
                 ws = new WebSocketConstructor(url);
             }
-            if (typeof ws.destroy === "undefined")
-            {
-                ws.destroy = function websocketDestroyFn()
-                {
+            if(typeof ws.destroy === "undefined") {
+                ws.destroy = function websocketDestroyFn() {
                     this.onopen = null;
                     this.onerror = null;
                     this.onclose = null;
@@ -38,20 +29,14 @@ WebGLNetworkDevice.prototype = {
                 };
             }
             return ws;
-        }
-        else
-        {
+        } else {
             return null;
         }
     },
-
-    update : function networkDeviceUpdateFn()
-    {
+    update: function networkDeviceUpdateFn() {
     }
 };
-
-WebGLNetworkDevice.create = function networkDeviceCreateFn(/* params */)
-{
-    var nd = new WebGLNetworkDevice();
+WebGLNetworkDevice.create = function networkDeviceCreateFn() {
+    /* params */ var nd = new WebGLNetworkDevice();
     return nd;
 };

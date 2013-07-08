@@ -1,1128 +1,1145 @@
-// Copyright (c) 2009-2012 Turbulenz Limited
+/* This file was generated from TypeScript source tslib/defaultrendering.ts */
 
-//
-// DefaultRendering
-//
 
-/*global TurbulenzEngine: false*/
-/*global renderingCommonCreateRendererInfoFn: false*/
-/*global renderingCommonGetTechniqueIndexFn: false*/
-/*global renderingCommonSortKeyFn: false */
-/*global Effect: false*/
+// m33
 
-function DefaultRendering() {}
-
-DefaultRendering.numPasses = 3;
-DefaultRendering.passIndex =  { opaque: 0, decal: 1, transparent: 2 };
-
-DefaultRendering.prototype =
-{
-    version : 1,
-
-    updateShader: function defaultRenderingUpdateShaderFn(/* sm */)
-    {
-    },
-
-    sortRenderablesAndLights: function defaultRenderingSortRenderablesAndLightsFn(camera, scene)
-    {
+var DefaultRendering = (function () {
+    function DefaultRendering() { }
+    DefaultRendering.version = 1;
+    DefaultRendering.numPasses = 3;
+    DefaultRendering.passIndex = {
+        opaque: 0,
+        decal: 1,
+        transparent: 2
+    };
+    DefaultRendering.nextRenderinfoID = 0;
+    DefaultRendering.nextSkinID = 0;
+    DefaultRendering.identityUVTransform = new Float32Array([
+        1, 
+        0, 
+        0, 
+        1, 
+        0, 
+        0
+    ]);
+    DefaultRendering.prototype.updateShader = function () {
+        /* sm */     };
+    DefaultRendering.prototype.sortRenderablesAndLights = function (camera, scene) {
         var index;
         var passes = this.passes;
         var numPasses = DefaultRendering.numPasses;
-        for (index = 0; index < numPasses; index += 1)
-        {
-            passes[index] = [];
+        for(index = 0; index < numPasses; index += 1) {
+            passes[index].length = 0;
         }
-
         var drawParametersArray;
         var numDrawParameters;
         var drawParameters;
         var drawParametersIndex;
-
         var visibleRenderables = scene.getCurrentVisibleRenderables();
         var numVisibleRenderables = visibleRenderables.length;
-        if (numVisibleRenderables > 0)
-        {
-            var renderable, meta, pass, passIndex;
+        if(numVisibleRenderables > 0) {
+            var renderable, pass, passIndex;
             var transparent = DefaultRendering.passIndex.transparent;
             var n = 0;
-            do
-            {
+            do {
                 renderable = visibleRenderables[n];
-
-                var rendererInfo = renderable.rendererInfo;
-                if (!rendererInfo)
-                {
-                    rendererInfo = renderingCommonCreateRendererInfoFn(renderable);
+                if(!renderable.renderUpdate) {
+                    var effect = renderable.sharedMaterial.effect;
+                    if(effect.prepare) {
+                        effect.prepare(renderable);
+                    }
                 }
-
-                meta = renderable.sharedMaterial.meta;
-
-                if (meta.far)
-                {
-                    renderable.distance = 1.e38;
-                }
-
-                rendererInfo.renderUpdate.call(renderable, camera);
-
+                renderable.renderUpdate(camera);
                 drawParametersArray = renderable.drawParameters;
                 numDrawParameters = drawParametersArray.length;
-                for (drawParametersIndex = 0; drawParametersIndex < numDrawParameters; drawParametersIndex += 1)
-                {
+                for(drawParametersIndex = 0; drawParametersIndex < numDrawParameters; drawParametersIndex += 1) {
                     drawParameters = drawParametersArray[drawParametersIndex];
                     passIndex = drawParameters.userData.passIndex;
-                    if (passIndex === transparent)
-                    {
-                        drawParameters.sortKey = renderable.distance;
+                    if(passIndex === transparent) {
+                        if(renderable.sharedMaterial.meta.far) {
+                            drawParameters.sortKey = 1e+38;
+                        } else {
+                            drawParameters.sortKey = renderable.distance;
+                        }
                     }
                     pass = passes[passIndex];
                     pass[pass.length] = drawParameters;
                 }
-
                 // this renderer does not care about lights
-
                 n += 1;
-            }
-            while (n < numVisibleRenderables);
-
+            }while(n < numVisibleRenderables);
         }
-    },
-
-    update: function defaultRenderingUpdateFn(gd, camera, scene, currentTime)
-    {
+    };
+    DefaultRendering.prototype.update = function (gd, camera, scene, currentTime) {
         scene.updateVisibleNodes(camera);
-
         this.sortRenderablesAndLights(camera, scene);
-
-        var md = this.md;
-        var globalTechniqueParameters = this.globalTechniqueParameters;
-        globalTechniqueParameters.eyePosition = md.m43Pos(camera.matrix, globalTechniqueParameters.eyePosition);
-        globalTechniqueParameters.time = currentTime;
+        var matrix = camera.matrix;
+        if(matrix[9] !== this.eyePosition[0] || matrix[10] !== this.eyePosition[1] || matrix[11] !== this.eyePosition[2]) {
+            this.eyePositionUpdated = true;
+            this.eyePosition[0] = matrix[9];
+            this.eyePosition[1] = matrix[10];
+            this.eyePosition[2] = matrix[11];
+        } else {
+            this.eyePositionUpdated = false;
+        }
+        this.globalTechniqueParameters['time'] = currentTime;
         this.camera = camera;
         this.scene = scene;
-    },
-
-    updateBuffers: function defaultRenderingUpdateBuffersFn(/* gd, deviceWidth, deviceHeight */)
-    {
-        return true;
-    },
-
-    draw: function defaultRenderingDrawFn(gd,
-                                          clearColor,
-                                          drawDecalsFn,
-                                          drawTransparentFn,
-                                          drawDebugFn)
-    {
+    };
+    DefaultRendering.prototype.updateBuffers = function () {
+        /* gd, deviceWidth, deviceHeight */ return true;
+    };
+    DefaultRendering.prototype.draw = function (gd, clearColor, drawDecalsFn, drawTransparentFn, drawDebugFn) {
         var globalTechniqueParameters = this.globalTechniqueParameters;
-        var globalTechniqueParametersArray = [globalTechniqueParameters];
-
+        var globalTechniqueParametersArray = [
+            globalTechniqueParameters
+        ];
         gd.clear(clearColor, 1.0, 0);
-
-        if (this.wireframe)
-        {
+        if(this.wireframe) {
             this.scene.drawWireframe(gd, this.sm, this.camera, this.wireframeInfo);
-
-            if (drawDecalsFn)
-            {
+            if(drawDecalsFn) {
                 drawDecalsFn();
             }
-
-            if (drawTransparentFn)
-            {
+            if(drawTransparentFn) {
                 drawTransparentFn();
             }
-        }
-        else
-        {
-
+        } else {
             gd.drawArray(this.passes[DefaultRendering.passIndex.opaque], globalTechniqueParametersArray, -1);
-
             gd.drawArray(this.passes[DefaultRendering.passIndex.decal], globalTechniqueParametersArray, -1);
-
-            if (drawDecalsFn)
-            {
+            if(drawDecalsFn) {
                 drawDecalsFn();
             }
-
             gd.drawArray(this.passes[DefaultRendering.passIndex.transparent], globalTechniqueParametersArray, 1);
-
-            if (drawTransparentFn)
-            {
+            if(drawTransparentFn) {
                 drawTransparentFn();
             }
         }
-
-        if (drawDebugFn)
-        {
+        if(drawDebugFn) {
             drawDebugFn();
         }
-    },
-
-
-    setGlobalLightPosition: function defaultRenderingSetGlobalLightPositionFn(pos)
-    {
-        this.globalTechniqueParameters.lightPosition = pos;
-    },
-
-    setGlobalLightColor: function defaultRenderingSetGlobalLightColorFn(color)
-    {
-        this.globalTechniqueParameters.lightColor = color;
-    },
-
-    setAmbientColor: function defaultRenderingSetAmbientColorFn(color)
-    {
-        this.globalTechniqueParameters.ambientColor = color;
-    },
-
-    setDefaultTexture: function defaultRenderingSetDefaultTextureFn(tex)
-    {
-        this.globalTechniqueParameters.diffuse = tex;
-    },
-
-    setWireframe: function defaultRenderingSetWireframe(wireframeEnabled, wireframeInfo)
-    {
+        this.lightPositionUpdated = false;
+    };
+    DefaultRendering.prototype.setGlobalLightPosition = function (pos) {
+        this.lightPositionUpdated = true;
+        this.lightPosition[0] = pos[0];
+        this.lightPosition[1] = pos[1];
+        this.lightPosition[2] = pos[2];
+    };
+    DefaultRendering.prototype.setGlobalLightColor = function (color) {
+        this.globalTechniqueParameters['lightColor'] = color;
+    };
+    DefaultRendering.prototype.setAmbientColor = function (color) {
+        this.globalTechniqueParameters['ambientColor'] = color;
+    };
+    DefaultRendering.prototype.setDefaultTexture = function (tex) {
+        this.globalTechniqueParameters['diffuse'] = tex;
+    };
+    DefaultRendering.prototype.setWireframe = function (wireframeEnabled, wireframeInfo) {
         this.wireframeInfo = wireframeInfo;
         this.wireframe = wireframeEnabled;
-    },
-
-    getDefaultSkinBufferSize: function getDefaultSkinBufferSizeFn()
-    {
-        return this.defaultSkinBufferSize;
-    },
-
-    destroy: function destroyFn()
-    {
-        delete this.globalTechniqueParameters;
-        delete this.passes;
-    }
-};
-
-//
-// defaultPrepareFn
-//
-DefaultRendering.defaultPrepareFn = function defaultPrepareFn(geometryInstance)
-{
-    var drawParameters = TurbulenzEngine.getGraphicsDevice().createDrawParameters();
-    drawParameters.userData = {};
-    geometryInstance.drawParameters = [drawParameters];
-    geometryInstance.prepareDrawParameters(drawParameters);
-
-    var sharedMaterial = geometryInstance.sharedMaterial;
-
-    drawParameters.technique = this.technique;
-
-    drawParameters.setTechniqueParameters(0, sharedMaterial.techniqueParameters);
-    drawParameters.setTechniqueParameters(1, geometryInstance.techniqueParameters);
-
-    if (sharedMaterial.meta.decal)
-    {
-        drawParameters.userData.passIndex = DefaultRendering.passIndex.decal;
-    }
-    else if (sharedMaterial.meta.transparent)
-    {
-        drawParameters.userData.passIndex = DefaultRendering.passIndex.transparent;
-    }
-    else
-    {
-        drawParameters.userData.passIndex = DefaultRendering.passIndex.opaque;
-    }
-
-    drawParameters.sortKey = renderingCommonSortKeyFn(this.techniqueIndex, sharedMaterial.meta.materialIndex);
-
-    geometryInstance.rendererInfo.renderUpdate = this.update;
-};
-
-//
-// Constructor function
-//
-DefaultRendering.create = function defaultRenderingCreateFn(gd, md, shaderManager, effectsManager)
-{
-    var dr = new DefaultRendering();
-
-    dr.md = md;
-    dr.sm = shaderManager;
-
-    dr.globalTechniqueParameters = gd.createTechniqueParameters({
-            lightPosition : md.v3Build(1000.0, 1000.0, 0.0),
-            lightColor : md.v3BuildOne(),
-            ambientColor : md.v3Build(0.2, 0.2, 0.3),
-            eyePosition : md.v3BuildZero(),
-            time : 0.0
-        });
-
-    dr.passes = [[], [], []];
-
-    var onShaderLoaded = function onShaderLoadedFn(shader)
-    {
-        var skinBones = shader.getParameter("skinBones");
-        dr.defaultSkinBufferSize = skinBones.rows * skinBones.columns;
     };
-
-    shaderManager.load("shaders/defaultrendering.cgfx", onShaderLoaded);
-    shaderManager.load("shaders/standard.cgfx");
-    shaderManager.load("shaders/debug.cgfx");
-
-    // Prepare effects
-    var m43MulM44 = md.m43MulM44;
-    var m43Transpose = md.m43Transpose;
-    var m33InverseTranspose = md.m33InverseTranspose;
-
-    function defaultUpdateFn(camera)
-    {
-        var techniqueParameters = this.techniqueParameters;
-        var matrix = this.node.world;
-        techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
-        if (this.techniqueParametersUpdated !== this.node.worldUpdate)
-        {
-            this.techniqueParametersUpdated = this.node.worldUpdate;
-            techniqueParameters.worldTranspose = m43Transpose.call(md, matrix, techniqueParameters.worldTranspose);
-            techniqueParameters.worldInverseTranspose = m33InverseTranspose.call(md, matrix, techniqueParameters.worldInverseTranspose);
-        }
-    }
-
-    function defaultSkinnedUpdateFn(camera)
-    {
-        var techniqueParameters = this.techniqueParameters;
-        var matrix = this.node.world;
-        techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
-        if (this.techniqueParametersUpdated !== this.node.worldUpdate)
-        {
-            this.techniqueParametersUpdated = this.node.worldUpdate;
-            techniqueParameters.worldTranspose = m43Transpose.call(md, matrix, techniqueParameters.worldTranspose);
-            techniqueParameters.worldInverseTranspose = m33InverseTranspose.call(md, matrix, techniqueParameters.worldInverseTranspose);
-        }
-        var skinController = this.skinController;
-        if (skinController)
-        {
-            techniqueParameters.skinBones = skinController.output;
-            skinController.update();
-        }
-    }
-
-    function defaultBlendUpdateFn(camera)
-    {
-        var techniqueParameters = this.techniqueParameters;
-        techniqueParameters.worldViewProjection = m43MulM44.call(md, this.node.world, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
-    }
-
-    function defaultBlendSkinnedUpdateFn(camera)
-    {
-        var techniqueParameters = this.techniqueParameters;
-        techniqueParameters.worldViewProjection = m43MulM44.call(md, this.node.world, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
-        var skinController = this.skinController;
-        if (skinController)
-        {
-            techniqueParameters.skinBones = skinController.output;
-            skinController.update();
-        }
-    }
-
-    function defaultSkyboxUpdateFn(camera)
-    {
-        var techniqueParameters = this.techniqueParameters;
-        var matrix = this.node.world;
-        techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
-        if (this.techniqueParametersUpdated !== this.node.worldUpdate)
-        {
-            this.techniqueParametersUpdated = this.node.worldUpdate;
-            techniqueParameters.worldTranspose = m43Transpose.call(md, matrix, techniqueParameters.worldTranspose);
-        }
-    }
-
-    function debugLinesPrepareFn(geometryInstance)
-    {
-        DefaultRendering.defaultPrepareFn.call(this, geometryInstance);
-        var techniqueParameters = geometryInstance.techniqueParameters;
-        techniqueParameters.constantColor = geometryInstance.sharedMaterial.meta.constantColor;
-    }
-
-    function defaultPrepareFn(geometryInstance)
-    {
-        DefaultRendering.defaultPrepareFn.call(this, geometryInstance);
-        //For untextured objects we need to choose a technique that uses materialColor instead.
-        var techniqueParameters = geometryInstance.sharedMaterial.techniqueParameters;
-        var diffuse = techniqueParameters.diffuse;
-        if (diffuse === undefined)
-        {
-            if (!techniqueParameters.materialColor)
-            {
-                techniqueParameters.materialColor = md.v4BuildOne();
-            }
-        }
-        else if (diffuse.length === 4)
-        {
-            techniqueParameters.diffuse = techniqueParameters.diffuse_map;
-            techniqueParameters.materialColor = md.v4Build.apply(md, diffuse);
-        }
-    }
-
-    function flatPrepareFn(geometryInstance)
-    {
-        defaultPrepareFn.call(this, geometryInstance);
-
-        //For untextured objects we need to switch techniques.
-        var techniqueParameters = geometryInstance.sharedMaterial.techniqueParameters;
-        if (!techniqueParameters.diffuse)
-        {
-            var shader = shaderManager.get("shaders/standard.cgfx");
-            if (geometryInstance.geometryType === "skinned")
-            {
-                geometryInstance.drawParameters[0].technique = shader.getTechnique("flat_skinned");
-            }
-            else
-            {
-                geometryInstance.drawParameters[0].technique = shader.getTechnique("flat");
-            }
-        }
-    }
-
-    function loadTechniques(shaderManager)
-    {
-        var that = this;
-
-        var callback = function shaderLoadedCallbackFn(shader)
-        {
-            that.shader = shader;
-            that.technique = shader.getTechnique(that.techniqueName);
-            that.techniqueIndex =  renderingCommonGetTechniqueIndexFn(that.techniqueName);
+    DefaultRendering.prototype.getDefaultSkinBufferSize = function () {
+        return this.defaultSkinBufferSize;
+    };
+    DefaultRendering.prototype.destroy = function () {
+        delete this.globalTechniqueParameters;
+        delete this.lightPosition;
+        delete this.eyePosition;
+        delete this.passes;
+    };
+    DefaultRendering.defaultPrepareFn = //
+    // defaultPrepareFn
+    //
+    function defaultPrepareFn(geometryInstance) {
+        var drawParameters = TurbulenzEngine.getGraphicsDevice().createDrawParameters();
+        drawParameters.userData = {
         };
-        shaderManager.load(this.shaderName, callback);
-    }
+        geometryInstance.drawParameters = [
+            drawParameters
+        ];
+        geometryInstance.prepareDrawParameters(drawParameters);
+        var sharedMaterial = geometryInstance.sharedMaterial;
+        var techniqueParameters = geometryInstance.techniqueParameters;
+        if(!sharedMaterial.techniqueParameters.uvTransform && !techniqueParameters.uvTransform) {
+            techniqueParameters.uvTransform = DefaultRendering.identityUVTransform;
+        }
+        drawParameters.technique = this.technique;
+        drawParameters.setTechniqueParameters(0, sharedMaterial.techniqueParameters);
+        drawParameters.setTechniqueParameters(1, techniqueParameters);
+        if(sharedMaterial.meta.decal) {
+            drawParameters.userData.passIndex = DefaultRendering.passIndex.decal;
+        } else if(sharedMaterial.meta.transparent) {
+            drawParameters.userData.passIndex = DefaultRendering.passIndex.transparent;
+        } else {
+            drawParameters.userData.passIndex = DefaultRendering.passIndex.opaque;
+        }
+        var node = geometryInstance.node;
+        if(!node.rendererInfo) {
+            var md = TurbulenzEngine.getMathDevice();
+            node.rendererInfo = {
+                id: DefaultRendering.nextRenderinfoID,
+                frameVisible: -1,
+                worldUpdate: -1,
+                worldViewProjection: md.m44BuildIdentity(),
+                worldInverse: md.m43BuildIdentity(),
+                eyePosition: md.v3BuildZero(),
+                lightPosition: md.v3BuildZero()
+            };
+            DefaultRendering.nextRenderinfoID += 1;
+        }
+        // do this once instead of for every update
+        var rendererInfo = node.rendererInfo;
+        techniqueParameters.worldViewProjection = rendererInfo.worldViewProjection;
+        techniqueParameters.eyePosition = rendererInfo.eyePosition;
+        techniqueParameters.lightPosition = rendererInfo.lightPosition;
+        var skinController = geometryInstance.skinController;
+        if(skinController) {
+            techniqueParameters.skinBones = skinController.output;
+            if(skinController.index === undefined) {
+                skinController.index = DefaultRendering.nextSkinID;
+                DefaultRendering.nextSkinID += 1;
+            }
+            drawParameters.sortKey = -renderingCommonSortKeyFn(this.techniqueIndex, skinController.index, sharedMaterial.meta.materialIndex);
+        } else {
+            drawParameters.sortKey = renderingCommonSortKeyFn(this.techniqueIndex, sharedMaterial.meta.materialIndex, rendererInfo.id);
+        }
+        geometryInstance.renderUpdate = this.update;
+    };
+    DefaultRendering.create = //
+    // Constructor function
+    //
+    function create(gd, md, shaderManager, effectsManager) {
+        var dr = new DefaultRendering();
+        dr.md = md;
+        dr.sm = shaderManager;
+        dr.lightPositionUpdated = true;
+        dr.lightPosition = md.v3Build(1000.0, 1000.0, 0.0);
+        dr.eyePositionUpdated = true;
+        dr.eyePosition = md.v3BuildZero();
+        dr.globalTechniqueParameters = gd.createTechniqueParameters({
+            lightColor: md.v3BuildOne(),
+            ambientColor: md.v3Build(0.2, 0.2, 0.3),
+            time: 0.0
+        });
+        dr.passes = [
+            [], 
+            [], 
+            []
+        ];
+        var onShaderLoaded = function onShaderLoadedFn(shader) {
+            var skinBones = shader.getParameter("skinBones");
+            dr.defaultSkinBufferSize = skinBones.rows * skinBones.columns;
+        };
+        shaderManager.load("shaders/defaultrendering.cgfx", onShaderLoaded);
+        shaderManager.load("shaders/debug.cgfx");
+        // Update effects
+        var m43MulM44 = md.m43MulM44;
+        var m43Inverse = md.m43Inverse;
+        var m33InverseTranspose = md.m33InverseTranspose;
+        var m43TransformPoint = md.m43TransformPoint;
+        var updateNodeRendererInfo = function updateNodeRendererInfoFn(node, rendererInfo, camera) {
+            var lightPositionUpdated = dr.lightPositionUpdated;
+            var eyePositionUpdated = dr.eyePositionUpdated;
+            var matrix = node.world;
+            if(rendererInfo.worldUpdate !== node.worldUpdate) {
+                rendererInfo.worldUpdate = node.worldUpdate;
+                lightPositionUpdated = true;
+                eyePositionUpdated = true;
+                rendererInfo.worldInverse = m43Inverse.call(md, matrix, rendererInfo.worldInverse);
+            }
+            if(lightPositionUpdated) {
+                rendererInfo.lightPosition = m43TransformPoint.call(md, rendererInfo.worldInverse, dr.lightPosition, rendererInfo.lightPosition);
+            }
+            if(eyePositionUpdated) {
+                rendererInfo.eyePosition = m43TransformPoint.call(md, rendererInfo.worldInverse, dr.eyePosition, rendererInfo.eyePosition);
+            }
+            rendererInfo.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, rendererInfo.worldViewProjection);
+        };
+        var defaultUpdate = function defaultUpdateFn(camera) {
+            var node = this.node;
+            var rendererInfo = node.rendererInfo;
+            if(rendererInfo.frameVisible !== node.frameVisible) {
+                rendererInfo.frameVisible = node.frameVisible;
+                updateNodeRendererInfo(node, rendererInfo, camera);
+            }
+        };
+        var defaultSkinnedUpdate = function defaultSkinnedUpdateFn(camera) {
+            var node = this.node;
+            var rendererInfo = node.rendererInfo;
+            if(rendererInfo.frameVisible !== node.frameVisible) {
+                rendererInfo.frameVisible = node.frameVisible;
+                updateNodeRendererInfo(node, rendererInfo, camera);
+            }
+            var skinController = this.skinController;
+            if(skinController) {
+                skinController.update();
+            }
+        };
+        var debugUpdate = function debugUpdateFn(camera) {
+            var matrix = this.node.world;
+            var techniqueParameters = this.techniqueParameters;
+            techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
+            techniqueParameters.worldInverseTranspose = m33InverseTranspose.call(md, matrix, techniqueParameters.worldInverseTranspose);
+        };
+        var debugSkinnedUpdate = function debugSkinnedUpdateFn(camera) {
+            var matrix = this.node.world;
+            var techniqueParameters = this.techniqueParameters;
+            techniqueParameters.worldViewProjection = m43MulM44.call(md, matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
+            techniqueParameters.worldInverseTranspose = m33InverseTranspose.call(md, matrix, techniqueParameters.worldInverseTranspose);
+            var skinController = this.skinController;
+            if(skinController) {
+                skinController.update();
+            }
+        };
+        var defaultEnvUpdate = function defaultEnvUpdateFn(camera) {
+            var node = this.node;
+            var rendererInfo = node.rendererInfo;
+            if(rendererInfo.frameVisible !== node.frameVisible) {
+                rendererInfo.frameVisible = node.frameVisible;
+                updateNodeRendererInfo(node, rendererInfo, camera);
+            }
+            if(rendererInfo.worldUpdateEnv !== node.worldUpdate) {
+                rendererInfo.worldUpdateEnv = node.worldUpdate;
+                var matrix = node.world;
+                rendererInfo.worldInverseTranspose = m33InverseTranspose.call(md, matrix, rendererInfo.worldInverseTranspose);
+            }
+            var techniqueParameters = this.techniqueParameters;
+            techniqueParameters.worldInverseTranspose = rendererInfo.worldInverseTranspose;
+        };
+        var defaultEnvSkinnedUpdate = function defaultEnvSkinnedUpdateFn(camera) {
+            defaultEnvUpdate.call(this, camera);
+            var skinController = this.skinController;
+            if(skinController) {
+                skinController.update();
+            }
+        };
+        // Prepare
+        var debugLinesPrepare = function debugLinesPrepareFn(geometryInstance) {
+            DefaultRendering.defaultPrepareFn.call(this, geometryInstance);
+            var techniqueParameters = geometryInstance.techniqueParameters;
+            techniqueParameters.constantColor = geometryInstance.sharedMaterial.meta.constantColor;
+        };
+        var defaultPrepare = function defaultPrepareFn(geometryInstance) {
+            DefaultRendering.defaultPrepareFn.call(this, geometryInstance);
+            //For untextured objects we need to choose a technique that uses materialColor instead.
+            var techniqueParameters = geometryInstance.sharedMaterial.techniqueParameters;
+            var diffuse = techniqueParameters.diffuse;
+            if(diffuse === undefined) {
+                if(!techniqueParameters.materialColor) {
+                    techniqueParameters.materialColor = md.v4BuildOne();
+                }
+            } else if(diffuse.length === 4) {
+                techniqueParameters.diffuse = techniqueParameters.diffuse_map;
+                techniqueParameters.materialColor = md.v4Build.apply(md, diffuse);
+            }
+        };
+        var flatPrepare = function flatPrepareFn(geometryInstance) {
+            defaultPrepare.call(this, geometryInstance);
+            //For untextured objects we need to switch techniques.
+            var techniqueParameters = geometryInstance.sharedMaterial.techniqueParameters;
+            if(!techniqueParameters.diffuse) {
+                var shader = shaderManager.get("shaders/defaultrendering.cgfx");
+                if(geometryInstance.geometryType === "skinned") {
+                    geometryInstance.drawParameters[0].technique = shader.getTechnique("flat_skinned");
+                } else {
+                    geometryInstance.drawParameters[0].technique = shader.getTechnique("flat");
+                }
+            }
+        };
+        var loadTechniques = function loadTechniquesFn(shaderManager) {
+            var that = this;
+            var callback = function shaderLoadedCallbackFn(shader) {
+                that.shader = shader;
+                that.technique = shader.getTechnique(that.techniqueName);
+                that.techniqueIndex = renderingCommonGetTechniqueIndexFn(that.techniqueName);
+            };
+            shaderManager.load(this.shaderName, callback);
+        };
+        dr.defaultPrepareFn = defaultPrepare;
+        dr.defaultUpdateFn = defaultUpdate;
+        var effect;
+        var effectTypeData;
+        var skinned = "skinned";
+        var rigid = "rigid";
+        // Register the effects
+        //
+        // constant
+        //
+        effect = Effect.create("constant");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: flatPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "flat",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: flatPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "flat_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // lambert
+        //
+        effect = Effect.create("lambert");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: flatPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "lambert",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: flatPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "lambert_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // blinn
+        //
+        effect = Effect.create("blinn");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "blinn",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "blinn_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // blinn_nocull
+        //
+        effect = Effect.create("blinn_nocull");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "blinn_nocull",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "blinn_skinned_nocull",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // phong
+        //
+        effect = Effect.create("phong");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: flatPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "phong",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: flatPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "phong_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // debug_lines_constant
+        //
+        effect = Effect.create("debug_lines_constant");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: debugLinesPrepare,
+            shaderName: "shaders/debug.cgfx",
+            techniqueName: "debug_lines_constant",
+            update: debugUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        //
+        // debug_normals
+        //
+        effect = Effect.create("debug_normals");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/debug.cgfx",
+            techniqueName: "debug_normals",
+            update: debugUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/debug.cgfx",
+            techniqueName: "debug_normals_skinned",
+            update: debugSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // debug_tangents
+        //
+        effect = Effect.create("debug_tangents");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/debug.cgfx",
+            techniqueName: "debug_tangents",
+            update: debugUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/debug.cgfx",
+            techniqueName: "debug_tangents_skinned",
+            update: debugSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // debug_binormals
+        //
+        effect = Effect.create("debug_binormals");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/debug.cgfx",
+            techniqueName: "debug_binormals",
+            update: debugUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/debug.cgfx",
+            techniqueName: "debug_binormals_skinned",
+            update: debugSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // normalmap
+        //
+        effect = Effect.create("normalmap");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // normalmap_specularmap
+        //
+        effect = Effect.create("normalmap_specularmap");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap_specularmap",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap_specularmap_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // normalmap_specularmap_alphamap
+        //
+        effect = Effect.create("normalmap_specularmap_alphamap");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap_specularmap_alphamap",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        //
+        // normalmap_alphatest
+        //
+        effect = Effect.create("normalmap_alphatest");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap_alphatest",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap_alphatest_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // normalmap_specularmap_alphatest
+        //
+        effect = Effect.create("normalmap_specularmap_alphatest");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap_specularmap_alphatest",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap_specularmap_alphatest_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // normalmap_glowmap
+        //
+        effect = Effect.create("normalmap_glowmap");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap_glowmap",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap_glowmap_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // normalmap_specularmap_glowmap
+        //
+        effect = Effect.create("normalmap_specularmap_glowmap");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap_specularmap_glowmap",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "normalmap_specularmap_glowmap_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // rxgb_normalmap
+        //
+        effect = Effect.create("rxgb_normalmap");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "rxgb_normalmap",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "rxgb_normalmap_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // rxgb_normalmap_specularmap
+        //
+        effect = Effect.create("rxgb_normalmap_specularmap");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "rxgb_normalmap_specularmap",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "rxgb_normalmap_specularmap_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // rxgb_normalmap_alphatest
+        //
+        effect = Effect.create("rxgb_normalmap_alphatest");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "rxgb_normalmap_alphatest",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "rxgb_normalmap_alphatest_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // rxgb_normalmap_specularmap_alphatest
+        //
+        effect = Effect.create("rxgb_normalmap_specularmap_alphatest");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "rxgb_normalmap_specularmap_alphatest",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "rxgb_normalmap_specularmap_alphatest_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // rxgb_normalmap_glowmap
+        //
+        effect = Effect.create("rxgb_normalmap_glowmap");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "rxgb_normalmap_glowmap",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "rxgb_normalmap_glowmap_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // rxgb_normalmap_specularmap_glowmap
+        //
+        effect = Effect.create("rxgb_normalmap_specularmap_glowmap");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "rxgb_normalmap_specularmap_glowmap",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "rxgb_normalmap_specularmap_glowmap_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // add
+        //
+        effect = Effect.create("add");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "add",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "add_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // add_particle
+        //
+        effect = Effect.create("add_particle");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "add_particle",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        //
+        // blend
+        //
+        effect = Effect.create("blend");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "blend",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "blend_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // blend_particle
+        //
+        effect = Effect.create("blend_particle");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "blend_particle",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        //
+        // translucent
+        //
+        effect = Effect.create("translucent");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "translucent",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "translucent_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // translucent_particle
+        //
+        effect = Effect.create("translucent_particle");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "translucent_particle",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        //
+        // filter
+        //
+        effect = Effect.create("filter");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "filter",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "filter_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // invfilter
+        //
+        effect = Effect.create("invfilter");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "invfilter",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        //
+        // invfilter_particle
+        //
+        effect = Effect.create("invfilter_particle");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "invfilter_particle",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        //
+        // glass
+        //
+        effect = Effect.create("glass");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "glass",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        //
+        // glass_env
+        //
+        effect = Effect.create("glass_env");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "glass_env",
+            update: defaultEnvUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        //
+        // modulate2
+        //
+        effect = Effect.create("modulate2");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "modulate2",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "modulate2_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // skybox
+        //
+        effect = Effect.create("skybox");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "skybox",
+            update: defaultEnvUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        //
+        // env
+        //
+        effect = Effect.create("env");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "env",
+            update: defaultEnvUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "env_skinned",
+            update: defaultEnvSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        //
+        // flare
+        //
+        effect = Effect.create("flare");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "add",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectsManager.map("default", "blinn");
+        //
+        // glowmap
+        //
+        effect = Effect.create("glowmap");
+        effectsManager.add(effect);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "glowmap",
+            update: defaultUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(rigid, effectTypeData);
+        effectTypeData = {
+            prepare: defaultPrepare,
+            shaderName: "shaders/defaultrendering.cgfx",
+            techniqueName: "glowmap_skinned",
+            update: defaultSkinnedUpdate,
+            loadTechniques: loadTechniques
+        };
+        effectTypeData.loadTechniques(shaderManager);
+        effect.add(skinned, effectTypeData);
+        return dr;
+    };
+    return DefaultRendering;
+})();
 
-    dr.defaultPrepareFn = defaultPrepareFn;
-    dr.defaultUpdateFn = defaultUpdateFn;
-
-    var effect;
-    var effectTypeData;
-    var skinned = "skinned";
-    var rigid = "rigid";
-
-    // Register the effects
-
-    //
-    // constant
-    //
-    effect = Effect.create("constant");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : flatPrepareFn,
-                        shaderName : "shaders/standard.cgfx",
-                        techniqueName : "flat",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : flatPrepareFn,
-                        shaderName : "shaders/standard.cgfx",
-                        techniqueName : "flat_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // lambert
-    //
-    effect = Effect.create("lambert");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : flatPrepareFn,
-                        shaderName : "shaders/standard.cgfx",
-                        techniqueName : "lambert",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : flatPrepareFn,
-                        shaderName : "shaders/standard.cgfx",
-                        techniqueName : "lambert_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // blinn
-    //
-    effect = Effect.create("blinn");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "blinn",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "blinn_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // blinn_nocull
-    //
-    effect = Effect.create("blinn_nocull");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "blinn_nocull",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "blinn_skinned_nocull",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // phong
-    //
-    effect = Effect.create("phong");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : flatPrepareFn,
-                        shaderName : "shaders/standard.cgfx",
-                        techniqueName : "phong",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : flatPrepareFn,
-                        shaderName : "shaders/standard.cgfx",
-                        techniqueName : "phong_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // debug_lines_constant
-    //
-    effect = Effect.create("debug_lines_constant");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : debugLinesPrepareFn,
-                        shaderName : "shaders/debug.cgfx",
-                        techniqueName : "debug_lines_constant",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    //
-    // debug_normals
-    //
-    effect = Effect.create("debug_normals");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/debug.cgfx",
-                        techniqueName : "debug_normals",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/debug.cgfx",
-                        techniqueName : "debug_normals_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // debug_tangents
-    //
-    effect = Effect.create("debug_tangents");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/debug.cgfx",
-                        techniqueName : "debug_tangents",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/debug.cgfx",
-                        techniqueName : "debug_tangents_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // debug_binormals
-    //
-    effect = Effect.create("debug_binormals");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/debug.cgfx",
-                        techniqueName : "debug_binormals",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/debug.cgfx",
-                        techniqueName : "debug_binormals_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // normalmap
-    //
-    effect = Effect.create("normalmap");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // normalmap_specularmap
-    //
-    effect = Effect.create("normalmap_specularmap");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap_specularmap",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap_specularmap_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // normalmap_specularmap_alphamap
-    //
-    effect = Effect.create("normalmap_specularmap_alphamap");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap_specularmap_alphamap",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    //
-    // normalmap_alphatest
-    //
-    effect = Effect.create("normalmap_alphatest");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap_alphatest",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap_alphatest_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-
-    //
-    // normalmap_specularmap_alphatest
-    //
-    effect = Effect.create("normalmap_specularmap_alphatest");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap_specularmap_alphatest",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap_specularmap_alphatest_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // normalmap_glowmap
-    //
-    effect = Effect.create("normalmap_glowmap");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap_glowmap",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap_glowmap_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // normalmap_specularmap_glowmap
-    //
-    effect = Effect.create("normalmap_specularmap_glowmap");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap_specularmap_glowmap",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "normalmap_specularmap_glowmap_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // rxgb_normalmap
-    //
-    effect = Effect.create("rxgb_normalmap");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "rxgb_normalmap",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "rxgb_normalmap_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // rxgb_normalmap_specularmap
-    //
-    effect = Effect.create("rxgb_normalmap_specularmap");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "rxgb_normalmap_specularmap",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "rxgb_normalmap_specularmap_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // rxgb_normalmap_alphatest
-    //
-    effect = Effect.create("rxgb_normalmap_alphatest");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "rxgb_normalmap_alphatest",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "rxgb_normalmap_alphatest_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // rxgb_normalmap_specularmap_alphatest
-    //
-    effect = Effect.create("rxgb_normalmap_specularmap_alphatest");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "rxgb_normalmap_specularmap_alphatest",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "rxgb_normalmap_specularmap_alphatest_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // rxgb_normalmap_glowmap
-    //
-    effect = Effect.create("rxgb_normalmap_glowmap");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "rxgb_normalmap_glowmap",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "rxgb_normalmap_glowmap_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // rxgb_normalmap_specularmap_glowmap
-    //
-    effect = Effect.create("rxgb_normalmap_specularmap_glowmap");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "rxgb_normalmap_specularmap_glowmap",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "rxgb_normalmap_specularmap_glowmap_skinned",
-                        update : defaultSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // add
-    //
-    effect = Effect.create("add");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "add",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "add_skinned",
-                        update : defaultBlendSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // add_particle
-    //
-    effect = Effect.create("add_particle");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "add_particle",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    //
-    // blend
-    //
-    effect = Effect.create("blend");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "blend",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "blend_skinned",
-                        update : defaultBlendSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // blend_particle
-    //
-    effect = Effect.create("blend_particle");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "blend_particle",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    //
-    // translucent
-    //
-    effect = Effect.create("translucent");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "translucent",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "translucent_skinned",
-                        update : defaultBlendSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // translucent_particle
-    //
-    effect = Effect.create("translucent_particle");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "translucent_particle",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    //
-    // filter
-    //
-    effect = Effect.create("filter");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "filter",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "filter_skinned",
-                        update : defaultBlendSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // invfilter
-    //
-    effect = Effect.create("invfilter");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "invfilter",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    //
-    // invfilter_particle
-    //
-    effect = Effect.create("invfilter_particle");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "invfilter_particle",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    //
-    // glass
-    //
-    effect = Effect.create("glass");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "glass",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    //
-    // glass_env
-    //
-    effect = Effect.create("glass_env");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "glass_env",
-                        update : defaultUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    //
-    // modulate2
-    //
-    effect = Effect.create("modulate2");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "modulate2",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "modulate2_skinned",
-                        update : defaultBlendSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // skybox
-    //
-    effect = Effect.create("skybox");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "skybox",
-                        update : defaultSkyboxUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    //
-    // env
-    //
-    effect = Effect.create("env");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "env",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "env_skinned",
-                        update : defaultBlendSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    //
-    // flare
-    //
-    effect = Effect.create("flare");
-    effectsManager.add(effect);
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "add",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectsManager.map("default", "blinn");
-
-    //
-    // glowmap
-    //
-    effect = Effect.create("glowmap");
-    effectsManager.add(effect);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "glowmap",
-                        update : defaultBlendUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(rigid, effectTypeData);
-
-    effectTypeData = {  prepare : defaultPrepareFn,
-                        shaderName : "shaders/defaultrendering.cgfx",
-                        techniqueName : "glowmap_skinned",
-                        update : defaultBlendSkinnedUpdateFn,
-                        loadTechniques : loadTechniques };
-    effectTypeData.loadTechniques(shaderManager);
-    effect.add(skinned, effectTypeData);
-
-    return dr;
-};

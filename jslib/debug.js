@@ -1,4 +1,4 @@
-// Copyright (c) 2012 Turbulenz Limited
+/* This file was generated from TypeScript source tslib/debug.ts */
 
 // The debug object is only available in debug modes.  The build tools
 // will automatically include it or prevent it from being included
@@ -17,43 +17,51 @@
 //   a.call(debug, ....);
 //
 // etc...
-
 var debug = {
-
-    // Override this to change the behaviour when asserts are
+    reportAssert: // Override this to change the behaviour when asserts are
     // triggered.  Default logs the message to the console and then
     // throws an exception.
-    reportAssert : function debugReportAssertFn(msg)
-    {
-        window.console.log(msg);
-
-        if ('undefined' !== typeof Error)
-        {
-            var getStackTrace = function debugReportAssertGetStackTraceFn()
-            {
-                var obj = {};
-                Error.captureStackTrace(obj, getStackTrace);
-                return obj.stack;
+    function debugReportAssertFn(msg) {
+        var fnName;
+        var stackTrace;
+        if('undefined' !== typeof Error && ((Error).captureStackTrace)) {
+            var getStackTrace = function debugReportAssertGetStackTraceFn() {
+                var obj = {
+                };
+                (Error).captureStackTrace(obj, getStackTrace);
+                stackTrace = (obj).stack;
+                // Attempt to get the name of the function in which
+                // debug.assert was called.
+                var fnFrame = stackTrace.split("\n")[3];
+                fnName = fnFrame.substr(fnFrame.indexOf("at ") + 3);
             };
-
-            window.console.log(getStackTrace());
+            getStackTrace();
         }
-
+        if(fnName) {
+            msg = "ASSERT at " + fnName + ": " + msg;
+        } else {
+            msg = "ASSERT: " + msg;
+        }
+        window.console.log(msg);
+        if(stackTrace) {
+            window.console.log(stackTrace);
+        }
         throw msg;
     },
-
-    // Basic assertion that a condition is true.
-    assert : function debugAssertFn(condition, msg)
-    {
-        if (!condition)
-        {
-            if (!msg)
-            {
+    abort: function debugAbortFn(msg) {
+        debug.reportAssert(msg);
+    },
+    assert: // Basic assertion that a condition is true.
+    function debugAssertFn(condition, msg) {
+        if(!condition) {
+            if(!msg) {
                 msg = "Unlabelled assert";
             }
             // TODO : Grab information about the caller?
-            debug.reportAssert("ASSERT: " + msg);
+            debug.reportAssert(msg);
         }
+    },
+    log: function debugAssertLogFn(msg) {
+        window.console.log(msg);
     }
-
 };

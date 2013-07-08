@@ -1,55 +1,38 @@
-// Copyright (c) 2010-2012 Turbulenz Limited
+/* This file was generated from TypeScript source tslib/physicsmanager.ts */
 
-/*global Utilities: false */
-/*global SceneNode: false */
 
 //
 // physicsmanager
 //
-function PhysicsManager() {}
-
-PhysicsManager.prototype =
-{
-    version: 1,
-
-    arrayConstructor: Array,
-
-    //
+var PhysicsManager = (function () {
+    function PhysicsManager() { }
+    PhysicsManager.version = 1;
+    PhysicsManager.prototype.update = //
     // update
     //
-    update: function physicsManagerUpdateFn(/* scene */)
-    {
+    function () {
         var mathsDevice = this.mathsDevice;
-
         // Dynamic nodes
         var physicsNodes = this.dynamicPhysicsNodes;
         var numPhysicsNodes = physicsNodes.length;
         var physicsNode, body, target, worldMatrix, origin, n;
-        if (numPhysicsNodes > 0)
-        {
-            for (n = 0; n < numPhysicsNodes; n += 1)
-            {
+        if(numPhysicsNodes > 0) {
+            for(n = 0; n < numPhysicsNodes; n += 1) {
                 physicsNode = physicsNodes[n];
                 body = physicsNode.body;
-                if (body.active)
-                {
+                if(body.active) {
                     target = physicsNode.target;
-                    if (target.disabled)
-                    {
+                    if(target.disabled) {
                         continue;
                     }
-
-                    if (target.parent)
-                    {
+                    if(target.parent) {
                         Utilities.assert(false, "Rigid bodies with parent nodes are unsupported");
                         //Not really possible, since the child can become inactive (frozen) and therefore it will
                         /*var parentWorld = target.parent.getWorldTransform();
                         var inverseParent = mathsDevice.m43Inverse(parentWorld);
                         var newLocal = mathsDevice.m43Mul(worldMatrix, inverseParent);
                         target.setLocalTransform(newLocal);*/
-                    }
-                    else
-                    {
+                                            } else {
                         worldMatrix = target.getLocalTransform();
                         body.calculateTransform(worldMatrix, physicsNode.origin);
                         target.setLocalTransform(worldMatrix);
@@ -57,216 +40,154 @@ PhysicsManager.prototype =
                 }
             }
         }
-
         // Kinematic nodes
         var tempMatrix = this.tempMatrix;
         physicsNodes = this.kinematicPhysicsNodes;
         numPhysicsNodes = physicsNodes.length;
-        for (n = 0; n < numPhysicsNodes; n += 1)
-        {
+        for(n = 0; n < numPhysicsNodes; n += 1) {
             physicsNode = physicsNodes[n];
             target = physicsNode.target;
-            if (target.disabled)
-            {
+            if(target.disabled) {
                 continue;
             }
-
-            if (target.worldUpdate !== physicsNode.worldUpdate)
-            {
+            if(target.worldUpdate !== physicsNode.worldUpdate) {
                 physicsNode.worldUpdate = target.worldUpdate;
                 worldMatrix = target.getWorldTransform();
                 origin = physicsNode.origin;
-                if (origin)
-                {
+                if(origin) {
                     // The physics API copies the matrix instead of referencing it
                     // so it is safe to share a temp one
                     physicsNode.body.transform = mathsDevice.m43Offset(worldMatrix, origin, tempMatrix);
-                }
-                else
-                {
+                } else {
                     physicsNode.body.transform = worldMatrix;
                 }
             }
         }
-    },
-
-    //
+    };
+    PhysicsManager.prototype.enableNode = //
     // enableNode
     //
-    enableNode : function physicsManagerEnableNodeFn(sceneNode, enabled)
-    {
+    function (sceneNode, enabled) {
         var physicsNodes = sceneNode.physicsNodes;
-
-        if (physicsNodes)
-        {
+        if(physicsNodes) {
             var dynamicsWorld = this.dynamicsWorld;
             var numPhysicsNodes = physicsNodes.length;
-            for (var p = 0; p < numPhysicsNodes; p += 1)
-            {
+            for(var p = 0; p < numPhysicsNodes; p += 1) {
                 var physicsNode = physicsNodes[p];
                 var body = physicsNode.body;
-                if (body)
-                {
-                    if (physicsNode.kinematic)
-                    {
-                        if (enabled)
-                        {
+                if(body) {
+                    if(physicsNode.kinematic) {
+                        if(enabled) {
                             dynamicsWorld.addCollisionObject(body);
-                        }
-                        else
-                        {
+                        } else {
                             dynamicsWorld.removeCollisionObject(body);
                         }
-                    }
-                    else if (physicsNode.dynamic)
-                    {
-                        if (enabled)
-                        {
+                    } else if(physicsNode.dynamic) {
+                        if(enabled) {
                             dynamicsWorld.addRigidBody(body);
-                        }
-                        else
-                        {
+                        } else {
                             dynamicsWorld.removeRigidBody(body);
                         }
-                    }
-                    else
-                    {
-                        if (enabled)
-                        {
+                    } else {
+                        if(enabled) {
                             dynamicsWorld.addCollisionObject(body);
-                        }
-                        else
-                        {
+                        } else {
                             dynamicsWorld.removeCollisionObject(body);
                         }
                     }
                 }
             }
         }
-    },
-
-    //
+    };
+    PhysicsManager.prototype.enableHierarchy = //
     // enableHierarchy
     //
-    enableHierarchy : function physicsManagerEnableHierarchyFn(sceneNode, enabled)
-    {
+    function (sceneNode, enabled) {
         this.enableNode(sceneNode, enabled);
-
         var children = sceneNode.children;
-        if (children)
-        {
+        if(children) {
             var numChildren = children.length;
-            for (var c = 0; c < numChildren; c += 1)
-            {
+            for(var c = 0; c < numChildren; c += 1) {
                 this.enableHierarchy(children[c], enabled);
             }
         }
-    },
-
-    //
+    };
+    PhysicsManager.prototype.deletePhysicsNode = //
     // deletePhysicsNode
     //
-    deletePhysicsNode : function physicsManagerDeletePhysicsNodeFn(physicsNode)
-    {
+    function (physicsNode) {
         var physicsNodes = this.physicsNodes;
         var numPhysicsNodes = physicsNodes.length;
         var n;
-        for (n = 0; n < numPhysicsNodes; n += 1)
-        {
-            if (physicsNodes[n] === physicsNode)
-            {
+        for(n = 0; n < numPhysicsNodes; n += 1) {
+            if(physicsNodes[n] === physicsNode) {
                 physicsNodes.splice(n, 1);
                 break;
             }
         }
-
         physicsNodes = this.dynamicPhysicsNodes;
         numPhysicsNodes = physicsNodes.length;
-        for (n = 0; n < numPhysicsNodes; n += 1)
-        {
-            if (physicsNodes[n] === physicsNode)
-            {
+        for(n = 0; n < numPhysicsNodes; n += 1) {
+            if(physicsNodes[n] === physicsNode) {
                 physicsNodes.splice(n, 1);
                 break;
             }
         }
-
         physicsNodes = this.kinematicPhysicsNodes;
         numPhysicsNodes = physicsNodes.length;
-        for (n = 0; n < numPhysicsNodes; n += 1)
-        {
-            if (physicsNodes[n] === physicsNode)
-            {
+        for(n = 0; n < numPhysicsNodes; n += 1) {
+            if(physicsNodes[n] === physicsNode) {
                 physicsNodes.splice(n, 1);
                 break;
             }
         }
-    },
-
-    //
+    };
+    PhysicsManager.prototype.deleteNode = //
     // deleteNode
     //
-    deleteNode : function physicsManagerDeleteNodeFn(sceneNode)
-    {
+    function (sceneNode) {
         var physicsNodes = sceneNode.physicsNodes;
-        if (physicsNodes)
-        {
+        if(physicsNodes) {
             var physicsDevice = this.physicsDevice;
             var dynamicsWorld = this.dynamicsWorld;
-            if (physicsDevice && dynamicsWorld)
-            {
+            if(physicsDevice && dynamicsWorld) {
                 var numPhysicsNodes = physicsNodes.length;
-                for (var p = 0; p < numPhysicsNodes; p += 1)
-                {
+                for(var p = 0; p < numPhysicsNodes; p += 1) {
                     var physicsNode = physicsNodes[p];
                     var body = physicsNode.body;
-                    if (body)
-                    {
-                        if (physicsNode.kinematic)
-                        {
+                    if(body) {
+                        if(physicsNode.kinematic) {
                             dynamicsWorld.removeCollisionObject(body);
-                        }
-                        else if (physicsNode.dynamic)
-                        {
+                        } else if(physicsNode.dynamic) {
                             dynamicsWorld.removeRigidBody(body);
-                        }
-                        else
-                        {
+                        } else {
                             dynamicsWorld.removeCollisionObject(body);
                         }
                     }
                     this.deletePhysicsNode(physicsNode);
                 }
-
                 this.unsubscribeSceneNode(sceneNode);
                 delete sceneNode.physicsNodes;
             }
         }
-    },
-
-    //
+    };
+    PhysicsManager.prototype.deleteHierarchy = //
     // deleteHierarchy
     //
-    deleteHierarchy : function physicsManagerDeleteHierarchyFn(sceneNode)
-    {
+    function (sceneNode) {
         this.deleteNode(sceneNode);
-
         var children = sceneNode.children;
-        if (children)
-        {
+        if(children) {
             var numChildren = children.length;
-            for (var c = 0; c < numChildren; c += 1)
-            {
+            for(var c = 0; c < numChildren; c += 1) {
                 this.deleteHierarchy(children[c]);
             }
         }
-    },
-
-    //
+    };
+    PhysicsManager.prototype.calculateHierarchyExtents = //
     // calculateHierarchyExtents
     //
-    calculateHierarchyExtents: function physicsManagerCalculateHierarchyExtentsFn(sceneNode)
-    {
+    function (sceneNode) {
         var min = Math.min;
         var max = Math.max;
         var maxValue = Number.MAX_VALUE;
@@ -276,18 +197,14 @@ PhysicsManager.prototype =
         /*jshint newcap: true*/
         totalExtents[2] = totalExtents[1] = totalExtents[0] = maxValue;
         totalExtents[5] = totalExtents[4] = totalExtents[3] = -maxValue;
-
-        function calculateNodeExtentsFn(sceneNode)
-        {
+        var calculateNodeExtents = function calculateNodeExtentsFn(sceneNode) {
             var physicsNodes = sceneNode.physicsNodes;
-            if (physicsNodes)
-            {
+            if(physicsNodes) {
                 var numPhysicsNodes = physicsNodes.length;
                 /*jshint newcap: false*/
                 var extents = new arrayConstructor(6);
                 /*jshint newcap: true*/
-                for (var p = 0; p < numPhysicsNodes; p += 1)
-                {
+                for(var p = 0; p < numPhysicsNodes; p += 1) {
                     physicsNodes[p].body.calculateExtents(extents);
                     totalExtents[0] = min(totalExtents[0], extents[0]);
                     totalExtents[1] = min(totalExtents[1], extents[1]);
@@ -297,46 +214,35 @@ PhysicsManager.prototype =
                     totalExtents[5] = max(totalExtents[5], extents[5]);
                 }
             }
-
             var children = sceneNode.children;
-            if (children)
-            {
+            if(children) {
                 var numChildren = children.length;
-                for (var n = 0; n < numChildren; n += 1)
-                {
-                    calculateNodeExtentsFn(children[n]);
+                for(var n = 0; n < numChildren; n += 1) {
+                    calculateNodeExtents(children[n]);
                 }
             }
-        }
-
-        calculateNodeExtentsFn(sceneNode);
-
-        if (totalExtents[0] >= totalExtents[3])
-        {
+        };
+        calculateNodeExtents(sceneNode);
+        if(totalExtents[0] >= totalExtents[3]) {
             return undefined;
         }
         return totalExtents;
-    },
-
-    //
+    };
+    PhysicsManager.prototype.calculateExtents = //
     // calculateExtents
     //
-    calculateExtents: function physicsManagerCalculateExtentsFn(sceneNode)
-    {
+    function (sceneNode) {
         var min = Math.min;
         var max = Math.max;
         var maxValue = Number.MAX_VALUE;
         var totalExtents = new this.arrayConstructor(6);
         totalExtents[2] = totalExtents[1] = totalExtents[0] = maxValue;
         totalExtents[5] = totalExtents[4] = totalExtents[3] = -maxValue;
-
         var physicsNodes = sceneNode.physicsNodes;
-        if (physicsNodes)
-        {
+        if(physicsNodes) {
             var numPhysicsNodes = physicsNodes.length;
             var extents = new this.arrayConstructor(6);
-            for (var p = 0; p < numPhysicsNodes; p += 1)
-            {
+            for(var p = 0; p < numPhysicsNodes; p += 1) {
                 physicsNodes[p].body.calculateExtents(extents);
                 totalExtents[0] = min(totalExtents[0], extents[0]);
                 totalExtents[1] = min(totalExtents[1], extents[1]);
@@ -346,47 +252,35 @@ PhysicsManager.prototype =
                 totalExtents[5] = max(totalExtents[5], extents[5]);
             }
         }
-
-        if (totalExtents[0] >= totalExtents[3])
-        {
+        if(totalExtents[0] >= totalExtents[3]) {
             return undefined;
         }
         return totalExtents;
-    },
-
-    //
+    };
+    PhysicsManager.prototype.clear = //
     // clear
     //
-    clear: function physicsManagerClearFn()
-    {
-        if (this.physicsNodes)
-        {
-            for (var index = 0; index < this.physicsNodes.length; index += 1)
-            {
+    function () {
+        if(this.physicsNodes) {
+            for(var index = 0; index < this.physicsNodes.length; index += 1) {
                 this.unsubscribeSceneNode(this.physicsNodes[index].target);
             }
         }
         this.physicsNodes = [];
         this.dynamicPhysicsNodes = [];
         this.kinematicPhysicsNodes = [];
-    },
-
-    //
+    };
+    PhysicsManager.prototype.loadNodes = //
     // loadNodes
     //
-    loadNodes: function physicsManagerLoadNodesFn(loadParams, scene)
-    {
+    function (loadParams, scene) {
         var sceneData = loadParams.data;
         var collisionMargin = (loadParams.collisionMargin || 0.005);
         var nodesNamePrefix = loadParams.nodesNamePrefix;
-
-        if (!loadParams.append)
-        {
+        if(!loadParams.append) {
             this.clear();
         }
-
-        if (!this.physicsDevice)
-        {
+        if(!this.physicsDevice) {
             return;
         }
         var physicsDevice = this.physicsDevice;
@@ -397,7 +291,6 @@ PhysicsManager.prototype =
         var characterFilterFlag = physicsDevice.FILTER_CHARACTER;
         var projectileFilterFlag = physicsDevice.FILTER_PROJECTILE;
         var allFilterFlag = physicsDevice.FILTER_ALL;
-
         var mathsDevice = this.mathsDevice;
         var physicsNodes = this.physicsNodes;
         var dynamicPhysicsNodes = this.dynamicPhysicsNodes;
@@ -407,33 +300,27 @@ PhysicsManager.prototype =
         var fileModels = sceneData.physicsmodels;
         var fileMaterials = sceneData.physicsmaterials;
         var shape, origin, triangleArray;
-        for (var fn in fileNodes)
-        {
-            if (fileNodes.hasOwnProperty(fn))
-            {
+        for(var fn in fileNodes) {
+            if(fileNodes.hasOwnProperty(fn)) {
                 var fileNode = fileNodes[fn];
                 var targetName = fileNode.target;
-                if (nodesNamePrefix)
-                {
+                if(nodesNamePrefix) {
                     targetName = SceneNode.makePath(nodesNamePrefix, targetName);
                 }
                 var target = scene.findNode(targetName);
-                if (!target)
-                {   //missing target.
+                if(!target) {
+                    //missing target.
                     continue;
                 }
                 var fileModel = fileModels[fileNode.body];
-                if (!fileModel)
-                {
+                if(!fileModel) {
                     continue;
                 }
                 var physicsMaterial;
-                if (fileMaterials)
-                {
+                if(fileMaterials) {
                     physicsMaterial = fileMaterials[fileModel.material];
                 }
-                if (physicsMaterial && (physicsMaterial.nonsolid || physicsMaterial.far))
-                {
+                if(physicsMaterial && (physicsMaterial.nonsolid || physicsMaterial.far)) {
                     continue;
                 }
                 var kinematic = (fileModel.kinematic || target.kinematic);
@@ -443,57 +330,45 @@ PhysicsManager.prototype =
                 origin = null;
                 triangleArray = null;
                 var shapeType = fileModel.shape;
-                if (shapeType === "box")
-                {
+                if(shapeType === "box") {
                     var halfExtents = fileModel.halfExtents || fileModel.halfextents;
                     shape = physicsDevice.createBoxShape({
                         halfExtents: halfExtents,
                         margin: collisionMargin
                     });
-                }
-                else if (shapeType === "sphere")
-                {
+                } else if(shapeType === "sphere") {
                     shape = physicsDevice.createSphereShape({
                         radius: fileModel.radius,
                         margin: collisionMargin
                     });
-                }
-                else if (shapeType === "cone")
-                {
+                } else if(shapeType === "cone") {
                     shape = physicsDevice.createConeShape({
                         radius: fileModel.radius,
                         height: fileModel.height,
                         margin: collisionMargin
                     });
-                }
-                else if (shapeType === "capsule")
-                {
+                } else if(shapeType === "capsule") {
                     shape = physicsDevice.createCapsuleShape({
                         radius: fileModel.radius,
                         height: fileModel.height,
                         margin: collisionMargin
                     });
-                }
-                else if (shapeType === "cylinder")
-                {
+                } else if(shapeType === "cylinder") {
                     shape = physicsDevice.createCylinderShape({
-                        halfExtents: [fileModel.radius, fileModel.height, fileModel.radius],
+                        halfExtents: [
+                            fileModel.radius, 
+                            fileModel.height, 
+                            fileModel.radius
+                        ],
                         margin: collisionMargin
                     });
-                }
-                else if (shapeType === "convexhull" ||
-                         shapeType === "mesh")
-                {
+                } else if(shapeType === "convexhull" || shapeType === "mesh") {
                     var geometry = fileShapes[fileModel.geometry];
-                    if (geometry)
-                    {
+                    if(geometry) {
                         shape = geometry.physicsShape;
-                        if (shape)
-                        {
+                        if(shape) {
                             origin = geometry.origin;
-                        }
-                        else
-                        {
+                        } else {
                             var inputs = geometry.inputs;
                             var inputPosition = inputs.POSITION;
                             var positions = geometry.sources[inputPosition.source];
@@ -502,15 +377,11 @@ PhysicsManager.prototype =
                             var posMax = positions.max;
                             var numPositionsValues, np, pos0, pos1, pos2;
                             var min0, min1, min2, max0, max1, max2;
-                            if (posMin && posMax)
-                            {
+                            if(posMin && posMax) {
                                 var centerPos0 = ((posMax[0] + posMin[0]) * 0.5);
                                 var centerPos1 = ((posMax[1] + posMin[1]) * 0.5);
                                 var centerPos2 = ((posMax[2] + posMin[2]) * 0.5);
-                                if (Math.abs(centerPos0) > 1.e-6 ||
-                                    Math.abs(centerPos1) > 1.e-6 ||
-                                    Math.abs(centerPos2) > 1.e-6)
-                                {
+                                if(Math.abs(centerPos0) > 0.000001 || Math.abs(centerPos1) > 0.000001 || Math.abs(centerPos2) > 0.000001) {
                                     var halfPos0 = ((posMax[0] - posMin[0]) * 0.5);
                                     var halfPos1 = ((posMax[1] - posMin[1]) * 0.5);
                                     var halfPos2 = ((posMax[2] - posMin[2]) * 0.5);
@@ -523,33 +394,23 @@ PhysicsManager.prototype =
                                     numPositionsValues = positionsData.length;
                                     var newPositionsData = [];
                                     newPositionsData.length = numPositionsValues;
-                                    for (np = 0; np < numPositionsValues; np += 3)
-                                    {
+                                    for(np = 0; np < numPositionsValues; np += 3) {
                                         pos0 = (positionsData[np + 0] - centerPos0);
                                         pos1 = (positionsData[np + 1] - centerPos1);
                                         pos2 = (positionsData[np + 2] - centerPos2);
-                                        if (min0 > pos0)
-                                        {
+                                        if(min0 > pos0) {
                                             min0 = pos0;
-                                        }
-                                        else if (max0 < pos0)
-                                        {
+                                        } else if(max0 < pos0) {
                                             max0 = pos0;
                                         }
-                                        if (min1 > pos1)
-                                        {
+                                        if(min1 > pos1) {
                                             min1 = pos1;
-                                        }
-                                        else if (max1 < pos1)
-                                        {
+                                        } else if(max1 < pos1) {
                                             max1 = pos1;
                                         }
-                                        if (min2 > pos2)
-                                        {
+                                        if(min2 > pos2) {
                                             min2 = pos2;
-                                        }
-                                        else if (max2 < pos2)
-                                        {
+                                        } else if(max2 < pos2) {
                                             max2 = pos2;
                                         }
                                         newPositionsData[np + 0] = pos0;
@@ -557,118 +418,102 @@ PhysicsManager.prototype =
                                         newPositionsData[np + 2] = pos2;
                                     }
                                     positionsData = newPositionsData;
-                                    posMin = [min0, min1, min2];
-                                    posMax = [max0, max1, max2];
+                                    posMin = [
+                                        min0, 
+                                        min1, 
+                                        min2
+                                    ];
+                                    posMax = [
+                                        max0, 
+                                        max1, 
+                                        max2
+                                    ];
                                     origin = mathsDevice.v3Build(centerPos0, centerPos1, centerPos2);
                                     geometry.origin = origin;
                                 }
-                            }
-                            else
-                            {
+                            } else {
                                 //TODO: add a warning that with no extents we can't calculate and origin?
-                                geometry.origin = [0, 0, 0];
+                                geometry.origin = [
+                                    0, 
+                                    0, 
+                                    0
+                                ];
                             }
-
                             // Can we use a box?
                             // TODO: do it offline
-                            if (positionsData.length === 24)
-                            {
+                            if(positionsData.length === 24) {
                                 min0 = posMin[0];
                                 min1 = posMin[1];
                                 min2 = posMin[2];
                                 max0 = posMax[0];
                                 max1 = posMax[1];
                                 max2 = posMax[2];
-
-                                for (np = 0; np < 24; np += 3)
-                                {
+                                for(np = 0; np < 24; np += 3) {
                                     pos0 = positionsData[np + 0];
                                     pos1 = positionsData[np + 1];
                                     pos2 = positionsData[np + 2];
-                                    if ((pos0 !== min0 && pos0 !== max0) ||
-                                        (pos1 !== min1 && pos1 !== max1) ||
-                                        (pos2 !== min2 && pos2 !== max2))
-                                    {
+                                    if((pos0 !== min0 && pos0 !== max0) || (pos1 !== min1 && pos1 !== max1) || (pos2 !== min2 && pos2 !== max2)) {
                                         break;
                                     }
                                 }
-
-                                if (np >= numPositionsValues)
-                                {
+                                if(np >= numPositionsValues) {
                                     shapeType = "box";
-
                                     shape = physicsDevice.createBoxShape({
-                                        halfExtents: [(max0 - min0) * 0.5,
-                                                      (max1 - min1) * 0.5,
-                                                      (max2 - min2) * 0.5],
+                                        halfExtents: [
+                                            (max0 - min0) * 0.5, 
+                                            (max1 - min1) * 0.5, 
+                                            (max2 - min2) * 0.5
+                                        ],
                                         margin: collisionMargin
                                     });
                                 }
                             }
-
-                            if (shapeType === "convexhull")
-                            {
+                            if(shapeType === "convexhull") {
                                 shape = physicsDevice.createConvexHullShape({
                                     points: positionsData,
                                     margin: collisionMargin
                                 });
-                            }
-                            else if (shapeType === "mesh")
-                            {
+                            } else if(shapeType === "mesh") {
                                 var maxOffset = 0;
-                                for (var input in inputs)
-                                {
-                                    if (inputs.hasOwnProperty(input))
-                                    {
+                                for(var input in inputs) {
+                                    if(inputs.hasOwnProperty(input)) {
                                         var fileInput = inputs[input];
                                         var offset = fileInput.offset;
-                                        if (offset > maxOffset)
-                                        {
+                                        if(offset > maxOffset) {
                                             maxOffset = offset;
                                         }
                                     }
                                 }
-
                                 var indices = [];
                                 var surfaces = geometry.surfaces;
-                                if (!surfaces)
-                                {
-                                    surfaces = { s: { triangles: geometry.triangles } };
+                                if(!surfaces) {
+                                    surfaces = {
+                                        s: {
+                                            triangles: geometry.triangles
+                                        }
+                                    };
                                 }
-                                for (var surf in surfaces)
-                                {
-                                    if (surfaces.hasOwnProperty(surf))
-                                    {
+                                for(var surf in surfaces) {
+                                    if(surfaces.hasOwnProperty(surf)) {
                                         var surface = surfaces[surf];
-
-                                        if (maxOffset > 0)
-                                        {
+                                        if(maxOffset > 0) {
                                             var triangles = surface.triangles;
-                                            if (triangles)
-                                            {
+                                            if(triangles) {
                                                 var indicesPerVertex = (maxOffset + 1);
                                                 var numIndices = triangles.length;
                                                 var positionsOffset = inputPosition.offset;
-                                                for (var v = 0; v < numIndices; v += indicesPerVertex)
-                                                {
+                                                for(var v = 0; v < numIndices; v += indicesPerVertex) {
                                                     indices.push(triangles[v + positionsOffset]);
                                                 }
                                             }
-                                        }
-                                        else
-                                        {
+                                        } else {
                                             var surfIndices = surface.triangles;
-                                            if (surfIndices)
-                                            {
-                                                if (indices.length === 0)
-                                                {
+                                            if(surfIndices) {
+                                                if(indices.length === 0) {
                                                     indices = surfIndices;
-                                                }
-                                                else
-                                                {
+                                                } else {
                                                     var numSurfIndices = surfIndices.length;
-                                                    for (var i = 0; i < numSurfIndices; i += 1)
-                                                    {
+                                                    for(var i = 0; i < numSurfIndices; i += 1) {
                                                         indices.push(surfIndices[i]);
                                                     }
                                                 }
@@ -676,9 +521,7 @@ PhysicsManager.prototype =
                                         }
                                     }
                                 }
-
-                                if (indices)
-                                {
+                                if(indices) {
                                     var triangleArrayParams = {
                                         vertices: positionsData,
                                         indices: indices,
@@ -686,8 +529,7 @@ PhysicsManager.prototype =
                                         maxExtent: posMax
                                     };
                                     triangleArray = physicsDevice.createTriangleArray(triangleArrayParams);
-                                    if (triangleArray)
-                                    {
+                                    if(triangleArray) {
                                         shape = physicsDevice.createTriangleMeshShape({
                                             triangleArray: triangleArray,
                                             margin: collisionMargin
@@ -699,298 +541,271 @@ PhysicsManager.prototype =
                         }
                     }
                 }
-
-                if (shape)
-                {
+                if(shape) {
                     var transform = target.getWorldTransform();
-                    if (origin)
-                    {
+                    if(origin) {
                         transform = mathsDevice.m43Offset(transform, origin);
                     }
-
+                    // TODO: Declare this as a Physics*Parameters so
+                    // we only have to initialize the required entries
+                    // at this stage.
                     var params = {
                         shape: shape,
-                        transform: transform
+                        transform: transform,
+                        friction: undefined,
+                        restitution: undefined,
+                        group: undefined,
+                        mask: undefined,
+                        kinematic: undefined,
+                        mass: undefined,
+                        inertia: undefined,
+                        frozen: undefined,
+                        linearVelocity: undefined,
+                        angularVelocity: undefined
                     };
-
-
-                    if (physicsMaterial)
-                    {
-                        if (physicsMaterial.dynamic_friction)
-                        {
+                    if(physicsMaterial) {
+                        if(physicsMaterial.dynamic_friction) {
                             params.friction = physicsMaterial.dynamic_friction;
                         }
-                        if (physicsMaterial.restitution)
-                        {
+                        if(physicsMaterial.restitution) {
                             params.restitution = physicsMaterial.restitution;
                         }
                     }
-
                     // Check for filters to specify which groups will collide against these objects
                     var collisionFilters = allFilterFlag;
-                    if (physicsMaterial)
-                    {
+                    if(physicsMaterial) {
                         var materialFilter = physicsMaterial.collisionFilter;
-                        if (materialFilter)
-                        {
+                        if(materialFilter) {
                             collisionFilters = 0;
                             var numFilters = materialFilter.length;
-                            for (var f = 0; f < numFilters; f += 1)
-                            {
+                            for(var f = 0; f < numFilters; f += 1) {
                                 var filter = materialFilter[f];
-                                if (filter === "ALL")
-                                {
+                                if(filter === "ALL") {
                                     collisionFilters += allFilterFlag;
-                                }
-                                else if (filter === "DYNAMIC")
-                                {
+                                } else if(filter === "DYNAMIC") {
                                     collisionFilters += dynamicFilterFlag;
-                                }
-                                else if (filter === "CHARACTER")
-                                {
+                                } else if(filter === "CHARACTER") {
                                     collisionFilters += characterFilterFlag;
-                                }
-                                else if (filter === "PROJECTILE")
-                                {
+                                } else if(filter === "PROJECTILE") {
                                     collisionFilters += projectileFilterFlag;
-                                }
-                                else if (filter === "STATIC")
-                                {
+                                } else if(filter === "STATIC") {
                                     collisionFilters += staticFilterFlag;
-                                }
-                                else if (filter === "KINEMATIC")
-                                {
+                                } else if(filter === "KINEMATIC") {
                                     collisionFilters += kinematicFilterFlag;
                                 }
                             }
                         }
                     }
-
                     var physicsObject;
-                    if (kinematic)
-                    {
+                    if(kinematic) {
                         params.group = kinematicFilterFlag;
                         params.mask = collisionFilters;
                         params.kinematic = true;
                         physicsObject = physicsDevice.createCollisionObject(params);
-                        if (physicsObject && !disabled)
-                        {
+                        if(physicsObject && !disabled) {
                             dynamicsWorld.addCollisionObject(physicsObject);
                         }
-                    }
-                    else if (dynamic)
-                    {
+                    } else if(dynamic) {
                         params.mass = (fileModel.mass || 1);
                         params.inertia = fileModel.inertia;
                         params.group = dynamicFilterFlag;
                         params.mask = collisionFilters;
                         params.frozen = false;
-                        if (fileModel.velocity)
-                        {
+                        if(fileModel.velocity) {
                             params.linearVelocity = fileModel.velocity;
                         }
-                        if (fileModel.angularvelocity)
-                        {
+                        if(fileModel.angularvelocity) {
                             params.angularVelocity = fileModel.angularvelocity;
                         }
                         physicsObject = physicsDevice.createRigidBody(params);
-                        if (physicsObject && !disabled)
-                        {
+                        if(physicsObject && !disabled) {
                             dynamicsWorld.addRigidBody(physicsObject);
                         }
-                    }
-                    else
-                    {
+                    } else {
                         params.group = staticFilterFlag;
                         params.mask = collisionFilters;
                         physicsObject = physicsDevice.createCollisionObject(params);
-                        if (physicsObject && !disabled)
-                        {
+                        if(physicsObject && !disabled) {
                             dynamicsWorld.addCollisionObject(physicsObject);
                         }
                     }
-
-                    if (physicsObject)
-                    {
+                    if(physicsObject) {
                         var physicsNode = {
                             body: physicsObject,
                             target: target
                         };
-
                         // Make the physics object point back at the target node so we can get to it
                         // from collision tests
                         physicsObject.userData = target;
-
-                        if (origin)
-                        {
+                        if(origin) {
                             physicsNode.origin = origin;
                         }
-
-                        if (triangleArray)
-                        {
+                        if(triangleArray) {
                             physicsNode.triangleArray = triangleArray;
                         }
-
-                        if (kinematic)
-                        {
+                        if(kinematic) {
                             physicsNode.kinematic = true;
                             target.kinematic = true;
                             target.dynamic = true;
                             kinematicPhysicsNodes.push(physicsNode);
-                        }
-                        else if (dynamic)
-                        {
+                        } else if(dynamic) {
                             physicsNode.dynamic = true;
                             target.dynamic = true;
                             dynamicPhysicsNodes.push(physicsNode);
                         }
-
                         physicsNodes.push(physicsNode);
-
                         var targetPhysicsNodes = target.physicsNodes;
-                        if (targetPhysicsNodes)
-                        {
+                        if(targetPhysicsNodes) {
                             targetPhysicsNodes.push(physicsNode);
-                        }
-                        else
-                        {
-                            target.physicsNodes = [physicsNode];
+                        } else {
+                            target.physicsNodes = [
+                                physicsNode
+                            ];
                             this.subscribeSceneNode(target);
                         }
-
                     }
                 }
             }
         }
-    },
-
-    //
+    };
+    PhysicsManager.prototype.unsubscribeSceneNode = //
     // unsubscribeSceneNode
     //
-    unsubscribeSceneNode : function physicsManagerUsubscribeSceneNode(sceneNode)
-    {
+    function (sceneNode) {
         sceneNode.unsubscribeCloned(this.sceneNodeCloned);
         sceneNode.unsubscribeDestroyed(this.sceneNodeDestroyed);
-    },
-
-    //
+    };
+    PhysicsManager.prototype.subscribeSceneNode = //
     // subscribeSceneNode
     //
-    subscribeSceneNode : function physicsManagerSubscribeSceneNodeFn(sceneNode)
-    {
+    function (sceneNode) {
         sceneNode.subscribeCloned(this.sceneNodeCloned);
         sceneNode.subscribeDestroyed(this.sceneNodeDestroyed);
-    },
-
-    //
+    };
+    PhysicsManager.prototype.cloneSceneNode = //
     // cloneSceneNode
     //
-    cloneSceneNode : function physicsManagerCloneSceneNodeFn(oldSceneNode, newSceneNode)
-    {
+    function (oldSceneNode, newSceneNode) {
         var physicsManager = this;
-
-        function physicsManagerCloneNodeFn(physicsNode, targetSceneNode)
-        {
+        var physicsManagerCloneNode = function physicsManagerCloneNodeFn(physicsNode, targetSceneNode) {
             var newPhysicsObject = physicsNode.body.clone();
-
             var newPhysicsNode = {
                 body: newPhysicsObject,
                 target: targetSceneNode
             };
-
             // Make the physics object point back at the target node so we can get to it
             // from collision tests
             newPhysicsObject.userData = targetSceneNode;
-
-            if (physicsNode.origin)
-            {
-                newPhysicsNode.origin = physicsNode.origin; // TODO: clone?
+            if(physicsNode.origin) {
+                newPhysicsNode.origin = physicsNode.origin// TODO: clone?
+                ;
             }
-
-            if (physicsNode.triangleArray)
-            {
+            if(physicsNode.triangleArray) {
                 newPhysicsNode.triangleArray = physicsNode.triangleArray;
             }
-
-            if (physicsNode.kinematic)
-            {
+            if(physicsNode.kinematic) {
                 newPhysicsNode.kinematic = true;
                 targetSceneNode.kinematic = true;
                 targetSceneNode.dynamic = true;
                 physicsManager.kinematicPhysicsNodes.push(newPhysicsNode);
                 newPhysicsNode.body.transform = targetSceneNode.getWorldTransform();
-            }
-            else if (physicsNode.dynamic)
-            {
+            } else if(physicsNode.dynamic) {
                 newPhysicsNode.dynamic = true;
                 targetSceneNode.dynamic = true;
                 physicsManager.dynamicPhysicsNodes.push(newPhysicsNode);
                 newPhysicsNode.body.transform = targetSceneNode.getWorldTransform();
             }
-
             physicsManager.physicsNodes.push(newPhysicsNode);
-
             var targetPhysicsNodes = targetSceneNode.physicsNodes;
-            if (targetPhysicsNodes)
-            {
+            if(targetPhysicsNodes) {
                 targetPhysicsNodes.push(newPhysicsNode);
-            }
-            else
-            {
-                targetSceneNode.physicsNodes = [newPhysicsNode];
+            } else {
+                targetSceneNode.physicsNodes = [
+                    newPhysicsNode
+                ];
                 this.subscribeSceneNode(targetSceneNode);
             }
-        }
-
+        };
         var physicsNodes = oldSceneNode.physicsNodes;
-        if (physicsNodes)
-        {
+        if(physicsNodes) {
             var numPhysicsNodes = physicsNodes.length;
             newSceneNode.physicsNodes = [];
-            for (var p = 0; p < numPhysicsNodes; p += 1)
-            {
-                physicsManagerCloneNodeFn(physicsNodes[p], newSceneNode);
+            for(var p = 0; p < numPhysicsNodes; p += 1) {
+                physicsManagerCloneNode(physicsNodes[p], newSceneNode);
             }
         }
-    }
-};
-
-//
-// Constructor function
-//
-PhysicsManager.create = function physicsManagerCreateFn(mathsDevice, physicsDevice, dynamicsWorld)
-{
-    var physicsManager = new PhysicsManager();
-
-    physicsManager.mathsDevice = mathsDevice;
-    physicsManager.physicsDevice = physicsDevice;
-    physicsManager.dynamicsWorld = dynamicsWorld;
-    physicsManager.clear();
-
-    physicsManager.sceneNodeCloned = function sceneNodeClonedFn(data)
-    {
-        physicsManager.cloneSceneNode(data.oldNode, data.newNode);
     };
-
-    physicsManager.sceneNodeDestroyed = function sceneNodeDestroyedFn(data)
-    {
-        physicsManager.deleteNode(data.node);
+    PhysicsManager.prototype.createSnapshot = //
+    // Snapshot
+    //
+    function () {
+        var snapshot = {
+        };
+        // We only snapshot dynamic nodes because kinematics are driven externally
+        var physicsNodes = this.dynamicPhysicsNodes;
+        var numPhysicsNodes = physicsNodes.length;
+        if(numPhysicsNodes > 0) {
+            var physicsNode, n, body;
+            for(n = 0; n < numPhysicsNodes; n += 1) {
+                physicsNode = physicsNodes[n];
+                body = physicsNode.body;
+                snapshot[physicsNode.target.name] = {
+                    active: body.active,
+                    transform: body.transform,
+                    linearVelocity: body.linearVelocity,
+                    angularVelocity: body.angularVelocity
+                };
+            }
+        }
+        return snapshot;
     };
+    PhysicsManager.prototype.restoreSnapshot = function (snapshot) {
+        var physicsNodes = this.dynamicPhysicsNodes;
+        var numPhysicsNodes = physicsNodes.length;
+        if(numPhysicsNodes > 0) {
+            var physicsNode, n, body, state;
+            for(n = 0; n < numPhysicsNodes; n += 1) {
+                physicsNode = physicsNodes[n];
+                body = physicsNode.body;
+                state = snapshot[physicsNode.target.name];
+                if(state) {
+                    body.transform = state.transform;
+                    body.linearVelocity = state.linearVelocity;
+                    body.angularVelocity = state.angularVelocity;
+                    body.active = state.active;
+                }
+            }
+        }
+    };
+    PhysicsManager.create = //
+    // Constructor function
+    //
+    function create(mathsDevice, physicsDevice, dynamicsWorld) {
+        var physicsManager = new PhysicsManager();
+        physicsManager.mathsDevice = mathsDevice;
+        physicsManager.physicsDevice = physicsDevice;
+        physicsManager.dynamicsWorld = dynamicsWorld;
+        physicsManager.clear();
+        physicsManager.sceneNodeCloned = function sceneNodeClonedFn(data) {
+            physicsManager.cloneSceneNode(data.oldNode, data.newNode);
+        };
+        physicsManager.sceneNodeDestroyed = function sceneNodeDestroyedFn(data) {
+            physicsManager.deleteNode(data.node);
+        };
+        physicsManager.tempMatrix = mathsDevice.m43BuildIdentity();
+        return physicsManager;
+    };
+    return PhysicsManager;
+})();
 
-    physicsManager.tempMatrix = mathsDevice.m43BuildIdentity();
-
-    return physicsManager;
-};
-
+PhysicsManager.prototype.arrayConstructor = Array;
 // Detect correct typed arrays
-(function () {
-    if (typeof Float32Array !== "undefined")
-    {
+((function () {
+    if(typeof Float32Array !== "undefined") {
         var testArray = new Float32Array(4);
         var textDescriptor = Object.prototype.toString.call(testArray);
-        if (textDescriptor === '[object Float32Array]')
-        {
+        if(textDescriptor === '[object Float32Array]') {
             PhysicsManager.prototype.arrayConstructor = Float32Array;
         }
     }
-}());
+})());

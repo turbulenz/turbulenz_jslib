@@ -1,94 +1,64 @@
+/* This file was generated from TypeScript source tslib/assettracker.ts */
+
 // Copyright (c) 2009-2012 Turbulenz Limited
-
 /*global Utilities: false*/
-
-function AssetTracker() {}
-AssetTracker.prototype =
-{
-    version : 1,
-
-    getLoadedCount : function assetTrackerGetLoadedCountFn()
-    {
+/// <reference path="utilities.ts" />
+var AssetTracker = (function () {
+    function AssetTracker() { }
+    AssetTracker.version = 1;
+    AssetTracker.prototype.getLoadedCount = // TODO: ? who calls this?
+    function () {
         return this.assetsLoadedCount;
-    },
-
-    getLoadingProgress : function assetTrackerGetLoadingProgressFn()
-    {
+    };
+    AssetTracker.prototype.getLoadingProgress = function () {
         return this.loadingProgress;
-    },
-
-    getNumberAssetsToLoad : function assetTrackerGetNumberAssetsToLoadFn()
-    {
+    };
+    AssetTracker.prototype.getNumberAssetsToLoad = function () {
         return this.numberAssetsToLoad;
-    },
-
-    eventOnAssetLoadedCallback : function assetTrackerEventOnAssetLoadedCallbackFn(event)
-    {
+    };
+    AssetTracker.prototype.eventOnAssetLoadedCallback = function (event) {
         var numberAssetsToLoad = this.numberAssetsToLoad;
-
         this.assetsLoadedCount += 1;
-
-        if (numberAssetsToLoad)
-        {
+        if(numberAssetsToLoad) {
             var progress = this.assetsLoadedCount / numberAssetsToLoad;
-
-            this.loadingProgress = (progress > 1.0) ? 1.0:  progress;
+            this.loadingProgress = (progress > 1.0) ? 1.0 : progress;
         }
-
-        if (this.displayLog)
-        {
+        if(this.displayLog) {
             Utilities.log(event.name + " (Asset Number " + this.assetsLoadedCount + ") Progress : " + this.loadingProgress);
         }
-
-        if (this.callback)
-        {
+        if(this.callback) {
             this.callback();
         }
-    },
-
-    setCallback : function assetTrackerSetCallbackFn(callback)
-    {
-        this.callback = callback;
-    },
-
-    setNumberAssetsToLoad : function assetTrackerSetNumberAssetsToLoadFn(numberAssetsToLoad)
-    {
-        if ((numberAssetsToLoad) && (this.numberAssetsToLoad !== numberAssetsToLoad))
-        {
-            this.numberAssetsToLoad = numberAssetsToLoad;
-
-            var progress = this.assetsLoadedCount / numberAssetsToLoad;
-
-            this.loadingProgress = (progress > 1.0) ? 1.0:  progress;
-        }
-
-        if (this.callback)
-        {
-            this.callback();
-        }
-    }
-};
-
-// Constructor function
-AssetTracker.create = function assetTrackerCreateFn(numberAssetsToLoad, displayLog)
-{
-    var f = new AssetTracker();
-
-    f.assetsLoadedCount = 0;
-    f.loadingProgress = 0;
-    f.numberAssetsToLoad = 0;
-    f.callback = null;
-    f.displayLog = displayLog;
-
-    if (numberAssetsToLoad)
-    {
-        f.numberAssetsToLoad = numberAssetsToLoad;
-    }
-
-    f.eventOnLoadHandler = function assetTrackerEventOnLoadHandlerFn(event)
-    {
-        f.eventOnAssetLoadedCallback(event);
     };
-    
-    return f;
-};
+    AssetTracker.prototype.setCallback = function (callback) {
+        this.callback = callback;
+    };
+    AssetTracker.prototype.setNumberAssetsToLoad = function (numberAssetsToLoad) {
+        if((numberAssetsToLoad) && (this.numberAssetsToLoad !== numberAssetsToLoad)) {
+            this.numberAssetsToLoad = numberAssetsToLoad;
+            var progress = this.assetsLoadedCount / numberAssetsToLoad;
+            this.loadingProgress = (progress > 1.0) ? 1.0 : progress;
+        }
+        if(this.callback) {
+            this.callback();
+        }
+    };
+    AssetTracker.create = // Constructor function
+    function create(numberAssetsToLoad, displayLog) {
+        var f = new AssetTracker();
+        f.assetsLoadedCount = 0;
+        f.loadingProgress = 0;
+        f.numberAssetsToLoad = 0;
+        f.callback = null;
+        f.displayLog = displayLog;
+        if(numberAssetsToLoad) {
+            f.numberAssetsToLoad = numberAssetsToLoad;
+        }
+        f.eventOnLoadHandler = function assetTrackerEventOnLoadHandlerFn(event) {
+            f.eventOnAssetLoadedCallback(event);
+        };
+        return f;
+    };
+    return AssetTracker;
+})();
+

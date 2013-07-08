@@ -1,19 +1,16 @@
-// Copyright (c) 2012 Turbulenz Limited
+/* This file was generated from TypeScript source tslib/services/multiplayersessionmanager.ts */
 
+// Copyright (c) 2012 Turbulenz Limited
 /*global TurbulenzServices: false*/
 /*global MultiPlayerSession: false*/
-
+/// <reference path="multiplayersession.ts" />
 //
 // API
 //
-function MultiPlayerSessionManager() {}
-MultiPlayerSessionManager.prototype =
-{
-    // Public API
-    createSession: function multiPlayerSessionManagerCreateSessionFn(numSlots,
-                                                                     sessionCreatedFn,
-                                                                     errorCallbackFn)
-    {
+var MultiPlayerSessionManager = (function () {
+    function MultiPlayerSessionManager() { }
+    MultiPlayerSessionManager.prototype.createSession = // Public API
+    function (numSlots, sessionCreatedFn, errorCallbackFn) {
         var gameSession = this.gameSession;
         var gameSessionId = gameSession.gameSessionId;
         var requestHandler = this.requestHandler;
@@ -27,28 +24,20 @@ MultiPlayerSessionManager.prototype =
             },
             requestHandler: requestHandler
         };
-
-        function successCallbackFn(jsonResponse)
-        {
+        var successCallback = function successCallbackFn(jsonResponse) {
             var mpSession;
             var sessionData = jsonResponse.data;
             sessionData.requestHandler = requestHandler;
             sessionData.gameSessionId = gameSessionId;
             mpSession = MultiPlayerSession.create(sessionData, sessionCreatedFn, errorCallbackFn);
             that.sessionList.push(mpSession);
-        }
-
-        this.processRequest("createSession", request, successCallbackFn, errorCallbackFn);
-    },
-
-    getJoinRequestQueue: function getJoinRequestQueueFn() {
+        };
+        this.processRequest("createSession", request, successCallback, errorCallbackFn);
+    };
+    MultiPlayerSessionManager.prototype.getJoinRequestQueue = function () {
         return TurbulenzServices.multiplayerJoinRequestQueue;
-    },
-
-    joinSession: function multiPlayerSessionManagerJoinSessionFn(sessionID,
-                                                                 sessionJoinedFn,
-                                                                 errorCallbackFn)
-    {
+    };
+    MultiPlayerSessionManager.prototype.joinSession = function (sessionID, sessionJoinedFn, errorCallbackFn) {
         var gameSessionId = this.gameSession.gameSessionId;
         var requestHandler = this.requestHandler;
         var that = this;
@@ -61,24 +50,17 @@ MultiPlayerSessionManager.prototype =
             },
             requestHandler: requestHandler
         };
-
-        function successCallbackFn(jsonResponse)
-        {
+        var successCallback = function successCallbackFn(jsonResponse) {
             var mpSession;
             var sessionData = jsonResponse.data;
             sessionData.requestHandler = requestHandler;
             sessionData.gameSessionId = gameSessionId;
             mpSession = MultiPlayerSession.create(sessionData, sessionJoinedFn, errorCallbackFn);
             that.sessionList.push(mpSession);
-        }
-
-        this.processRequest("joinSession", request, successCallbackFn, errorCallbackFn);
-    },
-
-    joinAnySession: function multiPlayerSessionManagerJoinAnySessionFn(sessionJoinedFn,
-                                                                       failCallbackFn,
-                                                                       errorCallbackFn)
-    {
+        };
+        this.processRequest("joinSession", request, successCallback, errorCallbackFn);
+    };
+    MultiPlayerSessionManager.prototype.joinAnySession = function (sessionJoinedFn, failCallbackFn, errorCallbackFn) {
         var gameSession = this.gameSession;
         var gameSessionId = gameSession.gameSessionId;
         var requestHandler = this.requestHandler;
@@ -91,118 +73,75 @@ MultiPlayerSessionManager.prototype =
             },
             requestHandler: requestHandler
         };
-
-        function successCallbackFn(jsonResponse)
-        {
+        var successCallback = function successCallbackFn(jsonResponse) {
             var sessionData = jsonResponse.data;
             var mpSession;
-
-            if (sessionData.sessionid)
-            {
+            if(sessionData.sessionid) {
                 sessionData.requestHandler = requestHandler;
                 sessionData.gameSessionId = gameSessionId;
                 mpSession = MultiPlayerSession.create(sessionData, sessionJoinedFn, errorCallbackFn);
                 that.sessionList.push(mpSession);
-            }
-            else
-            {
+            } else {
                 failCallbackFn();
             }
-        }
-
-        this.processRequest("joinAnySession", request, successCallbackFn, errorCallbackFn);
-    },
-
-    joinOrCreateSession: function multiPlayerSessionManagerJoinOrCreateSessionFn(numSlots,
-                                                                                 sessionJoinCreatedFn,
-                                                                                 errorCallbackFn)
-    {
+        };
+        this.processRequest("joinAnySession", request, successCallback, errorCallbackFn);
+    };
+    MultiPlayerSessionManager.prototype.joinOrCreateSession = function (numSlots, sessionJoinCreatedFn, errorCallbackFn) {
         var that = this;
-        var joinFailedCallback = function joinFailedCallbackFn()
-        {
+        var joinFailedCallback = function joinFailedCallbackFn() {
             that.createSession(numSlots, sessionJoinCreatedFn, errorCallbackFn);
         };
-
         this.joinAnySession(sessionJoinCreatedFn, joinFailedCallback, errorCallbackFn);
-    },
-
-    getFriendsSessions: function multiPlayerSessionManagerGetFriendsSessionsFn(querySuccessFn,
-                                                                               errorCallbackFn)
-    {
+    };
+    MultiPlayerSessionManager.prototype.getFriendsSessions = function (querySuccessFn, errorCallbackFn) {
         var requestHandler = this.requestHandler;
-
         var request = {
             url: '/api/v1/multiplayer/session/list/' + this.gameSession.gameSlug,
             method: 'GET',
             requestHandler: requestHandler
         };
-
-        function successCallbackFn(jsonResponse)
-        {
+        var successCallback = function successCallbackFn(jsonResponse) {
             querySuccessFn(jsonResponse.data);
-        }
-
-        this.processRequest("getFriendsSessions", request, successCallbackFn, errorCallbackFn);
-    },
-
-    destroy: function multiPlayerSessionManagerDestroyFn()
-    {
+        };
+        this.processRequest("getFriendsSessions", request, successCallback, errorCallbackFn);
+    };
+    MultiPlayerSessionManager.prototype.destroy = function () {
         var sessionList = this.sessionList;
         var sessionListLength = sessionList.length;
         var i;
-        for (i = 0; i < sessionListLength; i += 1)
-        {
+        for(i = 0; i < sessionListLength; i += 1) {
             sessionList[i].destroy();
         }
-
         delete this.sessionList;
-    },
-
-    // Helper Functions
-    processRequest: function multiPlayerSessionManagerProcessRequestFn(source,
-                                                                       request,
-                                                                       successFn,
-                                                                       errorFn)
-    {
-        if (!errorFn)
-        {
+    };
+    MultiPlayerSessionManager.prototype.processRequest = // Helper Functions
+    function (source, request, successFn, errorFn) {
+        if(!errorFn) {
             errorFn = TurbulenzServices.defaultErrorCallback;
         }
-
-        if (TurbulenzServices.available())
-        {
-            request.callback = function requestCallbackFn(jsonResponse,
-                                                          status)
-            {
-                if (status === 200)
-                {
+        if(TurbulenzServices.available()) {
+            request.callback = function requestCallbackFn(jsonResponse, status) {
+                if(status === 200) {
                     successFn(jsonResponse);
-                }
-                else if (errorFn)
-                {
-                    errorFn("MultiPlayerSessionManager." + source + " error with HTTP status " + status + ": " +
-                                jsonResponse.msg, status);
+                } else if(errorFn) {
+                    errorFn("MultiPlayerSessionManager." + source + " error with HTTP status " + status + ": " + jsonResponse.msg, status);
                 }
             };
-
             TurbulenzServices.getService('multiplayer').request(request);
-        }
-        else
-        {
-            if (errorFn)
-            {
+        } else {
+            if(errorFn) {
                 errorFn(source + " failed: Service not available", 0);
             }
         }
-    }
-};
+    };
+    MultiPlayerSessionManager.create = function create(requestHandler, gameSession) {
+        var manager = new MultiPlayerSessionManager();
+        manager.requestHandler = requestHandler;
+        manager.gameSession = gameSession;
+        manager.sessionList = [];
+        return manager;
+    };
+    return MultiPlayerSessionManager;
+})();
 
-MultiPlayerSessionManager.create = function multiPlayerSessionManagerCreate(requestHandler,
-                                                                            gameSession)
-{
-    var manager = new MultiPlayerSessionManager();
-    manager.requestHandler = requestHandler;
-    manager.gameSession = gameSession;
-    manager.sessionList = [];
-    return manager;
-};
