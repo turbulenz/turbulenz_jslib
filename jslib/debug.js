@@ -1,5 +1,7 @@
 /* This file was generated from TypeScript source tslib/debug.ts */
 
+TurbulenzEngine = {};
+
 // The debug object is only available in debug modes.  The build tools
 // will automatically include it or prevent it from being included
 // based on the build mode.
