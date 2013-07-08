@@ -237,14 +237,28 @@ LeaderboardManager.prototype =
         dataSpec.score = score;
         dataSpec.gameSessionId = that.gameSessionId;
 
-        this.service.request({
-            url: '/api/v1/leaderboards/scores/set/' + key,
-            method: 'POST',
-            data : dataSpec,
-            callback: setCallbackFn,
-            requestHandler: this.requestHandler,
-            encrypt: true
-        });
+        var url = '/api/v1/leaderboards/scores/set/' + key;
+
+        if (TurbulenzServices.bridgeServices)
+        {
+            TurbulenzServices.addSignature(dataSpec, url);
+            dataSpec.key = key;
+            TurbulenzServices.callOnBridge('leaderboard.set', dataSpec, function unpackResponse(response)
+            {
+                setCallbackFn(response, response.status);
+            });
+        }
+        else
+        {
+            this.service.request({
+                url: url,
+                method: 'POST',
+                data : dataSpec,
+                callback: setCallbackFn,
+                requestHandler: this.requestHandler,
+                encrypt: true
+            });
+        }
     }
 };
 
@@ -455,12 +469,13 @@ LeaderboardResult.prototype =
                                    newResult,
                                    this.wrapViewOperationError(errorCallbackFn));
             }
-            return;
+            return true;
         }
 
         this.viewTop -= offset;
         this.invalidView = true;
         this.viewOperationEnd(callbackFn);
+        return true;
     },
 
     moveDown: function moveDownFn(offset, callbackFn, errorCallbackFn)

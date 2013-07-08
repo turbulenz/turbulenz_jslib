@@ -518,8 +518,8 @@ var VMath =
 
     v2LessScalarMask : function v2LessScalarMaskFn(a, b)
     {
-        return [(a[0] > b),
-                (a[1] > b)];
+        return [(a[0] < b),
+                (a[1] < b)];
     },
 
     v2GreaterScalarMask : function v2GreaterScalarMaskFn(a, b)
@@ -1038,9 +1038,9 @@ var VMath =
 
     v3LessScalarMask : function v3LessScalarMaskFn(a, b)
     {
-        return [(a[0] > b),
-                (a[1] > b),
-                (a[2] > b)];
+        return [(a[0] < b),
+                (a[1] < b),
+                (a[2] < b)];
     },
 
     v3GreaterScalarMask : function v3GreaterScalarMaskFn(a, b)
@@ -4191,7 +4191,7 @@ var VMath =
         if (q1[3] * q2[3] < 0.0)
         {
             // quaternions in opposing hemispheres, negate one
-            q1temp = VMath.v4Mul([-1, -1, -1, -1], q1);
+            q1temp = VMath.v4Neg(q1);
         }
 
         var mag_sqrd = VMath.v4LengthSq(VMath.v4Sub(q1temp, q2));

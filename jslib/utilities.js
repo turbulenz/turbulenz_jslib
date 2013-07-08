@@ -65,6 +65,7 @@ Utilities.log = function logFn()
 
 Utilities.nearestLowerPow2 = function UtilitiesNearestLowerPow2(num)
 {
+    /*jshint bitwise: false*/
     num = num | (num >>> 1);
     num = num | (num >>> 2);
     num = num | (num >>> 4);
@@ -75,6 +76,7 @@ Utilities.nearestLowerPow2 = function UtilitiesNearestLowerPow2(num)
 
 Utilities.nearestUpperPow2 = function UtilitiesNearestUpperPow2(num)
 {
+    /*jshint bitwise: false*/
     num = num - 1;
     num = num | (num >>> 1);
     num = num | (num >>> 2);

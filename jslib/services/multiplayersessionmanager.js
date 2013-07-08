@@ -14,11 +14,12 @@ MultiPlayerSessionManager.prototype =
                                                                      sessionCreatedFn,
                                                                      errorCallbackFn)
     {
-        var gameSessionId = this.gameSession.gameSessionId;
+        var gameSession = this.gameSession;
+        var gameSessionId = gameSession.gameSessionId;
         var requestHandler = this.requestHandler;
         var that = this;
         var request = {
-            url: '/api/v1/multiplayer/session/create/' + window.gameSlug,
+            url: '/api/v1/multiplayer/session/create/' + gameSession.gameSlug,
             method: 'POST',
             data: {
                 'slots': numSlots,
@@ -78,14 +79,14 @@ MultiPlayerSessionManager.prototype =
                                                                        failCallbackFn,
                                                                        errorCallbackFn)
     {
-        var gameSessionId = this.gameSession.gameSessionId;
+        var gameSession = this.gameSession;
+        var gameSessionId = gameSession.gameSessionId;
         var requestHandler = this.requestHandler;
         var that = this;
         var request = {
-            url: '/api/v1/multiplayer/session/join-any',
+            url: '/api/v1/multiplayer/session/join-any/' + gameSession.gameSlug,
             method: 'POST',
             data: {
-                'slug': window.gameSlug,
                 'gameSessionId': gameSessionId
             },
             requestHandler: requestHandler
@@ -131,7 +132,7 @@ MultiPlayerSessionManager.prototype =
         var requestHandler = this.requestHandler;
 
         var request = {
-            url: '/api/v1/multiplayer/session/list/' + window.gameSlug,
+            url: '/api/v1/multiplayer/session/list/' + this.gameSession.gameSlug,
             method: 'GET',
             requestHandler: requestHandler
         };

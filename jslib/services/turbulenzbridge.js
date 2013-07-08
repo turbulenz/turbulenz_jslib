@@ -63,6 +63,16 @@ var TurbulenzBridge = {
     setListener: function setListenerFn() {},
 
     /**
+     * Message that passes game configuration information from the hosting site
+     */
+    setOnReceiveConfig: function setOnReceiveConfigFn(callback) {
+        this.on('config.set', callback);
+    },
+    triggerRequestConfig: function triggerRequestConfigFn() {
+        this.emit('config.request');
+    },
+
+    /**
      * Methods to signal the beginning and end of load/save processes.
      * This will display hints to the player and helps the page
      * to prioritize resources.
@@ -149,6 +159,10 @@ var TurbulenzBridge = {
 
     triggerBasketUpdate: function triggerBasketUpdateFn(basket) {
         this.emit('basket.game.update', basket);
+    },
+
+    triggerUserStoreUpdate: function triggerUserStoreUpdateFn(items) {
+        this.emit('store.user.update', items);
     },
 
     setOnPurchaseConfirmed: function setOnPurchaseConfirmedFn(callback) {

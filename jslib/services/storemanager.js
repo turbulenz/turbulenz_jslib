@@ -198,6 +198,8 @@ StoreManager.prototype =
                 {
                     callbackFn(jsonResponse.data.consumed);
                 }
+
+                TurbulenzBridge.triggerUserStoreUpdate(JSON.stringify(that.userItems));
             }
             else
             {
@@ -259,9 +261,6 @@ StoreManager.create = function storeManagerCreateFn(requestHandler,
     storeManager.userItemsRequestToken = SessionToken.create();
     storeManager.consumeRequestToken = SessionToken.create();
 
-    storeManager.gotBasket = false;
-    storeManager.gotStoreMeta = false;
-    storeManager.gotUserItems = false;
     var calledMetaRecieved = false;
 
     storeManager.ready = false;

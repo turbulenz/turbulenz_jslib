@@ -47,14 +47,27 @@ GameProfileManager.prototype =
         dataSpec.value = value;
         dataSpec.gameSessionId = that.gameSessionId;
 
-        this.service.request({
-            url: '/api/v1/game-profile/set',
-            method: 'POST',
-            data : dataSpec,
-            callback: setCallbackFn,
-            requestHandler: this.requestHandler,
-            encrypt: true
-        });
+        var url = '/api/v1/game-profile/set';
+
+        if (TurbulenzServices.bridgeServices)
+        {
+            TurbulenzServices.addSignature(dataSpec, url);
+            TurbulenzServices.callOnBridge('gameprofile.set', dataSpec, function unpackResponse(response)
+            {
+                setCallbackFn(response, response.status);
+            });
+        }
+        else
+        {
+            this.service.request({
+                url: url,
+                method: 'POST',
+                data : dataSpec,
+                callback: setCallbackFn,
+                requestHandler: this.requestHandler,
+                encrypt: true
+            });
+        }
 
         return true;
     },
@@ -85,14 +98,27 @@ GameProfileManager.prototype =
         var dataSpec = {};
         dataSpec.gameSessionId = that.gameSessionId;
 
-        this.service.request({
-            url: '/api/v1/game-profile/remove',
-            method: 'POST',
-            data: dataSpec,
-            callback: removeCallbackFn,
-            requestHandler: this.requestHandler,
-            encrypt: true
-        });
+        var url = '/api/v1/game-profile/remove';
+
+        if (TurbulenzServices.bridgeServices)
+        {
+            TurbulenzServices.addSignature(dataSpec, url);
+            TurbulenzServices.callOnBridge('gameprofile.remove', dataSpec, function unpackResponse(response)
+            {
+                removeCallbackFn(response, response.status);
+            });
+        }
+        else
+        {
+            this.service.request({
+                url: url,
+                method: 'POST',
+                data: dataSpec,
+                callback: removeCallbackFn,
+                requestHandler: this.requestHandler,
+                encrypt: true
+            });
+        }
 
         return true;
     },

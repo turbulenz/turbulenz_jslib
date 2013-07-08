@@ -17,7 +17,7 @@
 function WebGLTurbulenzEngine() {}
 WebGLTurbulenzEngine.prototype = {
 
-    version : '0.22.1.0',
+    version : '0.23.0.0',
 
     setInterval: function (f, t)
     {

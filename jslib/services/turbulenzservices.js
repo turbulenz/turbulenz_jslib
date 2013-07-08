@@ -105,7 +105,7 @@ ServiceRequester.prototype =
                 // call the old custom error handler
                 if (oldCustomErrorHandler)
                 {
-                    return oldCustomErrorHandler.call(that.requestHandler, callContext, makeRequest, responseJSON, status);
+                    return oldCustomErrorHandler.call(params.requestHandler, callContext, makeRequest, responseJSON, status);
                 }
                 return true;
             }
@@ -200,16 +200,82 @@ TurbulenzServices = {
 
     addBridgeEvents: function addBridgeEventsFn()
     {
-        var Turbulenz = window.top.Turbulenz;
+        var turbulenz = window.top.Turbulenz;
+        var turbulenzData = (turbulenz && turbulenz.Data) || {};
+        var sessionToJoin = turbulenzData.joinMultiplayerSessionId;
         var that = this;
-        if (Turbulenz && Turbulenz.Data && Turbulenz.Data.joinMultiplayerSessionId)
-        {
-            this.multiplayerJoinRequestQueue.push(Turbulenz.Data.joinMultiplayerSessionId);
-        }
-        function multiplayerSessionToJoin(joinMultiplayerSessionId) {
+
+        var onJoinMultiplayerSession = function onJoinMultiplayerSessionFn(joinMultiplayerSessionId) {
             that.multiplayerJoinRequestQueue.push(joinMultiplayerSessionId);
+        };
+
+        var onReceiveConfig = function onReceiveConfigFn(configString) {
+            var config = JSON.parse(configString);
+
+            if (config.mode)
+            {
+                that.mode = config.mode;
+            }
+
+            if (config.joinMultiplayerSessionId)
+            {
+                that.multiplayerJoinRequestQueue.push(config.joinMultiplayerSessionId);
+            }
+
+            that.bridgeServices = !!config.bridgeServices;
+        };
+
+        // This should go once we have fully moved to the new system
+        if (sessionToJoin)
+        {
+            this.multiplayerJoinRequestQueue.push(sessionToJoin);
         }
-        TurbulenzBridge.setOnMultiplayerSessionToJoin(multiplayerSessionToJoin);
+
+        TurbulenzBridge.setOnMultiplayerSessionToJoin(onJoinMultiplayerSession);
+        TurbulenzBridge.setOnReceiveConfig(onReceiveConfig);
+        TurbulenzBridge.triggerRequestConfig();
+
+        // Setup framework for asynchronous function calls
+        this.responseHandlers = [null];
+        // 0 is reserved value for no registered callback
+        this.responseIndex = 0;
+        TurbulenzBridge.on("bridgeservices.response", function (jsondata) { that.routeResponse(jsondata); });
+    },
+
+    callOnBridge: function turbulenzServicesCallOnBridgeFn(event, data, callback)
+    {
+        var request = {
+            data: data
+        };
+        if (callback)
+        {
+            this.responseIndex += 1;
+            this.responseHandlers[this.responseIndex] = callback;
+            request.key = this.responseIndex;
+        }
+        TurbulenzBridge.emit('bridgeservices.' + event, JSON.stringify(request));
+    },
+
+    addSignature: function turbulenzServicesAddSignatureFn(data, url)
+    {
+        var str;
+        data.requestUrl = url;
+        str = TurbulenzEngine.encrypt(JSON.stringify(data));
+        data.str = str;
+        data.signature = TurbulenzEngine.generateSignature(str);
+        return data;
+    },
+
+    routeResponse: function routeResponseFn(jsondata)
+    {
+        var response = JSON.parse(jsondata);
+        var index = response.key || 0;
+        var callback = this.responseHandlers[index];
+        if (callback)
+        {
+            this.responseHandlers[index] = null;
+            callback(response.data);
+        }
     },
 
     defaultErrorCallback: function turbulenzServicesDefaultErrorCallbackFn(errorMsg, httpStatus) {},
@@ -219,75 +285,7 @@ TurbulenzServices = {
 
     createGameSession: function turbulenzServicesCreateGameSession(requestHandler, sessionCreatedFn, errorCallbackFn)
     {
-        var gameSession = GameSession.create();
-
-        var gameSlug = window.gameSlug;
-        gameSession.gameSlug = gameSlug;
-
-        gameSession.requestHandler = requestHandler;
-        gameSession.errorCallbackFn = errorCallbackFn || TurbulenzServices.defaultErrorCallback;
-        gameSession.gameSessionId = null;
-        gameSession.service = this.getService('gameSessions');
-        gameSession.status = null;
-
-        if (!TurbulenzServices.available())
-        {
-            // Call sessionCreatedFn on a timeout to get the same behaviour as the AJAX call
-            if (sessionCreatedFn)
-            {
-                TurbulenzEngine.setTimeout(function sessionCreatedCall()
-                    {
-                        sessionCreatedFn(gameSession);
-                    }, 0);
-            }
-            return gameSession;
-        }
-
-        function gameSessionRequestCallbackFn(jsonResponse, status)
-        {
-            if (status === 200)
-            {
-                gameSession.mappingTable = jsonResponse.mappingTable;
-                gameSession.gameSessionId = jsonResponse.gameSessionId;
-
-                if (sessionCreatedFn)
-                {
-                    sessionCreatedFn(gameSession);
-                }
-
-                TurbulenzBridge.createdGameSession(gameSession.gameSessionId);
-            }
-            else
-            {
-                gameSession.errorCallbackFn("TurbulenzServices.createGameSession error with HTTP status " + status + ": " + jsonResponse.msg, status);
-            }
-        }
-
-        var createSessionURL = '/api/v1/games/create-session/' + gameSlug;
-
-        var Turbulenz = window.top.Turbulenz;
-        if (Turbulenz)
-        {
-            var data = Turbulenz.Data;
-            if (data)
-            {
-                var mode = data.mode;
-                if (mode)
-                {
-                    createSessionURL += '/' + mode;
-                }
-            }
-        }
-
-        gameSession.service.request({
-            url: createSessionURL,
-            method: 'POST',
-            callback: gameSessionRequestCallbackFn,
-            requestHandler: requestHandler,
-            neverDiscard: true
-        });
-
-        return gameSession;
+        return GameSession.create(requestHandler, sessionCreatedFn, errorCallbackFn);
     },
 
     createMappingTable: function turbulenzServicesCreateMappingTable(requestHandler,
