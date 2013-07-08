@@ -641,7 +641,7 @@ WebGLInputDevice.prototype = {
         if (this.isHovering &&
             window.document.activeElement === this.canvas)
         {
-            this.addInternalEventListener(window, 'mousedown', this.onMouseDown, this);
+            this.addInternalEventListener(window, 'mousedown', this.onMouseDown);
         }
     },
 
@@ -1101,14 +1101,14 @@ WebGLInputDevice.prototype = {
         // Add event listener to get focus event
         if (!this.isFocused())
         {
-            this.addInternalEventListener(window, 'mousedown', this.onMouseDown, this);
+            this.addInternalEventListener(window, 'mousedown', this.onMouseDown);
         }
 
-        this.addInternalEventListener(window, 'mouseup', this.onMouseUp, this);
-        this.addInternalEventListener(window, 'mousemove', this.onMouseOver, this);
-        this.addInternalEventListener(window, 'DOMMouseScroll', this.onWheel, this);
-        this.addInternalEventListener(window, 'mousewheel', this.onWheel, this);
-        this.addInternalEventListener(window, 'click', this.emptyEvent, this);
+        this.addInternalEventListener(window, 'mouseup', this.onMouseUp);
+        this.addInternalEventListener(window, 'mousemove', this.onMouseOver);
+        this.addInternalEventListener(window, 'DOMMouseScroll', this.onWheel);
+        this.addInternalEventListener(window, 'mousewheel', this.onWheel);
+        this.addInternalEventListener(window, 'click', this.emptyEvent);
     },
 
     setEventHandlersMouseLeave : function setEventHandlersMouseLeaveFn()
@@ -1116,112 +1116,121 @@ WebGLInputDevice.prototype = {
         // We do not need a mousedown listener if not focused
         if (!this.isFocused())
         {
-            this.removeInternalEventListener(window, 'mousedown', this.onMouseDown, this);
+            this.removeInternalEventListener(window, 'mousedown', this.onMouseDown);
         }
 
         // Remove mouse event listeners
-        this.removeInternalEventListener(window, 'mouseup', this.onMouseUp, this);
-        this.removeInternalEventListener(window, 'mousemove', this.onMouseOver, this);
-        this.removeInternalEventListener(window, 'DOMMouseScroll', this.onWheel, this);
-        this.removeInternalEventListener(window, 'mousewheel', this.onWheel, this);
-        this.removeInternalEventListener(window, 'click', this.emptyEvent, this);
+        this.removeInternalEventListener(window, 'mouseup', this.onMouseUp);
+        this.removeInternalEventListener(window, 'mousemove', this.onMouseOver);
+        this.removeInternalEventListener(window, 'DOMMouseScroll', this.onWheel);
+        this.removeInternalEventListener(window, 'mousewheel', this.onWheel);
+        this.removeInternalEventListener(window, 'click', this.emptyEvent);
     },
 
     setEventHandlersFocus : function setEventHandlersFocusFn()
     {
-        this.addInternalEventListener(window, 'keydown', this.onKeyDown, this);
-        this.addInternalEventListener(window, 'keyup', this.onKeyUp, this);
+        this.addInternalEventListener(window, 'keydown', this.onKeyDown);
+        this.addInternalEventListener(window, 'keyup', this.onKeyUp);
     },
 
     setEventHandlersBlur : function setEventHandlersBlurFn()
     {
-        this.removeInternalEventListener(window, 'keydown', this.onKeyDown, this);
-        this.removeInternalEventListener(window, 'keyup', this.onKeyUp, this);
-        this.removeInternalEventListener(window, 'mousedown', this.onMouseDown, this);
+        this.removeInternalEventListener(window, 'keydown', this.onKeyDown);
+        this.removeInternalEventListener(window, 'keyup', this.onKeyUp);
+        this.removeInternalEventListener(window, 'mousedown', this.onMouseDown);
     },
 
     setEventHandlersLock : function setEventHandlersLockFn()
     {
-        this.removeInternalEventListener(window, 'mousemove', this.onMouseOver, this);
+        this.removeInternalEventListener(window, 'mousemove', this.onMouseOver);
 
-        this.addInternalEventListener(window, 'mousemove', this.onMouseMove, this);
-        this.addInternalEventListener(window, 'fullscreenchange', this.onFullscreenChanged, this);
-        this.addInternalEventListener(window, 'mozfullscreenchange', this.onFullscreenChanged, this);
-        this.addInternalEventListener(window, 'webkitfullscreenchange', this.onFullscreenChanged, this);
+        this.addInternalEventListener(window, 'mousemove', this.onMouseMove);
+        this.addInternalEventListener(window, 'fullscreenchange', this.onFullscreenChanged);
+        this.addInternalEventListener(window, 'mozfullscreenchange', this.onFullscreenChanged);
+        this.addInternalEventListener(window, 'webkitfullscreenchange', this.onFullscreenChanged);
     },
 
     setEventHandlersUnlock : function setEventHandlersUnlockFn()
     {
-        this.removeInternalEventListener(window, 'webkitfullscreenchange', this.onFullscreenChanged, this);
-        this.removeInternalEventListener(window, 'mozfullscreenchange', this.onFullscreenChanged, this);
-        this.removeInternalEventListener(window, 'fullscreenchange', this.onFullscreenChanged, this);
-        this.removeInternalEventListener(window, 'mousemove', this.onMouseMove, this);
+        this.removeInternalEventListener(window, 'webkitfullscreenchange', this.onFullscreenChanged);
+        this.removeInternalEventListener(window, 'mozfullscreenchange', this.onFullscreenChanged);
+        this.removeInternalEventListener(window, 'fullscreenchange', this.onFullscreenChanged);
+        this.removeInternalEventListener(window, 'mousemove', this.onMouseMove);
 
-        this.addInternalEventListener(window, 'mousemove', this.onMouseOver, this);
+        this.addInternalEventListener(window, 'mousemove', this.onMouseOver);
     },
 
     setEventHandlersCanvas : function setEventHandlersCanvasFn()
     {
         var canvas = this.canvas;
 
-        this.addInternalEventListener(canvas, 'mouseover', this.canvasOnMouseOver, this);
-        this.addInternalEventListener(canvas, 'mouseout', this.canvasOnMouseOut, this);
-        this.addInternalEventListener(canvas, 'mousedown', this.canvasOnMouseDown, this);
+        this.addInternalEventListener(canvas, 'mouseover', this.canvasOnMouseOver);
+        this.addInternalEventListener(canvas, 'mouseout', this.canvasOnMouseOut);
+        this.addInternalEventListener(canvas, 'mousedown', this.canvasOnMouseDown);
     },
 
     setEventHandlersWindow : function setEventHandlersWindowFn()
     {
-        this.addInternalEventListener(window, 'blur', this.onBlur, this);
-        this.addInternalEventListener(window, 'focus', this.onWindowFocus, this);
+        this.addInternalEventListener(window, 'blur', this.onBlur);
+        this.addInternalEventListener(window, 'focus', this.onWindowFocus);
     },
 
     removeEventHandlersWindow : function removeEventHandlersWindowFn()
     {
-        this.removeInternalEventListener(window, 'blur', this.onBlur, this);
-        this.removeInternalEventListener(window, 'focus', this.onWindowFocus, this);
+        this.removeInternalEventListener(window, 'blur', this.onBlur);
+        this.removeInternalEventListener(window, 'focus', this.onWindowFocus);
     },
 
     setEventHandlersTouch : function setEventHandlersTouchFn()
     {
         var canvas = this.canvas;
 
-        this.addInternalEventListener(canvas, 'touchstart', this.onTouchStart, this);
-        this.addInternalEventListener(canvas, 'touchend', this.onTouchEnd, this);
-        this.addInternalEventListener(canvas, 'touchenter', this.onTouchEnter, this);
-        this.addInternalEventListener(canvas, 'touchleave', this.onTouchLeave, this);
-        this.addInternalEventListener(canvas, 'touchmove', this.onTouchMove, this);
-        this.addInternalEventListener(canvas, 'touchcancel', this.onTouchCancel, this);
+        this.addInternalEventListener(canvas, 'touchstart', this.onTouchStart);
+        this.addInternalEventListener(canvas, 'touchend', this.onTouchEnd);
+        this.addInternalEventListener(canvas, 'touchenter', this.onTouchEnter);
+        this.addInternalEventListener(canvas, 'touchleave', this.onTouchLeave);
+        this.addInternalEventListener(canvas, 'touchmove', this.onTouchMove);
+        this.addInternalEventListener(canvas, 'touchcancel', this.onTouchCancel);
     },
 
     // Helper methods
 
-    addInternalEventListener : function addInternalEventListenerFn(element, eventName, eventHandler, scope)
+    addInternalEventListener : function addInternalEventListenerFn(element, eventName, eventHandler)
     {
-        var eventHandlers = this.eventHandlers;
-        var boundEventHandler = scope ? eventHandler.bind(scope) : eventHandler;
-
-        if (typeof eventHandlers[eventName] === 'undefined')
+        var elementEventFlag = this.elementEventFlags[element];
+        if (!elementEventFlag)
         {
-            eventHandlers[eventName] = {};
+            this.elementEventFlags[element] = elementEventFlag = {};
         }
 
-        eventHandlers[eventName][eventHandler] = boundEventHandler;
+        if (!elementEventFlag[eventName])
+        {
+            elementEventFlag[eventName] = true;
 
-        element.addEventListener(eventName, boundEventHandler, false);
+            var boundEventHandler = this.boundFunctions[eventHandler];
+            if (!boundEventHandler)
+            {
+                this.boundFunctions[eventHandler] = boundEventHandler = eventHandler.bind(this);
+            }
+
+            element.addEventListener(eventName, boundEventHandler, false);
+        }
     },
 
-    removeInternalEventListener : function removeInternalEventListenerFn(element, eventName, eventHandler, scope)
+    removeInternalEventListener : function removeInternalEventListenerFn(element, eventName, eventHandler)
     {
-        var eventHandlers = this.eventHandlers;
-        var boundEventHandler = eventHandlers[eventName][eventHandler];
-        delete eventHandlers[eventName][eventHandler];
-
-        if (element !== this.canvas)
+        var elementEventFlag = this.elementEventFlags[element];
+        if (elementEventFlag)
         {
-            eventHandlers[eventName][element] = false;
-        }
+            if (elementEventFlag[eventName])
+            {
+                elementEventFlag[eventName] = false;
 
-        element.removeEventListener(eventName, boundEventHandler, false);
+                var boundEventHandler = this.boundFunctions[eventHandler];
+
+                element.removeEventListener(eventName, boundEventHandler, false);
+            }
+        }
     },
 
     destroy : function destroyFn()
@@ -1261,7 +1270,8 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
 
     id.touches = {};
 
-    id.eventHandlers = {};
+    id.boundFunctions = {};
+    id.elementEventFlags = {};
 
     id.canvas = canvas;
     id.isMouseLocked = false;
