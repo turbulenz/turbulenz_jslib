@@ -4,9 +4,8 @@
 /*global Float32Array: false*/
 /*global TurbulenzEngine: false*/
 /*global debug: false*/
-/// <reference path="debug.ts" />
-/// <reference path="external/base.d.ts" />
 /// <reference path="turbulenz.d.ts" />
+/// <reference path="debug.ts" />
 //
 // Vector math library
 //

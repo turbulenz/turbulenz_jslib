@@ -341,7 +341,6 @@ WebGLSoundSource.prototype = {
                 }
                 this.sound = sound;
                 this.audio = audio;
-                this.updateAudioVolume();
                 audio.loop = this.looping;
                 audio.addEventListener('ended', this.loopAudio, false);
             } else {
@@ -548,7 +547,7 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params) {
     source.sound = null;
     source.playing = false;
     source.paused = false;
-    var gain = (params.gain || 1);
+    var gain = (typeof params.gain === "number" ? params.gain : 1);
     var looping = (params.looping || false);
     var pitch = (params.pitch || 1);
     var position, direction, velocity;
@@ -558,9 +557,10 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params) {
         source.bufferNode = null;
         source.playStart = -1;
         source.playPaused = -1;
+        var masterGainNode = sd.gainNode;
         var pannerNode = audioContext.createPanner();
         source.pannerNode = pannerNode;
-        pannerNode.connect(audioContext.destination);
+        pannerNode.connect(masterGainNode);
         var gainNode = (audioContext.createGain ? audioContext.createGain() : audioContext.createGainNode());
         source.gainNode = gainNode;
         if(sd.linearDistance) {
@@ -625,7 +625,7 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params) {
             gainNode.disconnect();
             if(1 < sound.channels) {
                 // We do not support panning of stereo sources
-                gainNode.connect(audioContext.destination);
+                gainNode.connect(masterGainNode);
             } else {
                 gainNode.connect(pannerNode);
             }
@@ -771,10 +771,7 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params) {
                 return gain;
             },
             set: function setGainFn(newGain) {
-                if(gain !== newGain) {
-                    gain = newGain;
-                    source.updateAudioVolume();
-                }
+                gain = newGain;
             },
             enumerable: true,
             configurable: false
@@ -897,6 +894,7 @@ WebGLSoundDevice.prototype = {
         var listenerPosition0 = listenerTransform[9];
         var listenerPosition1 = listenerTransform[10];
         var listenerPosition2 = listenerTransform[11];
+        var listenerGain = this.listenerGain;
         var linearDistance = this.linearDistance;
         var playingSources = this.playingSources;
         var id;
@@ -932,6 +930,7 @@ WebGLSoundDevice.prototype = {
                         gainFactor = minDistance / (minDistance + (source.rollOff * (distance - minDistance)));
                     }
                 }
+                gainFactor *= listenerGain;
                 if(source.gainFactor !== gainFactor) {
                     source.gainFactor = gainFactor;
                     source.updateAudioVolume();
@@ -1049,6 +1048,8 @@ WebGLSoundDevice.create = function webGLSoundDeviceFn(params) {
         sd.renderer = 'WebAudio';
         sd.audioContext = audioContext;
         sd.frequency = audioContext.sampleRate;
+        sd.gainNode = (audioContext.createGain ? audioContext.createGain() : audioContext.createGainNode());
+        sd.gainNode.connect(audioContext.destination);
         var listener = audioContext.listener;
         listener.dopplerFactor = sd.dopplerFactor;
         listener.speedOfSound = sd.speedOfSound;
@@ -1079,17 +1080,8 @@ WebGLSoundDevice.create = function webGLSoundDeviceFn(params) {
             enumerable: true,
             configurable: false
         });
-        Object.defineProperty(sd, "gain", {
-            get: function getGainFn() {
-                return listener.gain;
-            },
-            set: function setGainFn(newGain) {
-                listener.gain = newGain;
-            },
-            enumerable: true,
-            configurable: false
-        });
         sd.update = function soundDeviceUpdate() {
+            this.gainNode.gain.value = this.listenerGain;
             var listenerPosition0 = listenerTransform[9];
             var listenerPosition1 = listenerTransform[10];
             var listenerPosition2 = listenerTransform[11];
@@ -1128,7 +1120,7 @@ WebGLSoundDevice.create = function webGLSoundDeviceFn(params) {
     }
     sd.listenerTransform = (params.listenerTransform || VMath.m43BuildIdentity());
     sd.listenerVelocity = (params.listenerVelocity || VMath.v3BuildZero());
-    sd.listenerGain = (params.listenerGain || 1);
+    sd.listenerGain = (typeof params.listenerGain === "number" ? params.listenerGain : 1);
     // Need a temporary Audio element to test capabilities
     var audio = new Audio();
     if(audio.mozSetup) {
