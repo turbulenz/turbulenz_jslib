@@ -89,7 +89,7 @@ ForwardRendering.prototype =
         var numPasses = this.numPasses;
         for (index = 0; index < numPasses; index += 1)
         {
-            passes[index] = [];
+            passes[index].length = 0;
         }
 
         var visibleRenderables = scene.getCurrentVisibleRenderables();
@@ -150,9 +150,9 @@ ForwardRendering.prototype =
                     }
                     else if (passIndex === fillZPassIndex)
                     {
-                        /*jslint bitwise:false*/
+                        /*jshint bitwise:false*/
                         drawParameters.sortKey = ((drawParameters.sortKey | 0) + sortDistance);
-                        /*jslint bitwise:true*/
+                        /*jshint bitwise:true*/
                     }
                     pass = passes[passIndex];
                     pass[pass.length] = drawParameters;
@@ -162,6 +162,8 @@ ForwardRendering.prototype =
             }
             while (n < numVisibleRenderables);
         }
+
+        var lightFindVisibleRenderables = this.lightFindVisibleRenderables;
 
         var visibleLights = scene.getCurrentVisibleLights();
         var numVisibleLights = visibleLights.length;
@@ -176,27 +178,48 @@ ForwardRendering.prototype =
                 light = lightInstance.light;
                 if (light)
                 {
-                    if (light.global)
+                    if (!light.global)
                     {
-                        continue;
-                    }
+                        lightInstance.shadows = false;
 
-                    if (light.spot)
-                    {
-                        spotLights[numSpot] = lightInstance;
-                        numSpot += 1;
-                    }
-                    else if (!light.fog) // this renderer does not support fog lights yet
-                    {
-                        // this includes local ambient lights
-                        pointLights[numPoint] = lightInstance;
-                        numPoint += 1;
+                        if (lightFindVisibleRenderables.call(this, lightInstance, scene))
+                        {
+                            if (light.spot)
+                            {
+                                spotLights[numSpot] = lightInstance;
+                                numSpot += 1;
+                            }
+                            else if (!light.fog) // this renderer does not support fog lights yet
+                            {
+                                // this includes local ambient lights
+                                pointLights[numPoint] = lightInstance;
+                                numPoint += 1;
+                            }
+                        }
+                        else
+                        {
+                            numVisibleLights -= 1;
+                            if (l < numVisibleLights)
+                            {
+                                visibleLights[l] = visibleLights[numVisibleLights];
+                                continue;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
                     }
                 }
 
                 l += 1;
             }
             while (l < numVisibleLights);
+
+            if (numVisibleLights < visibleLights.length)
+            {
+                visibleLights.length = numVisibleLights;
+            }
         }
 
         var globalLights = scene.getGlobalLights();
@@ -253,11 +276,11 @@ ForwardRendering.prototype =
             var lightOrigin = light.origin;
             if (lightOrigin)
             {
-                origin = md.m43TransformPoint(matrix, lightOrigin);
+                origin = md.m43TransformPoint(matrix, lightOrigin, lightInstance.lightOrigin);
             }
             else
             {
-                origin = md.m43Pos(matrix);
+                origin = md.m43Pos(matrix, lightInstance.lightOrigin);
             }
             lightInstance.lightOrigin = origin;
 
@@ -312,8 +335,15 @@ ForwardRendering.prototype =
         // Build a list of the geometries which are visible this frame, note we compare renderable.frameVisible against
         // lightFrameVisible which is the frame on which the light was last visible, since we're processing the
         // light that number must be the current frame
-        lightInstance.diffuseDrawParametersQueue = [];
         var diffuseDrawParametersQueue = lightInstance.diffuseDrawParametersQueue;
+        if (!diffuseDrawParametersQueue)
+        {
+            lightInstance.diffuseDrawParametersQueue = diffuseDrawParametersQueue = [];
+        }
+        else
+        {
+            diffuseDrawParametersQueue.length = 0;
+        }
 
         var drawParameterIndex, numDrawParameters, drawParametersArray;
         var numVisibleDrawParameters = 0;
@@ -412,6 +442,7 @@ ForwardRendering.prototype =
         globalTechniqueParameters.eyePosition = md.m43Pos(camera.matrix, globalTechniqueParameters.eyePosition);
         globalTechniqueParameters.time = currentTime;
 
+        /*
         var maxDepth = (scene.maxDistance + camera.nearPlane);
         var maxDepthReciprocal = (1.0 / maxDepth);
         globalTechniqueParameters.viewDepth = md.v4Build(-viewMatrix[2]  * maxDepthReciprocal,
@@ -419,6 +450,7 @@ ForwardRendering.prototype =
                                                          -viewMatrix[8]  * maxDepthReciprocal,
                                                          -viewMatrix[11] * maxDepthReciprocal,
                                                          globalTechniqueParameters.viewDepth);
+        */
 
         var globalLights = scene.globalLights;
         var numGlobalLights = globalLights.length;
@@ -440,9 +472,10 @@ ForwardRendering.prototype =
             }
         }
 
+        var lightingScale = this.lightingScale;
+
         if (ambientColorR || ambientColorG || ambientColorB)
         {
-            var lightingScale = this.globalTechniqueParameters.lightingScale;
             this.ambientColor = v3Build.call(md,
                                         (lightingScale * ambientColorR),
                                         (lightingScale * ambientColorG),
@@ -454,82 +487,58 @@ ForwardRendering.prototype =
             delete this.ambientColor;
         }
 
-        var l, node, light, lightInstance, matrix, techniqueParameters, origin, halfExtents, worldView;
+        var l, node, light, lightInstance, lightColor, matrix, techniqueParameters, origin, halfExtents, worldView;
         var lightViewInverseTranspose;
-        var lightFindVisibleRenderables = this.lightFindVisibleRenderables;
 
         var pointInstances = this.pointLights;
         var numPointInstances = pointInstances.length;
-        if (numPointInstances)
+        for (l = 0; l < numPointInstances; l += 1)
         {
+            lightInstance = pointInstances[l];
+            node = lightInstance.node;
+            light = lightInstance.light;
 
-            l = 0;
-            do
+            matrix = node.world;
+            techniqueParameters = lightInstance.techniqueParameters;
+            if (!techniqueParameters)
             {
-                lightInstance = pointInstances[l];
-                node = lightInstance.node;
-                light = lightInstance.light;
-                lightInstance.shadows = false;
-
-                if (lightFindVisibleRenderables.call(this, lightInstance, scene))
-                {
-                    matrix = node.world;
-                    techniqueParameters = lightInstance.techniqueParameters;
-                    if (!techniqueParameters)
-                    {
-                        techniqueParameters = gd.createTechniqueParameters();
-                        lightInstance.techniqueParameters = techniqueParameters;
-                    }
-
-                    origin = light.origin;
-
-                    worldView = m43Mul.call(md, matrix, viewMatrix, worldView);
-
-                    if (origin)
-                    {
-                        techniqueParameters.lightOrigin = m43TransformPoint.call(md, worldView, origin, techniqueParameters.lightOrigin);
-                    }
-                    else
-                    {
-                        techniqueParameters.lightOrigin = m43Pos.call(md, worldView, techniqueParameters.lightOrigin);
-                    }
-                    techniqueParameters.lightColor = light.color;
-
-                    lightViewInverseTranspose = m43InverseTransposeProjection.call(md, worldView, light.halfExtents,
-                                                                                   techniqueParameters.lightViewInverseTranspose);
-                    techniqueParameters.lightFalloff = v4Build.call(md,
-                                                                    lightViewInverseTranspose[8],
-                                                                    lightViewInverseTranspose[9],
-                                                                    lightViewInverseTranspose[10],
-                                                                    lightViewInverseTranspose[11],
-                                                                    techniqueParameters.lightFalloff);
-                    lightViewInverseTranspose[8] = 0;
-                    lightViewInverseTranspose[9] = 0;
-                    lightViewInverseTranspose[10] = 0;
-                    lightViewInverseTranspose[11] = 1.0;
-                    techniqueParameters.lightViewInverseTranspose = lightViewInverseTranspose;
-
-                    l += 1;
-                }
-                else
-                {
-                    numPointInstances -= 1;
-                    if (l < numPointInstances)
-                    {
-                        pointInstances[l] = pointInstances[numPointInstances];
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
+                techniqueParameters = gd.createTechniqueParameters();
+                lightInstance.techniqueParameters = techniqueParameters;
             }
-            while (l < numPointInstances);
 
-            if (numPointInstances < pointInstances.length)
+            origin = light.origin;
+
+            worldView = m43Mul.call(md, matrix, viewMatrix, worldView);
+
+            if (origin)
             {
-                pointInstances.length = numPointInstances;
+                techniqueParameters.lightOrigin = m43TransformPoint.call(md, worldView, origin, techniqueParameters.lightOrigin);
             }
+            else
+            {
+                techniqueParameters.lightOrigin = m43Pos.call(md, worldView, techniqueParameters.lightOrigin);
+            }
+
+            lightColor = light.color;
+            techniqueParameters.lightColor = v3Build.call(md,
+                                                          (lightingScale * lightColor[0]),
+                                                          (lightingScale * lightColor[1]),
+                                                          (lightingScale * lightColor[2]),
+                                                          techniqueParameters.lightColor);
+
+            lightViewInverseTranspose = m43InverseTransposeProjection.call(md, worldView, light.halfExtents,
+                                                                           techniqueParameters.lightViewInverseTranspose);
+            techniqueParameters.lightFalloff = v4Build.call(md,
+                                                            lightViewInverseTranspose[8],
+                                                            lightViewInverseTranspose[9],
+                                                            lightViewInverseTranspose[10],
+                                                            lightViewInverseTranspose[11],
+                                                            techniqueParameters.lightFalloff);
+            lightViewInverseTranspose[8] = 0;
+            lightViewInverseTranspose[9] = 0;
+            lightViewInverseTranspose[10] = 0;
+            lightViewInverseTranspose[11] = 1.0;
+            techniqueParameters.lightViewInverseTranspose = lightViewInverseTranspose;
         }
 
         var directionalLights = this.directionalLights;
@@ -540,12 +549,14 @@ ForwardRendering.prototype =
             {
                 techniqueParameters = this.directionalLightsTechniqueParameters;
                 var extents = scene.extents;
+
+                var sceneDirectionalLightDistance = (-1e6) * ((extents[3] - extents[0]) +
+                                                              (extents[4] - extents[1]) +
+                                                              (extents[5] - extents[2]));
+
                 halfExtents = v3Build.call(md, extents[3] - extents[0],
                                                extents[4] - extents[1],
                                                extents[5] - extents[2]);
-                this.sceneDirectionalLightDistance = ((extents[3] - extents[0]) +
-                                                      (extents[4] - extents[1]) +
-                                                      (extents[5] - extents[2])) * 1e6;
 
                 lightViewInverseTranspose = m43InverseTransposeProjection.call(md, viewMatrix, halfExtents,
                                                                                techniqueParameters.lightViewInverseTranspose);
@@ -561,6 +572,34 @@ ForwardRendering.prototype =
                 lightViewInverseTranspose[10] = 0;
                 lightViewInverseTranspose[11] = 1.0;
                 techniqueParameters.lightViewInverseTranspose = lightViewInverseTranspose;
+
+                var v3Normalize = md.v3Normalize;
+                var v3ScalarMul = md.v3ScalarMul;
+
+                var lightAt = md.v3BuildZero();
+
+                l = 0;
+                do
+                {
+                    light = directionalLights[l];
+
+                    techniqueParameters = light.techniqueParameters;
+
+                    v3Normalize.call(md, light.direction, lightAt);
+                    origin = v3ScalarMul.call(md, lightAt, sceneDirectionalLightDistance);
+                    techniqueParameters.lightOrigin = m43TransformPoint.call(md, viewMatrix, origin,
+                                                                             techniqueParameters.lightOrigin);
+
+                    lightColor = light.color;
+                    techniqueParameters.lightColor = v3Build.call(md,
+                                                                  (lightingScale * lightColor[0]),
+                                                                  (lightingScale * lightColor[1]),
+                                                                  (lightingScale * lightColor[2]),
+                                                                  techniqueParameters.lightColor);
+
+                    l += 1;
+                }
+                while (l < numDirectionalLights);
             }
             else
             {
@@ -585,69 +624,54 @@ ForwardRendering.prototype =
                 lightInstance = spotInstances[l];
                 node = lightInstance.node;
                 light = lightInstance.light;
-                lightInstance.shadows = false;
 
-                if (lightFindVisibleRenderables.call(this, lightInstance, scene))
+                matrix = node.world;
+                techniqueParameters = lightInstance.techniqueParameters;
+                if (!techniqueParameters)
                 {
-                    matrix = node.world;
-                    techniqueParameters = lightInstance.techniqueParameters;
-                    if (!techniqueParameters)
-                    {
-                        techniqueParameters = gd.createTechniqueParameters();
-                        lightInstance.techniqueParameters = techniqueParameters;
-                    }
+                    techniqueParameters = gd.createTechniqueParameters();
+                    lightInstance.techniqueParameters = techniqueParameters;
+                }
 
-                    origin = light.origin;
+                origin = light.origin;
 
-                    worldView = m43Mul.call(md, matrix, viewMatrix, worldView);
+                worldView = m43Mul.call(md, matrix, viewMatrix, worldView);
 
-                    if (origin)
-                    {
-                        techniqueParameters.lightOrigin = m43TransformPoint.call(md, worldView, origin, techniqueParameters.lightOrigin);
-                    }
-                    else
-                    {
-                        techniqueParameters.lightOrigin = m43Pos.call(md, worldView, techniqueParameters.lightOrigin);
-                    }
-                    techniqueParameters.lightColor = light.color;
-
-                    var frustum = light.frustum;
-                    var frustumNear = light.frustumNear;
-                    var invFrustumNear = 1.0 / (1 - frustumNear);
-                    lightView = m33MulM43.call(md, frustum, worldView, lightView);
-                    lightViewInverse = m43Inverse.call(md, lightView, lightViewInverse);
-                    lightProjection[8] = invFrustumNear;
-                    lightProjection[11] = -(frustumNear * invFrustumNear);
-                    lightViewInverseProjection = m43Mul.call(md, lightViewInverse, lightProjection, lightViewInverseProjection);
-                    lightViewInverseTranspose = m43Transpose.call(md, lightViewInverseProjection, techniqueParameters.lightViewInverseTranspose);
-                    techniqueParameters.lightViewInverseTranspose = lightViewInverseTranspose;
-                    techniqueParameters.lightFalloff = v4Build.call(md,
-                                                                    lightViewInverseTranspose[8],
-                                                                    lightViewInverseTranspose[9],
-                                                                    lightViewInverseTranspose[10],
-                                                                    lightViewInverseTranspose[11],
-                                                                    techniqueParameters.lightFalloff);
-                    l += 1;
+                if (origin)
+                {
+                    techniqueParameters.lightOrigin = m43TransformPoint.call(md, worldView, origin, techniqueParameters.lightOrigin);
                 }
                 else
                 {
-                    numSpotInstances -= 1;
-                    if (l < numSpotInstances)
-                    {
-                        spotInstances[l] = spotInstances[numSpotInstances];
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    techniqueParameters.lightOrigin = m43Pos.call(md, worldView, techniqueParameters.lightOrigin);
                 }
+
+                lightColor = light.color;
+                techniqueParameters.lightColor = v3Build.call(md,
+                                                              (lightingScale * lightColor[0]),
+                                                              (lightingScale * lightColor[1]),
+                                                              (lightingScale * lightColor[2]),
+                                                              techniqueParameters.lightColor);
+
+                var frustum = light.frustum;
+                var frustumNear = light.frustumNear;
+                var invFrustumNear = 1.0 / (1 - frustumNear);
+                lightView = m33MulM43.call(md, frustum, worldView, lightView);
+                lightViewInverse = m43Inverse.call(md, lightView, lightViewInverse);
+                lightProjection[8] = invFrustumNear;
+                lightProjection[11] = -(frustumNear * invFrustumNear);
+                lightViewInverseProjection = m43Mul.call(md, lightViewInverse, lightProjection, lightViewInverseProjection);
+                lightViewInverseTranspose = m43Transpose.call(md, lightViewInverseProjection, techniqueParameters.lightViewInverseTranspose);
+                techniqueParameters.lightViewInverseTranspose = lightViewInverseTranspose;
+                techniqueParameters.lightFalloff = v4Build.call(md,
+                                                                lightViewInverseTranspose[8],
+                                                                lightViewInverseTranspose[9],
+                                                                lightViewInverseTranspose[10],
+                                                                lightViewInverseTranspose[11],
+                                                                techniqueParameters.lightFalloff);
+                l += 1;
             }
             while (l < numSpotInstances);
-
-            if (numSpotInstances < spotInstances.length)
-            {
-                spotInstances.length = numSpotInstances;
-            }
         }
     },
 
@@ -740,37 +764,24 @@ ForwardRendering.prototype =
             return;
         }
 
-        var camera = this.camera;
-        var viewMatrix = camera.viewMatrix;
-        var directionalLightsTechniqueParameters = this.directionalLightsTechniqueParameters;
+        var light, lightTechniqueParameters;
 
-        var light, lightTechniqueParameters, origin;
-        var md = this.md;
-        var v3Normalize = md.v3Normalize;
-        var v3ScalarMul = md.v3ScalarMul;
-        var m43TransformPoint = md.m43TransformPoint;
+        var globalParameters = [globalTechniqueParameters, this.directionalLightsTechniqueParameters, null];
 
         gd.clear(null, null, 1.0);
 
         var diffuseDrawParametersQueue = this.diffuseDrawParametersQueue;
         if (diffuseDrawParametersQueue.length)
         {
-            var lightAt = md.v3BuildZero();
             var l = 0;
             do
             {
                 light = directionalLights[l];
                 lightTechniqueParameters = light.techniqueParameters;
 
-                v3Normalize.call(md, light.direction, lightAt);
-                origin = v3ScalarMul.call(md, lightAt, -this.sceneDirectionalLightDistance);
-                lightTechniqueParameters.lightOrigin = m43TransformPoint.call(md, viewMatrix, origin, lightTechniqueParameters.lightOrigin);
-                lightTechniqueParameters.lightColor = light.color;
-
-                // force update of techniqueParameters and geometry
-                gd.drawArray(diffuseDrawParametersQueue, [globalTechniqueParameters,
-                                                          lightTechniqueParameters,
-                                                          directionalLightsTechniqueParameters], -1);
+                // Draw renderables affected by the light
+                globalParameters[2] = lightTechniqueParameters;
+                gd.drawArray(diffuseDrawParametersQueue, globalParameters, -1);
 
                 l += 1;
             }
@@ -840,6 +851,8 @@ ForwardRendering.prototype =
         var setTechnique = gd.setTechnique;
         var setStream = gd.setStream;
         var draw = gd.draw;
+
+        var globalParameters = [globalTechniqueParameters, null, null];
         var diffuseDrawParametersQueue;
         var lightInstance, lightInstanceTechniqueParameters, light, lightTechniqueParameters, lightNode, lightWorld;
         var l;
@@ -870,10 +883,10 @@ ForwardRendering.prototype =
             setStream.call(gd, lightVolumeVertexBuffer, lightSemantics);
             draw.call(gd, lightPrimitive, 8);
 
-            // force update of techniqueParameters and geometry
-            gd.drawArray(diffuseDrawParametersQueue, [globalTechniqueParameters,
-                                                      lightTechniqueParameters,
-                                                      lightInstanceTechniqueParameters], -1);
+            // Draw renderables affected by the light
+            globalParameters[1] = lightTechniqueParameters;
+            globalParameters[2] = lightInstanceTechniqueParameters;
+            gd.drawArray(diffuseDrawParametersQueue, globalParameters, -1);
 
             // Draw light box to clear stencil
             setTechnique.call(gd, stencilClearTechnique);
@@ -913,6 +926,8 @@ ForwardRendering.prototype =
         var drawArray = gd.drawArray;
         var m43Offset = md.m43Offset;
         var m43Scale = md.m43Scale;
+
+        var globalParameters = [globalTechniqueParameters, null, null];
         var diffuseDrawParametersQueue;
         var lightInstance, lightInstanceTechniqueParameters, light, lightTechniqueParameters, lightNode, lightWorld;
         var lightCenter, lightTransform, center;
@@ -953,10 +968,10 @@ ForwardRendering.prototype =
             setStream.call(gd, lightVolumeVertexBuffer, lightSemantics);
             draw.call(gd, lightPrimitive, 14);
 
-            // force update of techniqueParameters and geometry
-            drawArray.call(gd, diffuseDrawParametersQueue, [globalTechniqueParameters,
-                                                            lightTechniqueParameters,
-                                                            lightInstanceTechniqueParameters], -1);
+            // Draw renderables affected by the light
+            globalParameters[1] = lightTechniqueParameters;
+            globalParameters[2] = lightInstanceTechniqueParameters;
+            drawArray.call(gd, diffuseDrawParametersQueue, globalParameters, -1);
 
             // Draw light box to clear stencil
             setTechnique.call(gd, stencilClearTechnique);
@@ -1022,7 +1037,11 @@ ForwardRendering.prototype =
         this.fillZBuffer(gd);
 
         //Skybox next
-        gd.drawArray(this.passes[this.passIndex.skybox], [globalTechniqueParameters], -1);
+        var pass = this.passes[this.passIndex.skybox];
+        if (0 < pass.length)
+        {
+            gd.drawArray(pass, [globalTechniqueParameters], -1);
+        }
 
         // ambient and emissive pass
         if (clearColor &&
@@ -1055,7 +1074,11 @@ ForwardRendering.prototype =
         this.drawSpotLights(gd, globalTechniqueParameters);
 
         // decals
-        gd.drawArray(this.passes[this.passIndex.decal], [globalTechniqueParameters], -1);
+        pass = this.passes[this.passIndex.decal];
+        if (0 < pass.length)
+        {
+            gd.drawArray(pass, [globalTechniqueParameters], -1);
+        }
 
         if (drawDecalsFn)
         {
@@ -1063,7 +1086,11 @@ ForwardRendering.prototype =
         }
 
         // transparent objects
-        gd.drawArray(this.passes[this.passIndex.transparent], [globalTechniqueParameters], 1);
+        pass = this.passes[this.passIndex.transparent];
+        if (0 < pass.length)
+        {
+            gd.drawArray(pass, [globalTechniqueParameters], 1);
+        }
 
         if (drawTransparentFn)
         {
@@ -1089,7 +1116,12 @@ ForwardRendering.prototype =
 
     setLightingScale: function setLightingScaleFn(scale)
     {
-        this.globalTechniqueParameters.lightingScale = scale;
+        this.lightingScale = scale;
+    },
+
+    getDefaultSkinBufferSize: function getDefaultSkinBufferSizeFn()
+    {
+        return this.defaultSkinBufferSize;
     },
 
     destroy: function destroyFn()
@@ -1194,7 +1226,6 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
     fr.md = md;
 
     fr.globalTechniqueParameters = gd.createTechniqueParameters({
-        lightingScale: 2.0,
         time : 0.0
     });
 
@@ -1207,7 +1238,15 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
     fr.passIndex = { fillZ: 0, skybox: 1, glow: 2, ambient: 3, shadow: 4, diffuse: 5, decal: 6, transparent: 7};
     fr.numPasses = fr.passIndex.transparent + 1;
 
-    fr.passes = [[], [], [], [], [], [], []];
+    var passes = fr.passes = [];
+    var numPasses = fr.numPasses;
+    var index;
+    for (index = 0; index < numPasses; index += 1)
+    {
+        passes[index] = [];
+    }
+
+    fr.lightingScale = 2.0;
 
     fr.spotLights = [];
     fr.pointLights = [];
@@ -1224,7 +1263,7 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
     fr.lightSemantics = gd.createSemantics(['POSITION']);
     fr.quadSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0']);
 
-    /*jslint white: false*/
+    /*jshint white: false*/
     fr.spotLightVolumeVertexBuffer = gd.createVertexBuffer({
             numVertices: 8,
             attributes: ['FLOAT3'],
@@ -1274,10 +1313,16 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
                  1.0, -1.0, 1.0, 0.0
             ]
         });
-    /*jslint white: true*/
+    /*jshint white: true*/
+
+    var onShaderLoaded = function onShaderLoadedFn(shader)
+    {
+        var skinBones = shader.getParameter("skinBones");
+        fr.defaultSkinBufferSize = skinBones.rows * skinBones.columns;
+    };
 
     shaderManager.load("shaders/zonly.cgfx");
-    shaderManager.load("shaders/forwardrendering.cgfx");
+    shaderManager.load("shaders/forwardrendering.cgfx", onShaderLoaded);
 
     // Prepare effects
     var shadowMappingUpdateFn;
@@ -1355,6 +1400,8 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
         geometryInstance.drawParameters = [];
         var numTechniqueParameters;
 
+        var techniqueName = this.technique.name;
+
         //
         // fillZ pass
         //
@@ -1382,7 +1429,6 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
             }
             else
             {
-                var techniqueName = this.technique.name;
                 if (-1 !== techniqueName.indexOf("_alpha"))
                 {
                     alpha = true;
@@ -1535,8 +1581,16 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
         }
         else
         {
-            drawParameters.userData.passIndex = fr.passIndex.diffuse;
-            geometryInstance.diffuseDrawParameters = [drawParameters];
+            // If technique name starts with "glowmap" it is emissive only
+            if (0 === techniqueName.indexOf("glowmap"))
+            {
+                geometryInstance.diffuseDrawParameters = [];
+            }
+            else
+            {
+                drawParameters.userData.passIndex = fr.passIndex.diffuse;
+                geometryInstance.diffuseDrawParameters = [drawParameters];
+            }
 
             if (fr.shadowMaps && this.shadowTechnique)
             {
@@ -1556,7 +1610,7 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
             }
             else
             {
-                geometryInstance.diffuseShadowDrawParameters = [drawParameters];
+                geometryInstance.diffuseShadowDrawParameters = geometryInstance.diffuseDrawParameters;
             }
         }
 
@@ -2796,6 +2850,34 @@ ForwardRendering.create = function forwardRenderingCreateFn(gd, md, shaderManage
     effectManager.map("default", "blinn");
     effectManager.map("lambert", "blinn");
     effectManager.map("phong", "blinn");
+
+    //
+    // glowmap
+    //
+    effect = Effect.create("glowmap");
+    effectManager.add(effect);
+
+    effectTypeData = {  prepare : forwardPrepareFn,
+                        shaderName : "shaders/forwardrendering.cgfx",
+                        techniqueName : "glowmap",
+                        update : forwardBlendUpdateFn,
+                        shadowMappingShaderName : "shaders/shadowmapping.cgfx",
+                        shadowMappingTechniqueName : "rigid",
+                        shadowMappingUpdate : shadowMappingUpdateFn,
+                        loadTechniques : loadTechniques };
+    effectTypeData.loadTechniques(shaderManager);
+    effect.add(rigid, effectTypeData);
+
+    effectTypeData = {  prepare : forwardPrepareFn,
+                        shaderName : "shaders/forwardrendering.cgfx",
+                        techniqueName : "glowmap_skinned",
+                        update : forwardBlendSkinnedUpdateFn,
+                        shadowMappingShaderName : "shaders/shadowmapping.cgfx",
+                        shadowMappingTechniqueName : "skinned",
+                        shadowMappingUpdate : shadowMappingSkinnedUpdateFn,
+                        loadTechniques : loadTechniques };
+    effectTypeData.loadTechniques(shaderManager);
+    effect.add(skinned, effectTypeData);
 
     return fr;
 };

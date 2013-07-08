@@ -96,6 +96,7 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
     var sharedIndexBuffer;
     var sharedVertexBuffer;
 
+    var reusableArrays = {};
 
     /**
       @class  Font
@@ -193,8 +194,18 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
             var kernings = this.kernings;
             var glyphs = this.glyphs;
 
-            var numVertices = (numGlyphs * 4);
-            var vertices = new Float32ArrayConstructor(numVertices * 4);
+            var vertices = reusableArrays[numGlyphs];
+            if (vertices)
+            {
+                // Need to remove from cache just in case it is not returned to us
+                reusableArrays[numGlyphs] = null;
+            }
+            else
+            {
+                var numVertices = (numGlyphs * 4);
+                vertices = new Float32ArrayConstructor(numVertices * 4);
+            }
+
             var vertexIndex = 0;
 
             var c, glyph, gx0, gy0, gx1, gy1, gaw, u0, v0, u1, v1;
@@ -311,7 +322,10 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
                 return;
             }
 
-            var numGlyphs = (vertices.length / 16);
+            var numGlyphs = (vertices.length >> 4);
+
+            reusableArrays[numGlyphs] = vertices;
+
             var numVertices = (numGlyphs * 4);
             var numIndicies = (numGlyphs * 6);
 
@@ -342,7 +356,7 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
             techniqueParameters.texture = this.texture;
             gd.setTechniqueParameters(techniqueParameters);
 
-            gd.drawIndexed(primitive, numIndicies);
+            gd.drawIndexed(primitive, numIndicies, 0);
         }
     };
 
@@ -807,6 +821,11 @@ FontManager.create = function fontManagerCreateFn(gd, rh, df, errorCallback, log
                 numGlyphs: 0
             };
         }
+    };
+
+    fm.reuseVertices = function reuseVerticesFn(vertices)
+    {
+        reusableArrays[vertices.length >> 4] = vertices;
     };
 
     /**

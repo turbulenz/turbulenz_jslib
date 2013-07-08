@@ -124,22 +124,22 @@ Camera.prototype =
 
         // Negate 'd' here to avoid doing it on the isVisible functions
         var vec = md.v4Build((m3  + m0), (m7  + m4), (m11 + m8), -(m15 + m12));
-        planes[0] = md.planeNormalize(vec); // left
+        planes[0] = md.planeNormalize(vec, planes[0]); // left
 
         md.v4Build((m3  - m0), (m7  - m4), (m11 - m8), -(m15 - m12), vec);
-        planes[1] = md.planeNormalize(vec); // right
+        planes[1] = md.planeNormalize(vec, planes[1]); // right
 
         md.v4Build((m3  - m1), (m7  - m5), (m11 - m9),  -(m15 - m13), vec);
-        planes[2] = md.planeNormalize(vec); // top
+        planes[2] = md.planeNormalize(vec, planes[2]); // top
 
         md.v4Build((m3  + m1), (m7  + m5), (m11 + m9),  -(m15 + m13), vec);
-        planes[3] = md.planeNormalize(vec); // bottom
+        planes[3] = md.planeNormalize(vec, planes[3]); // bottom
 
         md.v4Build((m3  + m2), (m7  + m6), (m11 + m10), -(m15 + m14), vec);
-        planes[4] = md.planeNormalize(vec);  // near
+        planes[4] = md.planeNormalize(vec, planes[4]);  // near
 
         md.v4Build((m3  - m2), (m7  - m6), (m11 - m10), -(m15 - m14), vec);
-        planes[5] = md.planeNormalize(vec); // far
+        planes[5] = md.planeNormalize(vec, planes[5]); // far
 
         return planes;
     },
@@ -179,7 +179,7 @@ Camera.prototype =
         return md.aabbIsFullyInsidePlanes(extents, this.frustumPlanes);
     },
 
-    getFrustumPoints : function getFrustumPointsFn()
+    getFrustumPoints : function getFrustumPointsFn(farPlane)
     {
         var viewOffsetX = this.viewOffsetX;
         var viewOffsetY = this.viewOffsetY;
@@ -189,7 +189,7 @@ Camera.prototype =
 
         var transform = this.matrix;
 
-        var farClip  = this.farPlane;
+        var farClip  = farPlane || this.farPlane;
         var nearClip = this.nearPlane;
 
         var frustumPoints = [];
@@ -369,9 +369,9 @@ Camera.prototype =
         return frustumPoints;
     },
 
-    getFrustumExtents : function getFrustumExtentsFn(extents)
+    getFrustumExtents : function getFrustumExtentsFn(extents, farClip)
     {
-        var frustumPoints = this.getFrustumPoints();
+        var frustumPoints = this.getFrustumPoints(farClip);
         var frustumPoint = frustumPoints[0];
         var min0 = frustumPoint[0];
         var min1 = frustumPoint[1];

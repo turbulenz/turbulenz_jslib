@@ -1,4 +1,7 @@
-// Copyright (c) 2010-2011 Turbulenz Limited
+// Copyright (c) 2010-2012 Turbulenz Limited
+
+/*global Utilities: false */
+/*global SceneNode: false */
 
 //
 // physicsmanager
@@ -34,13 +37,6 @@ PhysicsManager.prototype =
                         continue;
                     }
 
-                    worldMatrix = body.transform;
-                    origin = physicsNode.origin;
-                    if (origin)
-                    {
-                        worldMatrix = mathsDevice.m43NegOffset(worldMatrix, origin);
-                    }
-
                     if (target.parent)
                     {
                         Utilities.assert(false, "Rigid bodies with parent nodes are unsupported");
@@ -52,6 +48,13 @@ PhysicsManager.prototype =
                     }
                     else
                     {
+                        worldMatrix = body.transform;
+                        origin = physicsNode.origin;
+                        if (origin)
+                        {
+                            worldMatrix = mathsDevice.m43NegOffset(worldMatrix, origin, target.getLocalTransform());
+                        }
+
                         target.setLocalTransform(worldMatrix);
                     }
                 }
@@ -59,6 +62,7 @@ PhysicsManager.prototype =
         }
 
         // Kinematic nodes
+        var tempMatrix = this.tempMatrix;
         physicsNodes = this.kinematicPhysicsNodes;
         numPhysicsNodes = physicsNodes.length;
         for (n = 0; n < numPhysicsNodes; n += 1)
@@ -77,9 +81,14 @@ PhysicsManager.prototype =
                 origin = physicsNode.origin;
                 if (origin)
                 {
-                    worldMatrix = mathsDevice.m43Offset(worldMatrix, origin);
+                    // The physics API copies the matrix instead of referencing it
+                    // so it is safe to share a temp one
+                    physicsNode.body.transform = mathsDevice.m43Offset(worldMatrix, origin, tempMatrix);
                 }
-                physicsNode.body.transform = worldMatrix;
+                else
+                {
+                    physicsNode.body.transform = worldMatrix;
+                }
             }
         }
     },
@@ -93,7 +102,6 @@ PhysicsManager.prototype =
 
         if (physicsNodes)
         {
-            var physicsDevice = this.physicsDevice;
             var dynamicsWorld = this.dynamicsWorld;
             var numPhysicsNodes = physicsNodes.length;
             for (var p = 0; p < numPhysicsNodes; p += 1)
@@ -488,6 +496,8 @@ PhysicsManager.prototype =
                             var positionsData = positions.data;
                             var posMin = positions.min;
                             var posMax = positions.max;
+                            var numPositionsValues, np, pos0, pos1, pos2;
+                            var min0, min1, min2, max0, max1, max2;
                             if (posMin && posMax)
                             {
                                 var centerPos0 = ((posMax[0] + posMin[0]) * 0.5);
@@ -500,18 +510,51 @@ PhysicsManager.prototype =
                                     var halfPos0 = ((posMax[0] - posMin[0]) * 0.5);
                                     var halfPos1 = ((posMax[1] - posMin[1]) * 0.5);
                                     var halfPos2 = ((posMax[2] - posMin[2]) * 0.5);
-                                    posMin = [-halfPos0, -halfPos1, -halfPos2];
-                                    posMax = [ halfPos0,  halfPos1,  halfPos2];
-                                    var numPositionsValues = positionsData.length;
+                                    min0 = -halfPos0;
+                                    min1 = -halfPos1;
+                                    min2 = -halfPos2;
+                                    max0 = halfPos0;
+                                    max1 = halfPos1;
+                                    max2 = halfPos2;
+                                    numPositionsValues = positionsData.length;
                                     var newPositionsData = [];
                                     newPositionsData.length = numPositionsValues;
-                                    for (var np = 0; np < numPositionsValues; np += 3)
+                                    for (np = 0; np < numPositionsValues; np += 3)
                                     {
-                                        newPositionsData[np + 0] = (positionsData[np + 0] - centerPos0);
-                                        newPositionsData[np + 1] = (positionsData[np + 1] - centerPos1);
-                                        newPositionsData[np + 2] = (positionsData[np + 2] - centerPos2);
+                                        pos0 = (positionsData[np + 0] - centerPos0);
+                                        pos1 = (positionsData[np + 1] - centerPos1);
+                                        pos2 = (positionsData[np + 2] - centerPos2);
+                                        if (min0 > pos0)
+                                        {
+                                            min0 = pos0;
+                                        }
+                                        else if (max0 < pos0)
+                                        {
+                                            max0 = pos0;
+                                        }
+                                        if (min1 > pos1)
+                                        {
+                                            min1 = pos1;
+                                        }
+                                        else if (max1 < pos1)
+                                        {
+                                            max1 = pos1;
+                                        }
+                                        if (min2 > pos2)
+                                        {
+                                            min2 = pos2;
+                                        }
+                                        else if (max2 < pos2)
+                                        {
+                                            max2 = pos2;
+                                        }
+                                        newPositionsData[np + 0] = pos0;
+                                        newPositionsData[np + 1] = pos1;
+                                        newPositionsData[np + 2] = pos2;
                                     }
                                     positionsData = newPositionsData;
+                                    posMin = [min0, min1, min2];
+                                    posMax = [max0, max1, max2];
                                     origin = mathsDevice.v3Build(centerPos0, centerPos1, centerPos2);
                                     geometry.origin = origin;
                                 }
@@ -522,6 +565,43 @@ PhysicsManager.prototype =
                                 geometry.origin = [0, 0, 0];
                             }
 
+                            // Can we use a box?
+                            // TODO: do it offline
+                            if (positionsData.length === 24)
+                            {
+                                min0 = posMin[0];
+                                min1 = posMin[1];
+                                min2 = posMin[2];
+                                max0 = posMax[0];
+                                max1 = posMax[1];
+                                max2 = posMax[2];
+
+                                for (np = 0; np < 24; np += 3)
+                                {
+                                    pos0 = positionsData[np + 0];
+                                    pos1 = positionsData[np + 1];
+                                    pos2 = positionsData[np + 2];
+                                    if ((pos0 !== min0 && pos0 !== max0) ||
+                                        (pos1 !== min1 && pos1 !== max1) ||
+                                        (pos2 !== min2 && pos2 !== max2))
+                                    {
+                                        break;
+                                    }
+                                }
+
+                                if (np >= numPositionsValues)
+                                {
+                                    shapeType = "box";
+
+                                    shape = physicsDevice.createBoxShape({
+                                        halfExtents: [(max0 - min0) * 0.5,
+                                                      (max1 - min1) * 0.5,
+                                                      (max2 - min2) * 0.5],
+                                        margin: collisionMargin
+                                    });
+                                }
+                            }
+
                             if (shapeType === "convexhull")
                             {
                                 shape = physicsDevice.createConvexHullShape({
@@ -529,7 +609,7 @@ PhysicsManager.prototype =
                                     margin: collisionMargin
                                 });
                             }
-                            else //if (shapeType === "mesh")
+                            else if (shapeType === "mesh")
                             {
                                 var maxOffset = 0;
                                 for (var input in inputs)
@@ -892,6 +972,8 @@ PhysicsManager.create = function physicsManagerCreateFn(mathsDevice, physicsDevi
     {
         physicsManager.deleteNode(data.node);
     };
+
+    physicsManager.tempMatrix = mathsDevice.m43BuildIdentity();
 
     return physicsManager;
 };

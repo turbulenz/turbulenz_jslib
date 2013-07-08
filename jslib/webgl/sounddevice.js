@@ -5,6 +5,7 @@
 /*global VMath: false*/
 /*global navigator: false*/
 /*global window: false*/
+/*global Uint8Array: false*/
 /*global console*/
 "use strict";
 
@@ -224,11 +225,9 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
                         channel = buffer.getChannelData(c);
                         for (j = 0; j < bufferLength; j += 1)
                         {
-                            /*jslint bitwise: false*/
                             /*jshint bitwise: false*/
                             channel[j] = data[c + (((j * ratio) | 0) * numChannels)];
                             /*jshint bitwise: true*/
-                            /*jslint bitwise: true*/
                         }
                     }
                 }
@@ -262,8 +261,16 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
             data = params.data;
             if (data)
             {
-                /*global Uint8Array*/
-                var dataArray = new Uint8Array(data);
+
+                var dataArray;
+                if (data instanceof Uint8Array)
+                {
+                    dataArray = data;
+                }
+                else
+                {
+                    dataArray = new Uint8Array(data);
+                }
 
                 // Check extension based on data
 
@@ -291,20 +298,7 @@ WebGLSound.create = function webGLSoundCreateFn(sd, params)
                 }
 
                 // Mangle data into a data URI
-
-                var arrayToStr = function arrayToStrFn(bytes)
-                {
-                    var numBytes = bytes.length;
-                    var a = [];
-                    a.length = numBytes;
-                    for (var n = 0; n < numBytes; n += 1)
-                    {
-                        a[n] = bytes[n];
-                    }
-                    return String.fromCharCode.apply(null, a);
-                };
-
-                soundPath = soundPath + window.btoa(arrayToStr(dataArray));
+                soundPath = soundPath + TurbulenzEngine.base64encode(dataArray);
             }
 
             if (!(extension in sd.supportedExtensions))
@@ -777,6 +771,7 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params)
     var gain = (params.gain || 1);
     var looping = (params.looping || false);
     var pitch = (params.pitch || 1);
+    var position, direction, velocity;
 
     var audioContext = sd.audioContext;
     if (audioContext)
@@ -799,8 +794,6 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params)
         }
 
         pannerNode.panningModel = pannerNode.EQUALPOWER;
-
-        var position, direction, velocity;
 
         Object.defineProperty(source, "position", {
                 get : function getPositionFn() {
@@ -985,6 +978,39 @@ WebGLSoundSource.create = function webGLSoundSourceCreateFn(sd, id, params)
             }
         };
 
+        Object.defineProperty(source, "position", {
+                get : function getPositionFn() {
+                    return position.slice();
+                },
+                set : function setPositionFn(newPosition) {
+                    position = VMath.v3Copy(newPosition, position);
+                },
+                enumerable : true,
+                configurable : false
+            });
+
+        Object.defineProperty(source, "direction", {
+                get : function getDirectionFn() {
+                    return direction.slice();
+                },
+                set : function setDirectionFn(newDirection) {
+                    direction = VMath.v3Copy(newDirection, direction);
+                },
+                enumerable : true,
+                configurable : false
+            });
+
+        Object.defineProperty(source, "velocity", {
+                get : function getVelocityFn() {
+                    return velocity.slice();
+                },
+                set : function setVelocityFn(newVelocity) {
+                    velocity = VMath.v3Copy(newVelocity, velocity);
+                },
+                enumerable : true,
+                configurable : false
+            });
+
         Object.defineProperty(source, "gain", {
                 get : function getGainFn() {
                     return gain;
@@ -1114,7 +1140,7 @@ WebGLSoundDevice.prototype =
                 {
                     if (params.onload)
                     {
-                        params.onload(true);
+                        params.onload(success);
                     }
                 },
                 onerror : function soundTarFailedFn()

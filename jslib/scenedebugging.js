@@ -3,6 +3,7 @@
 /*global Geometry*/
 /*global GeometryInstance*/
 /*global Utilities*/
+/*global TurbulenzEngine*/
 
 //
 // Scene debugging methods
@@ -155,14 +156,23 @@ Scene.prototype.writeRotatedBox = function sceneWriteRotatedBoxFn(writer, transf
     var hy = halfExtents[1];
     var hz = halfExtents[2];
 
-    var p0 = md.m43TransformPoint(transform, md.v3Build(- hx, - hy, - hz));
-    var p1 = md.m43TransformPoint(transform, md.v3Build(+ hx, - hy, - hz));
-    var p2 = md.m43TransformPoint(transform, md.v3Build(+ hx, - hy, + hz));
-    var p3 = md.m43TransformPoint(transform, md.v3Build(- hx, - hy, + hz));
-    var p4 = md.m43TransformPoint(transform, md.v3Build(- hx, + hy, - hz));
-    var p5 = md.m43TransformPoint(transform, md.v3Build(+ hx, + hy, - hz));
-    var p6 = md.m43TransformPoint(transform, md.v3Build(+ hx, + hy, + hz));
-    var p7 = md.m43TransformPoint(transform, md.v3Build(- hx, + hy, + hz));
+    var p0 = md.v3Build(- hx, - hy, - hz);
+    var p1 = md.v3Build(+ hx, - hy, - hz);
+    var p2 = md.v3Build(+ hx, - hy, + hz);
+    var p3 = md.v3Build(- hx, - hy, + hz);
+    var p4 = md.v3Build(- hx, + hy, - hz);
+    var p5 = md.v3Build(+ hx, + hy, - hz);
+    var p6 = md.v3Build(+ hx, + hy, + hz);
+    var p7 = md.v3Build(- hx, + hy, + hz);
+
+    md.m43TransformPoint(transform, p0, p0);
+    md.m43TransformPoint(transform, p1, p1);
+    md.m43TransformPoint(transform, p2, p2);
+    md.m43TransformPoint(transform, p3, p3);
+    md.m43TransformPoint(transform, p4, p4);
+    md.m43TransformPoint(transform, p5, p5);
+    md.m43TransformPoint(transform, p6, p6);
+    md.m43TransformPoint(transform, p7, p7);
 
     writer(p0, r, g, b);
     writer(p1, r, g, b);
@@ -231,6 +241,7 @@ Scene.prototype.drawLights = function sceneDrawLightsFn(gd, sm, camera)
                     {
                         if (light.global)
                         {
+                            n += 1;
                             continue;
                         }
 
@@ -312,6 +323,7 @@ Scene.prototype.drawLights = function sceneDrawLightsFn(gd, sm, camera)
                         {
                             if (light.global)
                             {
+                                n += 1;
                                 continue;
                             }
 
@@ -375,6 +387,112 @@ Scene.prototype.drawLights = function sceneDrawLightsFn(gd, sm, camera)
 };
 
 //
+// drawLightsExtents
+//
+Scene.prototype.drawLightsExtents = function sceneDrawLightsExtentsFn(gd, sm, camera)
+{
+    var visibleLights = this.visibleLights;
+    var numVisibleLights = visibleLights.length;
+    if (numVisibleLights > 0)
+    {
+        var lightInstance, light;
+        var numLights = 0;
+        var n = 0;
+        do
+        {
+            lightInstance = visibleLights[n];
+            light = lightInstance.light;
+            if (light)
+            {
+                if (light.global)
+                {
+                    n += 1;
+                    continue;
+                }
+
+                numLights += 1;
+            }
+
+            n += 1;
+        }
+        while (n < numVisibleLights);
+
+
+        if (0 === numLights)
+        {
+            return;
+        }
+
+        var shader = sm.load("shaders/debug.cgfx");
+        var technique = shader.getTechnique("debug_lines");
+        if (!technique)
+        {
+            return;
+        }
+
+        gd.setTechnique(technique);
+
+        var techniqueParameters = this.debugLinesTechniqueParameters;
+        if (!techniqueParameters)
+        {
+            techniqueParameters = gd.createTechniqueParameters({
+                worldViewProjection: camera.viewProjectionMatrix
+            });
+            this.debugLinesTechniqueParameters = techniqueParameters;
+        }
+        else
+        {
+            techniqueParameters.worldViewProjection = camera.viewProjectionMatrix;
+        }
+
+        gd.setTechniqueParameters(techniqueParameters);
+
+        var sem = this.getDebugSemanticsPosCol();
+        var writer = gd.beginDraw(gd.PRIMITIVE_LINES,
+                                  (24 * numLights),
+                                  [ gd.VERTEXFORMAT_FLOAT3,
+                                    gd.VERTEXFORMAT_FLOAT3 ],
+                                  sem);
+        if (writer)
+        {
+            var writeBox = this.writeBox;
+            var extents, color, r, g, b;
+
+            n = 0;
+            do
+            {
+                lightInstance = visibleLights[n];
+                light = lightInstance.light;
+                if (light)
+                {
+                    if (light.global)
+                    {
+                        n += 1;
+                        continue;
+                    }
+
+                    extents = lightInstance.getWorldExtents();
+                    if (extents)
+                    {
+                        color = light.color;
+                        r = color[0];
+                        g = color[1];
+                        b = color[2];
+
+                        writeBox(writer, extents, r, g, b);
+                    }
+                }
+
+                n += 1;
+            }
+            while (n < numVisibleLights);
+
+            gd.endDraw(writer);
+        }
+    }
+};
+
+//
 // drawLightsScreenExtents
 //
 Scene.prototype.drawLightsScreenExtents = function sceneDrawLightsScreenExtentsFn(gd, sm, camera)
@@ -394,6 +512,7 @@ Scene.prototype.drawLightsScreenExtents = function sceneDrawLightsScreenExtentsF
             {
                 if (light.global)
                 {
+                    n += 1;
                     continue;
                 }
 
@@ -443,6 +562,7 @@ Scene.prototype.drawLightsScreenExtents = function sceneDrawLightsScreenExtentsF
                 {
                     if (light.global)
                     {
+                        n += 1;
                         continue;
                     }
 
@@ -1084,8 +1204,8 @@ Scene.prototype.createGeoSphere = function scenecreateGeoSphereFn(radius, recurs
     }
 
     // create 12 vertices of an icosahedron - default unit parameters
-    /*jslint white: false*/
     addVertex(-1,  t,  0);
+    /*jshint white: false*/
     addVertex( 1,  t,  0);
     addVertex(-1, -t,  0);
     addVertex( 1, -t,  0);
@@ -1099,7 +1219,7 @@ Scene.prototype.createGeoSphere = function scenecreateGeoSphereFn(radius, recurs
     addVertex( t,  0,  1);
     addVertex(-t,  0, -1);
     addVertex(-t,  0,  1);
-    /*jslint white: true*/
+    /*jshint white: true*/
 
     // create 20 triangles of the icosahedron
     indices = [
@@ -1595,7 +1715,7 @@ Scene.prototype.createRoundedPrimitive = function sceneCreateRoundedPrimitiveFn(
     addCorner(false, false, false);
 
     // Generate the edges
-    /*jslint white : false*/
+    /*jshint white: false*/
     addEdge(-1, -1,  0);
     addEdge(-1,  1,  0);
     addEdge( 1, -1,  0);
@@ -1608,7 +1728,7 @@ Scene.prototype.createRoundedPrimitive = function sceneCreateRoundedPrimitiveFn(
     addEdge( 0, -1,  1);
     addEdge( 0,  1, -1);
     addEdge( 0,  1,  1);
-    /*jslint white : true*/
+    /*jshint white: true*/
 
     return {
         indices : indices,
@@ -1648,7 +1768,7 @@ Scene.prototype.createBox = function sceneCreateBoxFn(halfExtents)
                      -xHalfExtent,  yHalfExtent, -zHalfExtent
                     ];
 
-    /*jslint white : false*/
+    /*jshint white: false*/
     var indices = [
                     2,  0,  1,
                     3,  0,  2,
@@ -1663,7 +1783,7 @@ Scene.prototype.createBox = function sceneCreateBoxFn(halfExtents)
                    22, 20, 21,
                    23, 20, 22
                 ];
-    /*jslint white : true*/
+    /*jshint white: true*/
 
     return {
         indices : indices,
@@ -1673,6 +1793,15 @@ Scene.prototype.createBox = function sceneCreateBoxFn(halfExtents)
 
 Scene.prototype.createConvexHull = function sceneCreateConvexHull(dw, body, numRays)
 {
+    if (TurbulenzEngine.canvas)
+    {
+        // Special case for WebGL.
+        // ConvexHull posesses a TriangleArray with vertices/indicies
+        //   to render a triangle mesh for debug view instead of
+        //   the much slower and less helpful ray casted positioned squares.
+        return body.shape._private.triangleArray;
+    }
+
     var positions = [];
     var indices = [];
     var md = this.md;
@@ -1793,7 +1922,7 @@ Scene.prototype.createConvexHull = function sceneCreateConvexHull(dw, body, numR
                         from : from,
                         to   : to
                     });
-                if (rayHit && rayHit.body === body)
+                if (rayHit && (rayHit.body === body || rayHit.collisionObject === body))
                 {
                     var hitPoint = rayHit.hitPoint;
                     var normal = rayHit.hitNormal;
@@ -1881,7 +2010,7 @@ Scene.prototype.drawPhysicsNodes = function sceneDrawPhysicsNodesFn(gd, sm, came
 
     var sem = this.getDebugSemanticsPosCol();
     var vformatFloat3 = gd.VERTEXFORMAT_FLOAT3;
-    var writer = gd.beginDraw('LINES',
+    var writer = gd.beginDraw(gd.PRIMITIVE_LINES,
                               (24 * numNodes),
                               [vformatFloat3, vformatFloat3],
                               sem);
@@ -1943,6 +2072,7 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
     var triangleArrayParams;
     var pd = physicsManager.physicsDevice;
     var dw = physicsManager.dynamicsWorld;
+    var shape;
     for (n = 0; n < numNodes; n += 1)
     {
         physicsNode = physicsNodes[n];
@@ -1967,7 +2097,7 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
             visiblePhysicsNodes[visiblePhysicsNodes.length] = physicsNode;
             if (!triangleArray)
             {
-                var shape = physicsNode.body.shape;
+                shape = physicsNode.body.shape;
                 var type = shape.type;
                 var halfExtents = shape.halfExtents;
 
@@ -2023,17 +2153,24 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
             if (!positions && triangleArray)
             {
                 var vertices = triangleArray.vertices;
-                var numVertexComponents = vertices.length;
                 var indices = triangleArray.indices;
                 numIndices = indices.length;
 
                 // convert native arrays to javascript ones
-                positions = [];
-                physicsNode.positions = positions;
-                positions.length = numVertexComponents;
-                for (i = 0; i < numVertexComponents; i += 1)
+                if (!TurbulenzEngine.canvas)
                 {
-                    positions[i] = vertices[i];
+                    var numVertexComponents = vertices.length;
+                    positions = [];
+                    physicsNode.positions = positions;
+                    positions.length = numVertexComponents;
+                    for (i = 0; i < numVertexComponents; i += 1)
+                    {
+                        positions[i] = vertices[i];
+                    }
+                }
+                else
+                {
+                    physicsNode.positions = vertices;
                 }
 
                 triangles = [];
@@ -2053,47 +2190,89 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
         return;
     }
 
-    gd.setTechnique(technique);
-
     // Cache math functions and vertex formats
     var v4Build = md.v4Build;
     var m43MulM44 = md.m43MulM44;
     var vformatFloat3 = gd.VERTEXFORMAT_FLOAT3;
     var vformatFloat4 = gd.VERTEXFORMAT_FLOAT4;
+    var attributes = [ vformatFloat4, vformatFloat3, vformatFloat3 ];
+    var numAttributeComponents = 10;
+
+    // Set technique and shared parameters
+    gd.setTechnique(technique);
+
+    technique.windowScale = [gd.width / 2, gd.height / 2];
+    technique.wireColor = v4Build.call(md, 0, 0.2, 0.6, 1);
+    technique.alphaRef = 0;
+    technique.alpha = 0.5;
+
+    var fillColor, worldViewProjection;
 
     for (n = 0; n < numNodes; n += 1)
     {
         physicsNode = visiblePhysicsNodes[n];
         target = physicsNode.target;
-        var scale = (target.disabled ? 0.2 : 1.0);
-        var r, g, b;
+        var body = physicsNode.body;
+        var scale = (target.disabled ? 0.2 : body.active ? 1.0 : 0.4);
+        var tintR, tintG, tintB;
         if (physicsNode.kinematic)
         {
-            r = 0;
-            g = 0;
-            b = scale;
+            tintR = 0;
+            tintG = 0;
+            tintB = scale;
         }
         else if (physicsNode.dynamic)
         {
+            tintR = 0;
+            tintG = scale;
+            tintB = 0;
+        }
+        else
+        {
+            tintR = scale;
+            tintG = 0;
+            tintB = 0;
+        }
+
+        var r, g, b;
+        if (body.type === "CHARACTER")
+        {
             r = 0;
-            g = scale;
+            g = 0;
             b = 0;
         }
         else
         {
-            r = scale;
-            g = 0;
-            b = 0;
+            shape = body.shape;
+            if (shape.type === "TRIANGLE_MESH")
+            {
+                r = 1;
+                g = 0;
+                b = 0;
+            }
+            else if (shape.type === "CONVEX_HULL")
+            {
+                r = 0;
+                g = 0;
+                b = 1;
+            }
+            else
+            {
+                r = 0;
+                g = 1;
+                b = 0;
+            }
         }
 
-        var body = physicsNode.body;
+        r = 0.5 * (r + tintR);
+        g = 0.5 * (g + tintG);
+        b = 0.5 * (b + tintB);
 
-        technique.wireColor = v4Build.call(md, 0, 0.2, 0.6, 1);
-        technique.fillColor = v4Build.call(md, r, g, b, 0);
-        technique.alphaRef = 0;
-        technique.alpha = 0.5;
-        technique.worldViewProjection = m43MulM44.call(md, body.transform, camera.viewProjectionMatrix);
-        technique.windowScale = [gd.width / 2, gd.height / 2];
+        fillColor = v4Build.call(md, r, g, b, 0, fillColor);
+        worldViewProjection = m43MulM44.call(md, body.transform, camera.viewProjectionMatrix, worldViewProjection);
+
+        technique.fillColor = fillColor;
+        technique.worldViewProjection = worldViewProjection;
 
         positions = physicsNode.positions;
         triangles = physicsNode.triangles;
@@ -2101,8 +2280,6 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
 
         var wireframeBuffer = physicsNode.wireframeBuffer;
 
-        var attributes = [ vformatFloat4, vformatFloat3, vformatFloat3 ];
-        var numAttributeComponents = 10;
         var wireframeSemantics = physicsNode.wireframeSemantics;
         if (!wireframeSemantics)
         {
@@ -2113,7 +2290,9 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
 
         if (!wireframeBuffer)
         {
-            var vData = [];
+            var vData = (this.float32ArrayConstructor ?
+                         new this.float32ArrayConstructor(numIndices * numAttributeComponents) :
+                         new Array(numIndices * numAttributeComponents));
             var j;
             var dstIndex = 0;
             var vdIndex0, vdValue0x, vdValue0y, vdValue0z,
@@ -2122,11 +2301,8 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
 
             var vertexBuffer = gd.createVertexBuffer({
                     numVertices: numIndices,
-                    attributes: attributes,
-                    dynamic: true
+                    attributes: attributes
                 });
-
-            vData.length = numIndices * numAttributeComponents;
 
             for (j = 0; j < numIndices; j += 3)
             {
@@ -2190,8 +2366,8 @@ Scene.prototype.drawPhysicsGeometry = function sceneDrawPhysicsGeometryFn(gd, sm
             physicsNode.wireframeBuffer = wireframeBuffer;
         }
 
-        gd.setStream.call(gd, wireframeBuffer, wireframeSemantics);
-        gd.draw.call(gd, gd.PRIMITIVE_TRIANGLES, wireframeBuffer.numVertices, 0);
+        gd.setStream(wireframeBuffer, wireframeSemantics);
+        gd.draw(gd.PRIMITIVE_TRIANGLES, wireframeBuffer.numVertices, 0);
     }
 };
 
@@ -2380,7 +2556,7 @@ Scene.prototype.drawNodesTree = function sceneDrawNodesTreeFn(tree, gd, sm, came
 
         if (level === 0)
         {
-            var extents = node.node.getWorldExtents();
+            var extents = node.extents;
             var p0 = extents[0];
             var p1 = extents[1];
             var p2 = extents[2];
@@ -2424,18 +2600,11 @@ Scene.prototype.drawNodesTree = function sceneDrawNodesTreeFn(tree, gd, sm, came
             writer(n0, p1, n2);
             writer(n0, p1, p2);
 
-            if (node.leaf)
-            {
-                return (idx + 1);
-            }
-            else
-            {
-                return (idx + node.escapeNodeOffset);
-            }
+            return (idx + node.escapeNodeOffset);
         }
         else
         {
-            if (node.leaf)
+            if (node.isLeaf())
             {
                 return (idx + 1);
             }
@@ -3265,9 +3434,33 @@ Scene.prototype.getVisibilityMetrics = function getVisibilityMetricsFn()
     }
     metrics.numPortalsPlanes = numPortalsPlanes;
 
-    metrics.numRenderables = this.visibleRenderables.length;
+    var numRenderables = this.visibleRenderables.length;
+    var numShadowMaps = 0, numOccluders = 0;
+    var visibleLights = this.visibleLights;
+    var numLights = visibleLights.length;
+    metrics.numLights = numLights;
+    for (n = 0; n < numLights; n += 1)
+    {
+        var lightInstance = visibleLights[n];
+        if (lightInstance.diffuseDrawParametersQueue) // Forward rendering
+        {
+            numRenderables += lightInstance.diffuseDrawParametersQueue.length;
+        }
+        var shadowMap = lightInstance.shadowMap;
+        if (shadowMap)
+        {
+            if (lightInstance.frameVisible === shadowMap.frameVisible &&
+                shadowMap.numRenderables) // may be undefined
+            {
+                numShadowMaps += 1;
+                numOccluders += shadowMap.numRenderables;
+            }
+        }
+    }
 
-    metrics.numLights = this.visibleLights.length;
+    metrics.numRenderables = numRenderables;
+    metrics.numShadowMaps = numShadowMaps;
+    metrics.numOccluders = numOccluders;
 
     return metrics;
 };

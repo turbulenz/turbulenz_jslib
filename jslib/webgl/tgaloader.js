@@ -43,10 +43,10 @@ TGALoader.prototype = {
 
         this.bytesPerPixel = Math.floor(header.bpp / 8);
 
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         this.horzRev = (header.descriptor & this.DESC_HORIZONTAL);
         this.vertRev = !(header.descriptor & this.DESC_VERTICAL);
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
 
         var rle = false;
 
@@ -253,7 +253,7 @@ TGALoader.prototype = {
 
     parseHeader : function parseHeaderFn(bytes)
     {
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         var header = {
             idLength : bytes[0],
             colorMapType : bytes[1],
@@ -280,7 +280,7 @@ TGALoader.prototype = {
             // 7-6: zero
             descriptor : bytes[17]
         };
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
         return header;
     },
 
@@ -363,7 +363,7 @@ TGALoader.prototype = {
             var count = data[src];
             src += 1;
 
-            /*jslint bitwise: false*/
+            /*jshint bitwise: false*/
             var bytes = (((count & ~RLE_PACKETSIZE) + 1) * datasize);
 
             if (count & RLE_PACKETSIZE)
@@ -406,7 +406,7 @@ TGALoader.prototype = {
                 }
                 src += bytes;
             }
-            /*jslint bitwise: true*/
+            /*jshint bitwise: true*/
 
             dest += bytes;
         }
@@ -524,7 +524,7 @@ TGALoader.prototype = {
             var src = 0, dest = 0;
             var r, g, b, a;
 
-            /*jslint bitwise: false*/
+            /*jshint bitwise: false*/
             var mask = ((1 << 5) - 1);
             var blueMask = mask;
             var greenMask = (mask << 5);
@@ -542,7 +542,7 @@ TGALoader.prototype = {
                 dest += 1;
             }
             while (src < size);
-            /*jslint bitwise: true*/
+            /*jshint bitwise: true*/
 
             return dst;
         }
@@ -614,7 +614,7 @@ TGALoader.create = function tgaLoaderFn(params)
                         }
                         else //if (xhr.responseText !== null)
                         {
-                            /*jslint bitwise: false*/
+                            /*jshint bitwise: false*/
                             var text = xhr.responseText;
                             var numChars = text.length;
                             buffer = [];
@@ -623,8 +623,15 @@ TGALoader.create = function tgaLoaderFn(params)
                             {
                                 buffer[i] = (text.charCodeAt(i) & 0xff);
                             }
-                            /*jslint bitwise: true*/
+                            /*jshint bitwise: true*/
                         }
+
+                        // Fix for loading from file
+                        if (xhrStatus === 0 && window.location.protocol === "file:")
+                        {
+                            xhrStatus = 200;
+                        }
+
                         loader.processBytes(new Uint8Array(buffer));
                         if (loader.data)
                         {

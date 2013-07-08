@@ -73,6 +73,7 @@ BadgeManager.prototype =
             if (status === 200)
             {
                 var userbadge = jsonResponse.data;
+                userbadge.gameSlug = that.gameSession.gameSlug;
                 TurbulenzBridge.updateUserBadge(userbadge);
                 callbackFn(userbadge);
             }
@@ -136,7 +137,7 @@ BadgeManager.prototype =
     },
 
     errorCallbackFn: function errorCallbackFnx() {
-        Utilities.log(Array.prototype.slice.call(arguments));
+        Utilities.log('BadgeManager error: ', Array.prototype.slice.call(arguments));
     }
 
 };

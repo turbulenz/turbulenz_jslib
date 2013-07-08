@@ -144,10 +144,34 @@ TurbulenzServices = {
         return window.gameSlug !== undefined;
     },
 
+    lastMultiplayerSessionIdToJoinEvent: null,
+    addBridgeEvents: function addBridgeEventsFn()
+    {
+        var that = this;
+        function multiplayerSessionToJoin(joinMultiplayerSessionId) {
+            that.lastMultiplayerSessionIdToJoinEvent = joinMultiplayerSessionId;
+        }
+        TurbulenzBridge.setOnMultiplayerSessionToJoin(multiplayerSessionToJoin);
+    },
+
+    getMultiplayerSessionIdToJoin: function turbulenzServicesGetMultiplayerSessionIdToJoin()
+    {
+        if (this.lastMultiplayerSessionIdToJoin)
+        {
+            return this.lastMultiplayerSessionIdToJoin;
+        }
+        var Turbulenz = window.top.Turbulenz;
+        if (Turbulenz && Turbulenz.Data && Turbulenz.Data.joinMultiplayerSessionId)
+        {
+            return Turbulenz.Data.joinMultiplayerSessionId;
+        }
+        return null;
+    },
+
     defaultErrorCallback: function turbulenzServicesDefaultErrorCallbackFn(errorMsg, httpStatus) {},
 
     onServiceUnavailable: function turbulenzServicesOnServiceUnavailableFn(serviceName, callContext) {},
-    onServiceAvailable : function turbulenzServicesOnServiceAvailableFn(serviceName, callContext) {},
+    onServiceAvailable: function turbulenzServicesOnServiceAvailableFn(serviceName, callContext) {},
 
     createGameSession: function turbulenzServicesCreateGameSession(requestHandler, sessionCreatedFn, errorCallbackFn)
     {
@@ -282,17 +306,18 @@ TurbulenzServices = {
         requestHandler.request({
                 src: mappingTable.mappingTableURL,
                 onload: function jsonifyResponse(jsonResponse, status) {
-                    var obj = JSON.parse(jsonResponse);
                     if (status === 200)
                     {
+                        var obj = JSON.parse(jsonResponse);
                         createMappingTableCallbackFn(obj);
+                        return;
                     }
-                    else
-                    {
-                        mappingTable.errorCallbackFn("TurbulenzServices.createMappingTable error with HTTP status " + status + ": " + jsonResponse.msg, status);
-                        mappingTable.urlMapping = defaultMappingSettings && (defaultMappingSettings.urnMapping || {});
-                        tableRecievedFn(mappingTable);
-                    }
+
+                    jsonResponse = jsonResponse || { msg: "(no response)"};
+                    mappingTable.errorCallbackFn("TurbulenzServices.createMappingTable error with HTTP status " + status + ": " + jsonResponse.msg, status);
+
+                    mappingTable.urlMapping = defaultMappingSettings && (defaultMappingSettings.urnMapping || {});
+                    tableRecievedFn(mappingTable);
                 }
             });
 
@@ -304,6 +329,14 @@ TurbulenzServices = {
                                                                                  leaderboardMetaRecieved,
                                                                                  errorCallbackFn)
     {
+        if (!TurbulenzServices.available())
+        {
+            // Call error callback on a timeout to get the same behaviour as the ajax call
+            TurbulenzEngine.setTimeout(function () {
+                errorCallbackFn('TurbulenzServices.createLeaderboardManager could not load leaderboards meta data');
+            }, 0);
+            return null;
+        }
         var leaderboardManager = new LeaderboardManager();
 
         leaderboardManager.gameSession = gameSession;
@@ -311,15 +344,6 @@ TurbulenzServices = {
         leaderboardManager.errorCallbackFn = errorCallbackFn || this.defaultErrorCallback;
         leaderboardManager.service = this.getService('leaderboards');
         leaderboardManager.requestHandler = requestHandler;
-
-        if (!TurbulenzServices.available())
-        {
-            // Call error callback on a timeout to get the same behaviour as the ajax call
-            TurbulenzEngine.setTimeout(function () {
-                leaderboardManager.errorCallbackFn('TurbulenzServices.createLeaderboardManager could not load leaderboards meta data');
-            }, 0);
-            return leaderboardManager;
-        }
 
         leaderboardManager.service.request({
             url: '/api/v1/leaderboards/read/' + gameSession.gameSlug,
@@ -358,6 +382,11 @@ TurbulenzServices = {
     //just a factory, Badges have to be included from the caller!->TODO change to a less obtrusive pattern
     createBadgeManager: function turbulenzServicesCreateBadgeManager(requestHandler, gameSession)
     {
+        if (!TurbulenzServices.available())
+        {
+            return null;
+        }
+
         var badgeManager = new BadgeManager();
 
         badgeManager.gameSession = gameSession;
@@ -703,3 +732,8 @@ TurbulenzServices = {
     }
 
 };
+
+if (typeof TurbulenzBridge !== 'undefined')
+{
+    TurbulenzServices.addBridgeEvents();
+}

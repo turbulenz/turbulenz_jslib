@@ -272,11 +272,7 @@ WebGLInputDevice.prototype = {
             this.isMouseLocked = true;
             this.hideMouse();
 
-            var pointer = (navigator.pointer || navigator.webkitPointer);
-            if (pointer && !pointer.isLocked)
-            {
-                pointer.lock(this.canvas);
-            }
+            this.requestBrowserLock();
 
             this.setEventHandlersLock();
 
@@ -295,11 +291,7 @@ WebGLInputDevice.prototype = {
             this.isMouseLocked = false;
             this.showMouse();
 
-            var pointer = (navigator.pointer || navigator.webkitPointer);
-            if (pointer && pointer.isLocked)
-            {
-                pointer.unlock();
-            }
+            this.requestBrowserUnlock();
 
             this.setEventHandlersUnlock();
 
@@ -358,12 +350,12 @@ WebGLInputDevice.prototype = {
     // Returns the local coordinates of the event (i.e. position in Canvas coords)
     getCanvasPosition : function getCanvasPositionFn(event, position)
     {
-        if (event.offsetX)
+        if (event.offsetX !== undefined)
         {
             position.x = event.offsetX;
             position.y = event.offsetY;
         }
-        else if (event.layerX)
+        else if (event.layerX !== undefined)
         {
             position.x = event.layerX;
             position.y = event.layerY;
@@ -434,6 +426,7 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
     id.isCursorHidden = false;
     id.isOutsideEngine = false; // Used for determining where we are when unlocking
     id.previousCursor = '';
+    id.ignoreNextMouseMoves = 0;
 
     // Used to screen out auto-repeats, dictionary from keycode to bool,
     // true for each key currently pressed down
@@ -889,11 +882,27 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         event.stopPropagation();
         event.preventDefault();
 
-        var deltaX, deltaY;
-        if (event.movementX !== undefined || event.webkitMovementX !== undefined)
+        if (id.ignoreNextMouseMoves)
         {
-            deltaX = (event.movementX || event.webkitMovementX);
-            deltaY = (event.movementY || event.webkitMovementY);
+            id.ignoreNextMouseMoves -= 1;
+            return;
+        }
+
+        var deltaX, deltaY;
+        if (event.movementX !== undefined)
+        {
+            deltaX = event.movementX;
+            deltaY = event.movementY;
+        }
+        else if (event.mozMovementX !== undefined)
+        {
+            deltaX = event.mozMovementX;
+            deltaY = event.mozMovementY;
+        }
+        else if (event.webkitMovementX !== undefined)
+        {
+            deltaX = event.webkitMovementX;
+            deltaY = event.webkitMovementY;
         }
         else
         {
@@ -1058,11 +1067,8 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
         {
             if (document.fullscreenEnabled || document.mozFullScreen || document.webkitIsFullScreen)
             {
-                var pointer = (navigator.pointer || navigator.webkitPointer);
-                if (pointer && !pointer.isLocked)
-                {
-                    pointer.lock(id.canvas);
-                }
+                id.ignoreNextMouseMoves = 2; // Some browsers will send 2 mouse events with a massive delta
+                id.requestBrowserLock();
             }
             else
             {
@@ -1150,6 +1156,66 @@ WebGLInputDevice.create = function webGLInputDeviceFn(canvas, params)
     id.padAxisDeadZone = 0.26;
     id.maxAxisRange = 1.0;
     id.padTimestampUpdate = 0;
+
+    // Pointer locking
+    var requestPointerLock = (canvas.requestPointerLock    ||
+                              canvas.mozRequestPointerLock ||
+                              canvas.webkitRequestPointerLock);
+    if (requestPointerLock)
+    {
+        var exitPointerLock = (document.exitPointerLock    ||
+                               document.mozExitPointerLock ||
+                               document.webkitExitPointerLock);
+
+        id.requestBrowserLock = function requestBrowserLockFn()
+        {
+            var pointerLockElement = (document.pointerLockElement    ||
+                                      document.mozPointerLockElement ||
+                                      document.webkitPointerLockElement);
+            if (pointerLockElement !== canvas)
+            {
+                requestPointerLock.call(canvas);
+            }
+        };
+
+        id.requestBrowserUnlock = function requestBrowserUnlockFn()
+        {
+            var pointerLockElement = (document.pointerLockElement    ||
+                                      document.mozPointerLockElement ||
+                                      document.webkitPointerLockElement);
+            if (pointerLockElement === canvas)
+            {
+                exitPointerLock.call(document);
+            }
+        };
+    }
+    else
+    {
+        var pointer = (navigator.pointer || navigator.webkitPointer);
+        if (pointer)
+        {
+            id.requestBrowserLock = function requestBrowserLockFn()
+            {
+                if (!pointer.isLocked)
+                {
+                    pointer.lock(canvas);
+                }
+            };
+
+            id.requestBrowserUnlock = function requestBrowserUnlockFn()
+            {
+                if (pointer.isLocked)
+                {
+                    pointer.unlock();
+                }
+            };
+        }
+        else
+        {
+            id.requestBrowserLock = function requestBrowserLockFn() {};
+            id.requestBrowserUnlock = function requestBrowserUnlockFn() {};
+        }
+    }
 
     return id;
 };

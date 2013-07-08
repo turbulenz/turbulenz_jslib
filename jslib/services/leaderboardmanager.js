@@ -1,6 +1,7 @@
 // Copyright (c) 2011-2012 Turbulenz Limited
 
 /*global TurbulenzEngine: false*/
+/*global TurbulenzBridge*/
 
 //
 // API
@@ -198,6 +199,17 @@ LeaderboardManager.prototype =
                 if (newBest)
                 {
                     bestScore = score;
+
+                    // Assemble data for notification system.
+                    var scoreData = {};
+                    scoreData.key = key;
+                    scoreData.title = meta.title;
+                    scoreData.sortBy = meta.sortBy;
+                    scoreData.score = score;
+                    scoreData.prevBest = data.prevBest; // may be 'undefined'
+                    scoreData.gameSlug = that.gameSession.gameSlug;
+                    // Trigger notification (only for new best scores).
+                    TurbulenzBridge.updateLeaderBoard(scoreData);
                 }
                 meta.bestScore = bestScore;
                 callbackFn(key, score, newBest, bestScore);

@@ -1,4 +1,4 @@
-// Copyright (c) 2012 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 
 //
 // SimpleRendering
@@ -183,6 +183,11 @@ SimpleRendering.prototype =
         this.wireframe = wireframeEnabled;
     },
 
+    getDefaultSkinBufferSize: function getDefaultSkinBufferSizeFn()
+    {
+        return this.defaultSkinBufferSize;
+    },
+
     destroy: function destroyFn()
     {
         delete this.globalTechniqueParameters;
@@ -250,10 +255,17 @@ SimpleRendering.create = function simpleRenderingCreateFn(gd, md, shaderManager,
 
     dr.passes = [[], [], []];
 
+
+    var onShaderLoaded = function onShaderLoadedFn(shader)
+    {
+        var skinBones = shader.getParameter("skinBones");
+        dr.defaultSkinBufferSize = skinBones.rows * skinBones.columns;
+    };
+
     var simpleCGFX = 'shaders/simplerendering.cgfx';
     var debugCGFX = 'shaders/debug.cgfx';
 
-    shaderManager.load(simpleCGFX);
+    shaderManager.load(simpleCGFX, onShaderLoaded);
     shaderManager.load(debugCGFX);
 
     // Prepare effects
@@ -1234,6 +1246,28 @@ SimpleRendering.create = function simpleRenderingCreateFn(gd, md, shaderManager,
     effect.add(rigid, effectTypeData);
 
     effectsManager.map("simple", "blinn");
+
+    //
+    // glowmap
+    //
+    effect = Effect.create("glowmap");
+    effectsManager.add(effect);
+
+    effectTypeData = {  prepare : simplePrepareFn,
+                        shaderName : simpleCGFX,
+                        techniqueName : "glowmap",
+                        update : simpleNoLightUpdateFn,
+                        loadTechniques : loadTechniques };
+    effectTypeData.loadTechniques(shaderManager);
+    effect.add(rigid, effectTypeData);
+
+    effectTypeData = {  prepare : simplePrepareFn,
+                        shaderName : simpleCGFX,
+                        techniqueName : "glowmap_skinned",
+                        update : simpleNoLightSkinnedUpdateFn,
+                        loadTechniques : loadTechniques };
+    effectTypeData.loadTechniques(shaderManager);
+    effect.add(skinned, effectTypeData);
 
     return dr;
 };

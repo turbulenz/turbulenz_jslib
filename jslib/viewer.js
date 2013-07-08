@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 
 /*global Camera: false*/
 /*global CameraController: false*/
@@ -17,6 +17,7 @@
 /*global PoseController: false*/
 /*global NodeTransformController: false*/
 /*global SkinnedNode: false*/
+/*global GPUSkinController: false*/
 
 /*global jQuery: false*/
 /*global window: false*/
@@ -296,6 +297,8 @@ Viewer.create = function viewerCreateFn(tz, applicationSettings)
         maxSpeed = (len < 100 ? (len * 2) : (len * 0.5));
         objectCenter = c;
         lightRadius = (len * 4);
+
+        GPUSkinController.setDefaultBufferSize(vi.renderer.getDefaultSkinBufferSize());
 
         scene.skinnedNodes = [];
         var nodeHasSkeleton = animationManager.nodeHasSkeleton;

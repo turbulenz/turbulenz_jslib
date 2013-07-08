@@ -14,11 +14,13 @@ GameSession.prototype =
 
     setStatus: function gameSessionSetStatusFn(status)
     {
-        if (this.status !== status)
+        if (this.destroyed || this.status === status)
         {
-            this.status = status;
-            TurbulenzBridge.setGameSessionStatus(this.gameSessionId, status);
+            return;
         }
+
+        this.status = status;
+        TurbulenzBridge.setGameSessionStatus(this.gameSessionId, status);
     },
 
     // callbackFn is for testing only!
@@ -27,7 +29,10 @@ GameSession.prototype =
     {
         if (this.gameSessionId)
         {
+            // we can't wait for the callback as the browser doesn't
+            // call async callbacks after onbeforeunload has been called
             TurbulenzBridge.destroyedGameSession(this.gameSessionId);
+            this.destroyed = true;
 
             Utilities.ajax({
                 url: '/api/v1/games/destroy-session',

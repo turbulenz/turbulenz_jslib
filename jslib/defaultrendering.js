@@ -1,10 +1,14 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 
 //
 // DefaultRendering
 //
-/*global renderingCommonCreateRendererInfoFn: false,  renderingCommonGetTechniqueIndexFn: false
-         renderingCommonSortKeyFn: false */
+
+/*global TurbulenzEngine: false*/
+/*global renderingCommonCreateRendererInfoFn: false*/
+/*global renderingCommonGetTechniqueIndexFn: false*/
+/*global renderingCommonSortKeyFn: false */
+/*global Effect: false*/
 
 function DefaultRendering() {}
 
@@ -180,6 +184,11 @@ DefaultRendering.prototype =
         this.wireframe = wireframeEnabled;
     },
 
+    getDefaultSkinBufferSize: function getDefaultSkinBufferSizeFn()
+    {
+        return this.defaultSkinBufferSize;
+    },
+
     destroy: function destroyFn()
     {
         delete this.globalTechniqueParameters;
@@ -242,7 +251,13 @@ DefaultRendering.create = function defaultRenderingCreateFn(gd, md, shaderManage
 
     dr.passes = [[], [], []];
 
-    shaderManager.load("shaders/defaultrendering.cgfx");
+    var onShaderLoaded = function onShaderLoadedFn(shader)
+    {
+        var skinBones = shader.getParameter("skinBones");
+        dr.defaultSkinBufferSize = skinBones.rows * skinBones.columns;
+    };
+
+    shaderManager.load("shaders/defaultrendering.cgfx", onShaderLoaded);
     shaderManager.load("shaders/standard.cgfx");
     shaderManager.load("shaders/debug.cgfx");
 
@@ -1086,6 +1101,28 @@ DefaultRendering.create = function defaultRenderingCreateFn(gd, md, shaderManage
     effect.add(rigid, effectTypeData);
 
     effectsManager.map("default", "blinn");
+
+    //
+    // glowmap
+    //
+    effect = Effect.create("glowmap");
+    effectsManager.add(effect);
+
+    effectTypeData = {  prepare : defaultPrepareFn,
+                        shaderName : "shaders/defaultrendering.cgfx",
+                        techniqueName : "glowmap",
+                        update : defaultBlendUpdateFn,
+                        loadTechniques : loadTechniques };
+    effectTypeData.loadTechniques(shaderManager);
+    effect.add(rigid, effectTypeData);
+
+    effectTypeData = {  prepare : defaultPrepareFn,
+                        shaderName : "shaders/defaultrendering.cgfx",
+                        techniqueName : "glowmap_skinned",
+                        update : defaultBlendSkinnedUpdateFn,
+                        loadTechniques : loadTechniques };
+    effectTypeData.loadTechniques(shaderManager);
+    effect.add(skinned, effectTypeData);
 
     return dr;
 };

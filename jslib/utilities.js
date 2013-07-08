@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2011 Turbulenz Limited
+// Copyright (c) 2010-2012 Turbulenz Limited
 
 /*global window: false*/
 /*global Observer: false*/
@@ -61,6 +61,27 @@ Utilities.log = function logFn()
             break;
         }
     }
+};
+
+Utilities.nearestLowerPow2 = function UtilitiesNearestLowerPow2(num)
+{
+    num = num | (num >>> 1);
+    num = num | (num >>> 2);
+    num = num | (num >>> 4);
+    num = num | (num >>> 8);
+    num = num | (num >>> 16);
+    return (num - (num >>> 1));
+};
+
+Utilities.nearestUpperPow2 = function UtilitiesNearestUpperPow2(num)
+{
+    num = num - 1;
+    num = num | (num >>> 1);
+    num = num | (num >>> 2);
+    num = num | (num >>> 4);
+    num = num | (num >>> 8);
+    num = num | (num >>> 16);
+    return (num + 1);
 };
 
 var MathDeviceConvert =
@@ -133,7 +154,7 @@ var MathDeviceConvert =
                                    m33Array[6], m33Array[7], m33Array[8], m33Dest);
     },
 
-    /*jslint white: false*/
+    /*jshint white: false*/
     m43ToArray : function m43ToJavaScriptArrayFn(m43)
     {
         return [m43[0], m43[ 1], m43[ 2],
@@ -172,7 +193,7 @@ var MathDeviceConvert =
                                    m44Array[ 8], m44Array[ 9], m44Array[10], m44Array[11],
                                    m44Array[12], m44Array[13], m44Array[14], m44Array[15], m44Dest);
     }
-    /*jslint white: true*/
+    /*jshint white: true*/
 };
 
 //
@@ -307,7 +328,7 @@ Utilities.ajax = function utilitiesAjaxFn(params)
 
         var httpCallback = function httpCallbackFn()
         {
-            if (xhr.readyState === 4 && !TurbulenzEngine.isUnloading()) /* 4 == complete */
+            if (xhr.readyState === 4 && TurbulenzEngine && !TurbulenzEngine.isUnloading()) /* 4 == complete */
             {
                 var xhrResponseText = xhr.responseText;
                 var xhrStatus = xhr.status;
@@ -411,6 +432,7 @@ Utilities.ajaxStatusCodes = {
     415: "Unsupported Media Type",
     416: "Requested range not satisfiable",
     417: "Expectation Failed",
+    429: "Too Many Requests",
     480: "Temporarily Unavailable",
     500: "Internal Server Error",
     501: "Not Implemented",

@@ -38,9 +38,9 @@ TARLoader.prototype = {
 
         function getNumber(text)
         {
-            /*jslint regexp: false*/
+            /*jshint regexp: false*/
             text = text.replace(/[^\d]/g, '');
-            /*jslint regexp: true*/
+            /*jshint regexp: true*/
             return parseInt('0' + text, 8);
         }
 
@@ -206,7 +206,7 @@ TARLoader.create = function tgaLoaderFn(params)
                         }
                         else //if (xhr.responseText !== null)
                         {
-                            /*jslint bitwise: false*/
+                            /*jshint bitwise: false*/
                             var text = xhr.responseText;
                             var numChars = text.length;
                             buffer = [];
@@ -215,8 +215,15 @@ TARLoader.create = function tgaLoaderFn(params)
                             {
                                 buffer[i] = (text.charCodeAt(i) & 0xff);
                             }
-                            /*jslint bitwise: true*/
+                            /*jshint bitwise: true*/
                         }
+
+                        // Fix for loading from file
+                        if (xhrStatus === 0 && window.location.protocol === "file:")
+                        {
+                            xhrStatus = 200;
+                        }
+
                         if (loader.processBytes(new Uint8Array(buffer)))
                         {
                             if (loader.onload)

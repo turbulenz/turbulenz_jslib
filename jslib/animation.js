@@ -799,7 +799,11 @@ ReferenceController.create = function referenceControllerCreateFn(baseController
 {
     /*jshint proto:true*/
     var c = new ReferenceController();
+    /*jshint nomen: false*/
+    /*jshint proto: true*/
     c.__proto__ = baseController;
+    /*jshint proto: false*/
+    /*jshint nomen: true*/
     c.referenceSource = baseController;
     c.setReferenceController = function setReferenceControllerFn(controller)
     {
@@ -814,7 +818,11 @@ ReferenceController.create = function referenceControllerCreateFn(baseController
                 delete this[p];
             }
         }
+        /*jshint nomen: false*/
+        /*jshint proto: true*/
         this.__proto__ = controller;
+        /*jshint proto: false*/
+        /*jshint nomen: true*/
         this.referenceSource = controller;
         this.setReferenceController = setReferenceControllerFn;
     };
@@ -1993,8 +2001,9 @@ GPUSkinController.prototype =
         if (oldNumBones !== newNumBones)
         {
             this.ltms.length = newNumBones;
+            var size = this.bufferSize || (newNumBones * 12);
             this.output = this.gd.createTechniqueParameterBuffer({
-                numFloats : (newNumBones * 12),
+                numFloats : size,
                 dynamic : true
             });
         }
@@ -2072,11 +2081,18 @@ GPUSkinController.prototype =
             output.unmap(writer);
         }
         this.dirty = false;
-    }
+    },
+
+    defaultBufferSize : undefined
+};
+
+GPUSkinController.setDefaultBufferSize = function  gpuSkinControllerSetDefaultBufferSize(size)
+{
+    GPUSkinController.prototype.defaultBufferSize = size;
 };
 
 // Constructor function
-GPUSkinController.create = function skinControllerCreateFn(gd, md)
+GPUSkinController.create = function skinControllerCreateFn(gd, md, bufferSize)
 {
     var c = new GPUSkinController();
 
@@ -2086,6 +2102,7 @@ GPUSkinController.create = function skinControllerCreateFn(gd, md)
     c.ltms = [];
     c.outputMat = undefined;
     c.convertedquatPos = undefined;
+    c.bufferSize = bufferSize || GPUSkinController.prototype.defaultBufferSize;
 
     return c;
 };
@@ -2098,6 +2115,8 @@ function SkinnedNode() {}
 SkinnedNode.prototype =
 {
     version : 1,
+
+    scratchM43 : null,
 
     addTime : function addTimeFn(delta)
     {
@@ -2207,7 +2226,7 @@ SkinnedNode.prototype =
         return jointIndex;
     },
 
-    getJointLTM : function getJointLTMFn(jointIndex)
+    getJointLTM : function getJointLTMFn(jointIndex, dst)
     {
         if (this.input.dirty)
         {
@@ -2225,20 +2244,25 @@ SkinnedNode.prototype =
 
         var jointParents = this.skinController.skeleton.parents;
 
-        var boneMatrix, parentMatrix;
+        var boneMatrix;
         if (hasScale)
         {
             boneMatrix = m43FromRTS.call(md,
                                          interpOut[jointIndex].rotation,
                                          interpOut[jointIndex].translation,
-                                         interpOut[jointIndex].scale);
+                                         interpOut[jointIndex].scale,
+                                         dst);
         }
         else
         {
             boneMatrix = m43FromRT.call(md,
                                         interpOut[jointIndex].rotation,
-                                        interpOut[jointIndex].translation);
+                                        interpOut[jointIndex].translation,
+                                        dst);
         }
+
+        var parentMatrix = this.scratchM43;
+
         while (jointParents[jointIndex] !== -1)
         {
             jointIndex = jointParents[jointIndex];
@@ -2276,7 +2300,7 @@ SkinnedNode.prototype =
 };
 
 // Constructor function
-SkinnedNode.create = function skinnedNodeCreateFn(gd, md, node, skeleton, inputController)
+SkinnedNode.create = function skinnedNodeCreateFn(gd, md, node, skeleton, inputController, bufferSize)
 {
     var sn = new SkinnedNode();
 
@@ -2284,7 +2308,7 @@ SkinnedNode.create = function skinnedNodeCreateFn(gd, md, node, skeleton, inputC
     sn.input = inputController;
     if (gd)
     {
-        sn.skinController = GPUSkinController.create(gd, md);
+        sn.skinController = GPUSkinController.create(gd, md, bufferSize);
     }
     else
     {
@@ -2297,6 +2321,11 @@ SkinnedNode.create = function skinnedNodeCreateFn(gd, md, node, skeleton, inputC
     }
     sn.skinController.setSkeleton(skeleton);
     sn.node = node;
+
+    if (sn.scratchM43 === null)
+    {
+        SkinnedNode.prototype.scratchM43 = md.m43BuildIdentity();
+    }
 
     return sn;
 };

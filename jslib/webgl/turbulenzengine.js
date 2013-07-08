@@ -17,7 +17,7 @@
 function WebGLTurbulenzEngine() {}
 WebGLTurbulenzEngine.prototype = {
 
-    version : '0.20.3.0',
+    version : '0.21.0.0',
 
     setInterval: function (f, t)
     {
@@ -134,58 +134,19 @@ WebGLTurbulenzEngine.prototype = {
 
             VMath.v3Build.apply(VMath, testVector);
 
-            if (Float32Array.prototype.slice === undefined)
-            {
-                Float32Array.prototype.slice = function Float32ArraySlice(s, e)
-                {
-                    var length = this.length;
-                    if (s === undefined)
-                    {
-                        s = 0;
-                    }
-                    else if (s < 0)
-                    {
-                        s += length;
-                    }
-                    if (e === undefined)
-                    {
-                        e = length;
-                    }
-                    else if (e < 0)
-                    {
-                        e += length;
-                    }
-                    length = (e - s);
-                    if (0 < length)
-                    {
-                        var dst = new Float32Array(length);
-                        var n = 0;
-                        do
-                        {
-                            dst[n] = this[s];
-                            n += 1;
-                            s += 1;
-                        }
-                        while (s < e);
-                        return dst;
-                    }
-                    else
-                    {
-                        return new Float32Array();
-                    }
-                };
-            }
-
             // Clamp FLOAT_MAX
             testVector[0] = VMath.FLOAT_MAX;
             VMath.FLOAT_MAX = testVector[0];
-
-            VMathArrayConstructor = Float32Array;
         }
         catch (e)
         {
         }
 
+        return VMath;
+    },
+
+    createNativeMathDevice: function (params)
+    {
         return VMath;
     },
 
@@ -220,6 +181,11 @@ WebGLTurbulenzEngine.prototype = {
     },
 
     getMathDevice: function ()
+    {
+        return VMath;
+    },
+
+    getNativeMathDevice: function ()
     {
         return VMath;
     },
@@ -317,8 +283,13 @@ WebGLTurbulenzEngine.prototype = {
                         return;
                     }
 
-                    // Invoke the callback
+                    // Fix for loading from file
+                    if (xhrStatus === 0 && xhrResponseText && window.location.protocol === "file:")
+                    {
+                        xhrStatus = 200;
+                    }
 
+                    // Invoke the callback
                     if (xhrStatus !== 0)
                     {
                         // Under these conditions, we return a null
@@ -478,19 +449,30 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
     tz.plugin = null;
 
     // time property
-    var getTime;
-    if (window.performance && window.performance.now)
+    var getTime = Date.now;
+    var performance = window.performance;
+    if (performance)
     {
-        getTime = function getTimeFn()
+        // It seems high resolution "now" requires a proper "this"
+        if (performance.now)
         {
-            // It seems high resolution "now" requires a proper "this"
-            return window.performance.now();
-        };
+            getTime = function getTimeFn()
+            {
+                return performance.now();
+            };
+        }
+        else if (performance.webkitNow)
+        {
+            getTime = function getTimeFn()
+            {
+                return performance.webkitNow();
+            };
+        }
     }
-    else
-    {
-        getTime = Date.now;
-    }
+
+    // To be used by the GraphicsDevice for accurate fps calculations
+    tz.getTime = getTime;
+
     var baseTime = getTime(); // all in milliseconds (our "time" property is in seconds)
 
     if (Object.defineProperty)
@@ -787,6 +769,62 @@ WebGLTurbulenzEngine.create = function webGLTurbulenzEngineFn(params)
         }
     }
     tz.systemInfo = systemInfo;
+
+    var b64ConversionTable = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=".split('');
+
+    tz.base64encode = function base64encodeFn(bytes)
+    {
+        var output = "";
+        var numBytes = bytes.length;
+        var valueToChar = b64ConversionTable;
+        var n, chr1, chr2, chr3, enc1, enc2, enc3, enc4;
+
+        /*jshint bitwise: false*/
+        n = 0;
+        while (n < numBytes)
+        {
+            chr1 = bytes[n];
+            n += 1;
+
+            enc1 = (chr1 >> 2);
+
+            if (n < numBytes)
+            {
+                chr2 = bytes[n];
+                n += 1;
+
+                if (n < numBytes)
+                {
+                    chr3 = bytes[n];
+                    n += 1;
+
+                    enc2 = (((chr1 & 3) << 4) | (chr2 >> 4));
+                    enc3 = (((chr2 & 15) << 2) | (chr3 >> 6));
+                    enc4 = (chr3 & 63);
+                }
+                else
+                {
+                    enc2 = (((chr1 & 3) << 4) | (chr2 >> 4));
+                    enc3 = ((chr2 & 15) << 2);
+                    enc4 = 64;
+                }
+            }
+            else
+            {
+                enc2 = ((chr1 & 3) << 4);
+                enc3 = 64;
+                enc4 = 64;
+            }
+
+            output += valueToChar[enc1];
+            output += valueToChar[enc2];
+            output += valueToChar[enc3];
+            output += valueToChar[enc4];
+        }
+        /*jshint bitwise: true*/
+
+        return output;
+    };
 
     return tz;
 };

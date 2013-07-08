@@ -100,7 +100,6 @@ DDSLoader.prototype = {
     BGRPIXELFORMAT_B8G8R8A8 : 2,
     BGRPIXELFORMAT_B8G8R8 : 3,
 
-
     processBytes : function processBytesFn(bytes)
     {
         if (!this.isValidHeader(bytes))
@@ -117,7 +116,7 @@ DDSLoader.prototype = {
         this.width = header.dwWidth;
         this.height = header.dwHeight;
 
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         if ((header.dwCaps2 & this.DDSF_VOLUME) && (header.dwDepth > 0))
         {
             this.depth = header.dwDepth;
@@ -340,7 +339,7 @@ DDSLoader.prototype = {
                 d = (d > 1 ? (d >> 1) : 1);
             }
         }
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
 
         if (bytes.length < (offset + size))
         {
@@ -491,7 +490,7 @@ DDSLoader.prototype = {
             var src = 0, dest = 0;
             var r, g, b;
 
-            /*jslint bitwise: false*/
+            /*jshint bitwise: false*/
             var mask5bit = ((1 << 5) - 1);
             var midMask6bit = (((1 << 6) - 1) << 5);
             do
@@ -505,24 +504,28 @@ DDSLoader.prototype = {
                 dest += 1;
             }
             while (offset < size);
-            /*jslint bitwise: true*/
+            /*jshint bitwise: true*/
             return dst;
         }
         return data;
     },
 
-    decodeColor : function decodeColorFn(data, src, isDXT1, out, cache)
+    decode565: function decode565Fn(value, color)
     {
-        /*jslint bitwise: false*/
-        function decode565(value, color)
-        {
-            color[0] = (((value >> 11) & 31) * (255 / 31));
-            color[1] = (((value >> 5)  & 63) * (255 / 63));
-            color[2] = (((value)       & 31) * (255 / 31));
-            color[3] = 255;
-            return color;
-        }
+        /*jshint bitwise: false*/
+        color[0] = ((value >> 11) & 31) * (255 / 31);
+        color[1] = ((value >> 5)  & 63) * (255 / 63);
+        color[2] = ((value)       & 31) * (255 / 31);
+        color[3] = 255;
+        /*jshint bitwise: true*/
+        return color;
+    },
 
+    decodeColor : function decodeColorFn(data, src, isDXT1, out, scratchpad)
+    {
+        /*jshint bitwise: false*/
+        var cache = scratchpad.cache;
+        var decode565 = DDSLoader.prototype.decode565;
         var col0 = ((data[src + 1] << 8) | data[src]);
         src += 2;
         var col1 = ((data[src + 1] << 8) | data[src]);
@@ -571,9 +574,14 @@ DDSLoader.prototype = {
             }
         }
 
-        var c = [c0, c1, c2, c3];
+        var c = scratchpad.colorArray;
+        c[0] = c0;
+        c[1] = c1;
+        c[2] = c2;
+        c[3] = c3;
+
         // ((1 << 2) - 1) === 3;
-        var row, dest;
+        var row, dest, color;
         if (isDXT1)
         {
             for (i = 0; i < 4; i += 1)
@@ -592,18 +600,38 @@ DDSLoader.prototype = {
             {
                 row = data[src + i];
                 dest = out[i];
-                dest[0] = c[(row)      & 3].slice();
-                dest[1] = c[(row >> 2) & 3].slice();
-                dest[2] = c[(row >> 4) & 3].slice();
-                dest[3] = c[(row >> 6) & 3].slice();
+
+                color = c[(row)      & 3];
+                dest[0][0] = color[0];
+                dest[0][1] = color[1];
+                dest[0][2] = color[2];
+                dest[0][3] = color[3];
+
+                color = c[(row >> 2) & 3];
+                dest[1][0] = color[0];
+                dest[1][1] = color[1];
+                dest[1][2] = color[2];
+                dest[1][3] = color[3];
+
+                color = c[(row >> 4) & 3];
+                dest[2][0] = color[0];
+                dest[2][1] = color[1];
+                dest[2][2] = color[2];
+                dest[2][3] = color[3];
+
+                color = c[(row >> 6) & 3];
+                dest[3][0] = color[0];
+                dest[3][1] = color[1];
+                dest[3][2] = color[2];
+                dest[3][3] = color[3];
             }
         }
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
     },
 
     decodeDXT3Alpha : function decodeDXT3AlphaFn(data, src, out)
     {
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         // ((1 << 4) - 1) === 15;
         for (var i = 0; i < 4; i += 1)
         {
@@ -612,10 +640,10 @@ DDSLoader.prototype = {
             var dest = out[i];
             if (row)
             {
-                dest[0][3] = (((row)       & 15) * (255 / 15));
-                dest[1][3] = (((row >> 4)  & 15) * (255 / 15));
-                dest[2][3] = (((row >> 8)  & 15) * (255 / 15));
-                dest[3][3] = (((row >> 12) & 15) * (255 / 15));
+                dest[0][3] = ((row)       & 15) * (255 / 15);
+                dest[1][3] = ((row >> 4)  & 15) * (255 / 15);
+                dest[2][3] = ((row >> 8)  & 15) * (255 / 15);
+                dest[3][3] = ((row >> 12) & 15) * (255 / 15);
             }
             else
             {
@@ -625,19 +653,19 @@ DDSLoader.prototype = {
                 dest[3][3] = 0;
             }
         }
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
     },
 
-    decodeDXT5Alpha : function decodeDXT5AlphaFn(data, src, out)
+    decodeDXT5Alpha : function decodeDXT5AlphaFn(data, src, out, scratchpad)
     {
         var a0 = data[src];
         src += 1;
         var a1 = data[src];
         src += 1;
 
-        /*jslint bitwise: false*/
-        var a = [];
-        a.length = 8;
+        /*jshint bitwise: false*/
+        var a = scratchpad.alphaArray;
+
         a[0] = a0;
         a[1] = a1;
         if (a0 > a1)
@@ -685,15 +713,18 @@ DDSLoader.prototype = {
             dest[2][3] = a[(value >> 18) & 7];
             dest[3][3] = a[(value >> 21) & 7];
         }
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
     },
 
     convertDXT1ToRGBA : function convertDXT1ToRGBAFn(data)
     {
         var decodeColor = this.decodeColor;
-        var cache = [[], [], [], []];
+
+        var scratchpad = { cache: [new Uint8Array(4), new Uint8Array(4), new Uint8Array(4), new Uint8Array(4)],
+                           colorArray: new Array(4)
+                         };
         data = this.convertToRGBA(data, function decodeDXT1(data, src, out) {
-            decodeColor(data, src, true, out, cache);
+            decodeColor(data, src, true, out, scratchpad);
         }, 8);
         this.format = this.gd.PIXELFORMAT_R8G8B8A8;
         return data;
@@ -703,9 +734,11 @@ DDSLoader.prototype = {
     {
         var decodeColor = this.decodeColor;
         var decodeDXT3Alpha = this.decodeDXT3Alpha;
-        var cache = [[], [], [], []];
+        var scratchpad = { cache: [new Uint8Array(4), new Uint8Array(4), new Uint8Array(4), new Uint8Array(4)],
+                           colorArray: new Array(4)
+                         };
         data = this.convertToRGBA(data, function decodeDXT3(data, src, out) {
-            decodeColor(data, (src + 8), false, out, cache);
+            decodeColor(data, (src + 8), false, out, scratchpad);
             decodeDXT3Alpha(data, src, out);
         }, 16);
         this.format = this.gd.PIXELFORMAT_R8G8B8A8;
@@ -716,10 +749,13 @@ DDSLoader.prototype = {
     {
         var decodeColor = this.decodeColor;
         var decodeDXT5Alpha = this.decodeDXT5Alpha;
-        var cache = [[], [], [], []];
+        var scratchpad = { cache: [new Uint8Array(4), new Uint8Array(4), new Uint8Array(4), new Uint8Array(4)],
+                           colorArray: new Array(4),
+                           alphaArray: new Uint8Array(8)
+                         };
         data = this.convertToRGBA(data, function decodeDXT5(data, src, out) {
-            decodeColor(data, (src + 8), false, out, cache);
-            decodeDXT5Alpha(data, src, out);
+            decodeColor(data, (src + 8), false, out, scratchpad);
+            decodeDXT5Alpha(data, src, out, scratchpad);
         }, 16);
         this.format = this.gd.PIXELFORMAT_R8G8B8A8;
         return data;
@@ -734,7 +770,7 @@ DDSLoader.prototype = {
         var numLevels = this.numLevels;
         var numFaces = this.numFaces;
 
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         var numPixels = 0;
         for (level = 0; level < numLevels; level += 1)
         {
@@ -747,7 +783,11 @@ DDSLoader.prototype = {
 
         var src = 0, dest = 0;
 
-        var color = [[], [], [], []];
+        var color = [[new Uint8Array(4), new Uint8Array(4), new Uint8Array(4), new Uint8Array(4)],
+                     [new Uint8Array(4), new Uint8Array(4), new Uint8Array(4), new Uint8Array(4)],
+                     [new Uint8Array(4), new Uint8Array(4), new Uint8Array(4), new Uint8Array(4)],
+                     [new Uint8Array(4), new Uint8Array(4), new Uint8Array(4), new Uint8Array(4)]
+                    ];
         for (var face = 0; face < numFaces; face += 1)
         {
             width = this.width;
@@ -792,7 +832,7 @@ DDSLoader.prototype = {
                 height = (height > 1 ? (height >> 1) : 1);
             }
         }
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
 
         return dst;
     }
@@ -806,7 +846,7 @@ DDSLoader.create = function ddsLoaderFn(params)
     loader.onload = params.onload;
     loader.onerror = params.onerror;
 
-    /*jslint bitwise: false*/
+    /*jshint bitwise: false*/
     function MAKEFOURCC(c0, c1, c2, c3)
     {
         return (c0.charCodeAt(0) +
@@ -814,7 +854,7 @@ DDSLoader.create = function ddsLoaderFn(params)
                (c2.charCodeAt(0) * 65536) +
                (c3.charCodeAt(0) * 16777216));
     }
-    /*jslint bitwise: true*/
+    /*jshint bitwise: true*/
     loader.FOURCC_ATI1 = MAKEFOURCC('A', 'T', 'I', '1');
     loader.FOURCC_ATI2 = MAKEFOURCC('A', 'T', 'I', '2');
     loader.FOURCC_RXGB = MAKEFOURCC('R', 'X', 'G', 'B');
@@ -872,7 +912,7 @@ DDSLoader.create = function ddsLoaderFn(params)
                         }
                         else //if (xhr.responseText !== null)
                         {
-                            /*jslint bitwise: false*/
+                            /*jshint bitwise: false*/
                             var text = xhr.responseText;
                             var numChars = text.length;
                             buffer = [];
@@ -881,8 +921,15 @@ DDSLoader.create = function ddsLoaderFn(params)
                             {
                                 buffer[i] = (text.charCodeAt(i) & 0xff);
                             }
-                            /*jslint bitwise: true*/
+                            /*jshint bitwise: true*/
                         }
+
+                        // Fix for loading from file
+                        if (xhrStatus === 0 && window.location.protocol === "file:")
+                        {
+                            xhrStatus = 200;
+                        }
+
                         loader.processBytes(new Uint8Array(buffer));
                         if (loader.data)
                         {

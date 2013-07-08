@@ -551,7 +551,6 @@ SceneNode.prototype =
             delete this.dirtyWorldExtents;
             delete this.worldExtentsUpdate;
             delete this.dirtyWorld;
-            delete this.worldExtentsUpdate;
             delete this.notifiedParent;
             delete this.dynamic;
         }
@@ -753,9 +752,9 @@ SceneNode.prototype =
                         for (index = 0; index < numRenderables; index += 1)
                         {
                             renderable = renderables[index];
-                            if (renderable.hasCustomWorldExtents())
+                            extents = renderable.getCustomWorldExtents();
+                            if (extents)
                             {
-                                extents = renderable.getCustomWorldExtents();
                                 minX = extents[0];
                                 minY = extents[1];
                                 minZ = extents[2];
@@ -771,10 +770,9 @@ SceneNode.prototype =
                         for (; index < numRenderables; index += 1)
                         {
                             renderable = renderables[index];
-                            if (renderable.hasCustomWorldExtents())
+                            extents = renderable.getCustomWorldExtents();
+                            if (extents)
                             {
-                                extents = renderable.getCustomWorldExtents();
-
                                 if (minX > extents[0])
                                 {
                                     minX = extents[0];
@@ -813,7 +811,7 @@ SceneNode.prototype =
                             worldExtents = node.worldExtents;
                             if (!worldExtents)
                             {
-                                worldExtents = [];
+                                worldExtents = new node.arrayConstructor(6);
                                 node.worldExtents = worldExtents;
                             }
                             worldExtents[0] = minX;
@@ -866,7 +864,7 @@ SceneNode.prototype =
                         worldExtents = node.worldExtents;
                         if (!worldExtents)
                         {
-                            worldExtents = [];
+                            worldExtents = new node.arrayConstructor(6);
                             node.worldExtents = worldExtents;
                         }
                         worldExtents[0] = (ct0 - ht0);
@@ -957,7 +955,7 @@ SceneNode.prototype =
     //
     updateLocalExtents: function sceneNodeUpdateLocalExtentsFn()
     {
-        var localExtents;
+        var localExtents, center, halfExtents;
         var hasExtents = false;
         if (this.customLocalExtents)
         {
@@ -974,11 +972,14 @@ SceneNode.prototype =
                 var minValue = -maxValue;
                 var min = Math.min;
                 var max = Math.max;
-                var center, halfExtents;
+                var h0, h1, h2, c0, c1, c2;
 
-                localExtents = [maxValue, maxValue, maxValue, minValue, minValue, minValue];
-                this.localExtents = localExtents;
-                hasExtents = true;
+                var localExtents0 = maxValue;
+                var localExtents1 = maxValue;
+                var localExtents2 = maxValue;
+                var localExtents3 = minValue;
+                var localExtents4 = minValue;
+                var localExtents5 = minValue;
 
                 if (renderables)
                 {
@@ -989,26 +990,34 @@ SceneNode.prototype =
                         halfExtents = renderable.halfExtents;
                         if (halfExtents && !renderable.hasCustomWorldExtents())
                         {
+                            h0 = halfExtents[0];
+                            h1 = halfExtents[1];
+                            h2 = halfExtents[2];
+
                             center = renderable.center;
                             if (center)
                             {
-                                localExtents[0] = min(localExtents[0], (center[0] - halfExtents[0]));
-                                localExtents[1] = min(localExtents[1], (center[1] - halfExtents[1]));
-                                localExtents[2] = min(localExtents[2], (center[2] - halfExtents[2]));
+                                c0 = center[0];
+                                c1 = center[1];
+                                c2 = center[2];
 
-                                localExtents[3] = max(localExtents[3], (center[0] + halfExtents[0]));
-                                localExtents[4] = max(localExtents[4], (center[1] + halfExtents[1]));
-                                localExtents[5] = max(localExtents[5], (center[2] + halfExtents[2]));
+                                localExtents0 = min(localExtents0, (c0 - h0));
+                                localExtents1 = min(localExtents1, (c1 - h1));
+                                localExtents2 = min(localExtents2, (c2 - h2));
+
+                                localExtents3 = max(localExtents3, (c0 + h0));
+                                localExtents4 = max(localExtents4, (c1 + h1));
+                                localExtents5 = max(localExtents5, (c2 + h2));
                             }
                             else
                             {
-                                localExtents[0] = min(localExtents[0], - halfExtents[0]);
-                                localExtents[1] = min(localExtents[1], - halfExtents[1]);
-                                localExtents[2] = min(localExtents[2], - halfExtents[2]);
+                                localExtents0 = min(localExtents0, - h0);
+                                localExtents1 = min(localExtents1, - h1);
+                                localExtents2 = min(localExtents2, - h2);
 
-                                localExtents[3] = max(localExtents[3], + halfExtents[0]);
-                                localExtents[4] = max(localExtents[4], + halfExtents[1]);
-                                localExtents[5] = max(localExtents[5], + halfExtents[2]);
+                                localExtents3 = max(localExtents3, + h0);
+                                localExtents4 = max(localExtents4, + h1);
+                                localExtents5 = max(localExtents5, + h2);
                             }
                         }
                     }
@@ -1023,40 +1032,65 @@ SceneNode.prototype =
                         halfExtents = light.halfExtents;
                         if (halfExtents)
                         {
+                            h0 = halfExtents[0];
+                            h1 = halfExtents[1];
+                            h2 = halfExtents[2];
+
                             center = light.center;
                             if (center)
                             {
-                                localExtents[0] = min(localExtents[0], (center[0] - halfExtents[0]));
-                                localExtents[1] = min(localExtents[1], (center[1] - halfExtents[1]));
-                                localExtents[2] = min(localExtents[2], (center[2] - halfExtents[2]));
+                                c0 = center[0];
+                                c1 = center[1];
+                                c2 = center[2];
 
-                                localExtents[3] = max(localExtents[3], (center[0] + halfExtents[0]));
-                                localExtents[4] = max(localExtents[4], (center[1] + halfExtents[1]));
-                                localExtents[5] = max(localExtents[5], (center[2] + halfExtents[2]));
+                                localExtents0 = min(localExtents0, (c0 - h0));
+                                localExtents1 = min(localExtents1, (c1 - h1));
+                                localExtents2 = min(localExtents2, (c2 - h2));
+
+                                localExtents3 = max(localExtents3, (c0 + h0));
+                                localExtents4 = max(localExtents4, (c1 + h1));
+                                localExtents5 = max(localExtents5, (c2 + h2));
                             }
                             else
                             {
-                                localExtents[0] = min(localExtents[0], - halfExtents[0]);
-                                localExtents[1] = min(localExtents[1], - halfExtents[1]);
-                                localExtents[2] = min(localExtents[2], - halfExtents[2]);
+                                localExtents0 = min(localExtents0, - h0);
+                                localExtents1 = min(localExtents1, - h1);
+                                localExtents2 = min(localExtents2, - h2);
 
-                                localExtents[3] = max(localExtents[3], + halfExtents[0]);
-                                localExtents[4] = max(localExtents[4], + halfExtents[1]);
-                                localExtents[5] = max(localExtents[5], + halfExtents[2]);
+                                localExtents3 = max(localExtents3, + h0);
+                                localExtents4 = max(localExtents4, + h1);
+                                localExtents5 = max(localExtents5, + h2);
                             }
                         }
                     }
                 }
+
+                localExtents = new this.arrayConstructor(6);
+                localExtents[0] = localExtents0;
+                localExtents[1] = localExtents1;
+                localExtents[2] = localExtents2;
+                localExtents[3] = localExtents3;
+                localExtents[4] = localExtents4;
+                localExtents[5] = localExtents5;
+                this.localExtents = localExtents;
+                hasExtents = true;
             }
         }
         if (hasExtents)
         {
             localExtents = this.localExtents;
-            var cX = (localExtents[3] + localExtents[0]) * 0.5;
-            var cY = (localExtents[4] + localExtents[1]) * 0.5;
-            var cZ = (localExtents[5] + localExtents[2]) * 0.5;
-            this.localExtentsCenter = [cX, cY, cZ];
-            this.localHalfExtents = [(localExtents[3] - cX), (localExtents[4] - cY), (localExtents[5] - cZ)];
+
+            center = (this.localExtentsCenter || new this.arrayConstructor(3));
+            center[0] = (localExtents[3] + localExtents[0]) * 0.5;
+            center[1] = (localExtents[4] + localExtents[1]) * 0.5;
+            center[2] = (localExtents[5] + localExtents[2]) * 0.5;
+            this.localExtentsCenter = center;
+
+            halfExtents = (this.localHalfExtents || new this.arrayConstructor(3));
+            halfExtents[0] = (localExtents[3] - center[0]);
+            halfExtents[1] = (localExtents[4] - center[1]);
+            halfExtents[2] = (localExtents[5] - center[2]);
+            this.localHalfExtents = halfExtents;
         }
         else
         {
@@ -1110,9 +1144,9 @@ SceneNode.prototype =
                     for (index = 0; index < numRenderables; index += 1)
                     {
                         renderable = renderables[index];
-                        if (renderable.hasCustomWorldExtents())
+                        extents = renderable.getCustomWorldExtents();
+                        if (extents)
                         {
-                            extents = renderable.getCustomWorldExtents();
                             minX = extents[0];
                             minY = extents[1];
                             minZ = extents[2];
@@ -1128,10 +1162,9 @@ SceneNode.prototype =
                     for (; index < numRenderables; index += 1)
                     {
                         renderable = renderables[index];
-                        if (renderable.hasCustomWorldExtents())
+                        extents = renderable.getCustomWorldExtents();
+                        if (extents)
                         {
-                            extents = renderable.getCustomWorldExtents();
-
                             if (minX > extents[0])
                             {
                                 minX = extents[0];
@@ -1170,7 +1203,7 @@ SceneNode.prototype =
                         worldExtents = this.worldExtents;
                         if (!worldExtents)
                         {
-                            worldExtents = [];
+                            worldExtents = new this.arrayConstructor(6);
                             this.worldExtents = worldExtents;
                         }
                         worldExtents[0] = minX;
@@ -1223,7 +1256,7 @@ SceneNode.prototype =
                     worldExtents = this.worldExtents;
                     if (!worldExtents)
                     {
-                        worldExtents = [];
+                        worldExtents = new this.arrayConstructor(6);
                         this.worldExtents = worldExtents;
                     }
                     worldExtents[0] = (ct0 - ht0);
@@ -1380,28 +1413,20 @@ SceneNode.prototype =
     //
     calculateHierarchyWorldExtents: function sceneNodeCalculateHierarchyWorldExtentsFn()
     {
-        var min = Math.min;
-        var max = Math.max;
-        var maxValue = Number.MAX_VALUE;
-        var totalExtents = [];
-        totalExtents[0] = maxValue;
-        totalExtents[1] = maxValue;
-        totalExtents[2] = maxValue;
-        totalExtents[3] = -maxValue;
-        totalExtents[4] = -maxValue;
-        totalExtents[5] = -maxValue;
-
-        function calculateNodeExtentsFn(sceneNode)
+        function calculateNodeExtentsFn(sceneNode, totalExtents)
         {
+            var valid = false;
+
             var worldExtents = sceneNode.getWorldExtents();
             if (worldExtents)
             {
-                totalExtents[0] = min(totalExtents[0], worldExtents[0]);
-                totalExtents[1] = min(totalExtents[1], worldExtents[1]);
-                totalExtents[2] = min(totalExtents[2], worldExtents[2]);
-                totalExtents[3] = max(totalExtents[3], worldExtents[3]);
-                totalExtents[4] = max(totalExtents[4], worldExtents[4]);
-                totalExtents[5] = max(totalExtents[5], worldExtents[5]);
+                totalExtents[0] = (totalExtents[0] < worldExtents[0] ? totalExtents[0] : worldExtents[0]);
+                totalExtents[1] = (totalExtents[1] < worldExtents[1] ? totalExtents[1] : worldExtents[1]);
+                totalExtents[2] = (totalExtents[2] < worldExtents[2] ? totalExtents[2] : worldExtents[2]);
+                totalExtents[3] = (totalExtents[3] > worldExtents[3] ? totalExtents[3] : worldExtents[3]);
+                totalExtents[4] = (totalExtents[4] > worldExtents[4] ? totalExtents[4] : worldExtents[4]);
+                totalExtents[5] = (totalExtents[5] > worldExtents[5] ? totalExtents[5] : worldExtents[5]);
+                valid = true;
             }
 
             var children = sceneNode.children;
@@ -1410,17 +1435,30 @@ SceneNode.prototype =
                 var numChildren = children.length;
                 for (var n = 0; n < numChildren; n += 1)
                 {
-                    calculateNodeExtentsFn(children[n]);
+                    valid = (calculateNodeExtentsFn(children[n], totalExtents) || valid);
                 }
             }
-        }
-        calculateNodeExtentsFn(this);
 
-        if (totalExtents[0] === maxValue)
+            return valid;
+        }
+
+        var maxValue = Number.MAX_VALUE;
+        var totalExtents = new this.arrayConstructor(6);
+        totalExtents[0] = maxValue;
+        totalExtents[1] = maxValue;
+        totalExtents[2] = maxValue;
+        totalExtents[3] = -maxValue;
+        totalExtents[4] = -maxValue;
+        totalExtents[5] = -maxValue;
+
+        if (calculateNodeExtentsFn(this, totalExtents))
+        {
+            return totalExtents;
+        }
+        else
         {
             return undefined;
         }
-        return totalExtents;
     },
 
     //
@@ -1686,3 +1724,17 @@ SceneNode.create = function sceneNodeCreateFn(params)
 
     return sceneNode;
 };
+
+// Detect correct typed arrays
+(function () {
+    SceneNode.prototype.arrayConstructor = Array;
+    if (typeof Float32Array !== "undefined")
+    {
+        var testArray = new Float32Array(4);
+        var textDescriptor = Object.prototype.toString.call(testArray);
+        if (textDescriptor === '[object Float32Array]')
+        {
+            SceneNode.prototype.arrayConstructor = Float32Array;
+        }
+    }
+}());

@@ -108,6 +108,9 @@ RequestHandler.prototype =
         var responseCallback = function responseCallbackFn(responseAsset, status)
         {
             var xhr = callContext.xhr;
+            var sendEventToHandlers = that.sendEventToHandlers;
+            var handlers = that.handlers;
+
             if (xhr)
             {
                 var retryAfterHeader = xhr.getResponseHeader("Retry-After");
@@ -157,6 +160,18 @@ RequestHandler.prototype =
 
             if (callContext.onload)
             {
+                var nameStr;
+                if (responseAsset && responseAsset.name)
+                {
+                    nameStr = responseAsset.name;
+                }
+                else
+                {
+                    nameStr = callContext.src;
+                }
+
+                sendEventToHandlers(handlers.eventOnload, {eventType: "eventOnload", name: nameStr});
+
                 callContext.onload(responseAsset, status, callContext);
                 callContext.onload = null;
             }
@@ -187,6 +202,73 @@ RequestHandler.prototype =
         };
 
         makeRequest();
+    },
+
+    addEventListener : function addEventListenerFn(eventType, eventListener)
+    {
+        var i;
+        var length;
+        var eventHandlers;
+
+        if (this.handlers.hasOwnProperty(eventType))
+        {
+            eventHandlers = this.handlers[eventType];
+
+            if (eventListener)
+            {
+                // Check handler is not already stored
+                length = eventHandlers.length;
+                for (i = 0; i < length; i += 1)
+                {
+                    if (eventHandlers[i] === eventListener)
+                    {
+                        // Event handler has already been added
+                        return;
+                    }
+                }
+
+                eventHandlers.push(eventListener);
+            }
+        }
+    },
+
+    removeEventListener : function removeEventListenerFn(eventType, eventListener)
+    {
+        var i;
+        var length;
+        var eventHandlers;
+
+        if (this.handlers.hasOwnProperty(eventType))
+        {
+            eventHandlers = this.handlers[eventType];
+
+            if (eventListener)
+            {
+                length = eventHandlers.length;
+                for (i = 0; i < length; i += 1)
+                {
+                    if (eventHandlers[i] === eventListener)
+                    {
+                        eventHandlers.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+        }
+    },
+
+    sendEventToHandlers : function sendEventToHandlersFn(eventHandlers, arg0)
+    {
+        var i;
+        var length = eventHandlers.length;
+
+        if (length)
+        {
+            for (i = 0; i < length; i += 1)
+            {
+                eventHandlers[i](arg0);
+            }
+        }
     }
 };
 
@@ -205,6 +287,10 @@ RequestHandler.create = function requestHandlerCreateFn(params)
 
     rh.onReconnected = params.onReconnected || function onReconnectedFn() {};
     rh.onRequestTimeout = params.onRequestTimeout || function onRequestTimeoutFn(callContext) {};
+    var handlers = {};
+    rh.handlers = handlers;
+
+    rh.handlers.eventOnload = [];
 
     return rh;
 };

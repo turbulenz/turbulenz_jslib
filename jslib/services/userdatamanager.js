@@ -154,7 +154,7 @@ UserDataManager.prototype =
         }
 
         var that = this;
-        function setCallbackFn(responseText, status)
+        function setCallbackFn(jsonResponse, status)
         {
             if (status === 200)
             {
@@ -163,7 +163,7 @@ UserDataManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.set failed with status " + status + ": " + responseText,
+                errorCallback("UserDataManager.set failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               that.set,
                               [key, value, callbackFn]);
@@ -192,7 +192,7 @@ UserDataManager.prototype =
         }
 
         var that = this;
-        function removeCallbackFn(responseText, status)
+        function removeCallbackFn(jsonResponse, status)
         {
             if (status === 200)
             {
@@ -205,7 +205,7 @@ UserDataManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.remove failed with status " + status + ": " + responseText,
+                errorCallback("UserDataManager.remove failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               that.remove,
                               [key, callbackFn]);
@@ -228,7 +228,7 @@ UserDataManager.prototype =
     removeAll: function userdataManagerRemoveAllFn(callbackFn, errorCallbackFn)
     {
         var that = this;
-        function removeAllCallbackFn(responseText, status)
+        function removeAllCallbackFn(jsonResponse, status)
         {
             if (status === 200)
             {
@@ -237,7 +237,7 @@ UserDataManager.prototype =
             else
             {
                 var errorCallback = errorCallbackFn || that.errorCallbackFn;
-                errorCallback("UserDataManager.removeAll failed with status " + status + ": " + responseText,
+                errorCallback("UserDataManager.removeAll failed with status " + status + ": " + jsonResponse.msg,
                               status,
                               that.removeAll,
                               [callbackFn]);

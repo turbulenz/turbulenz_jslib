@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Turbulenz Limited
+// Copyright (c) 2011-2012 Turbulenz Limited
 
 
 var namedCSSColor = {
@@ -390,9 +390,8 @@ CanvasLinearGradient.prototype =
             var dx = (lx / (width > 1 ? (width - 1) : 1));
             var dy = (ly / (height > 1 ? (height - 1) : 1));
 
-            var ArrayTypeConstructor = [].constructor;
             var numValues = (width * height * 4);
-            var pixelData = new ArrayTypeConstructor(numValues);
+            var pixelData = new Array(numValues);
             var p = 0;
             var vy = 0;
             for (var y = 0; y < height; y += 1, vy += dy)
@@ -633,18 +632,17 @@ CanvasRadialGradient.prototype =
             var r1 = this.r1;
             var dr = (r1 - r0);
 
-            var ArrayTypeConstructor = [].constructor;
             var numValues = (width * height * 4);
-            var pixelData = new ArrayTypeConstructor(numValues);
+            var pixelData = new Array(numValues);
 
             var cos = Math.cos;
             var sin = Math.sin;
             var abs = Math.abs;
             var pi2 = (Math.PI * 2);
 
-            /*jslint bitwise: false*/
+            /*jshint bitwise: false*/
             var numSteps = Math.max(abs(dx | 0), abs(dy | 0), abs(dr | 0));
-            /*jslint bitwise: true*/
+            /*jshint bitwise: true*/
 
             var dw = (1.0 / numSteps);
             var c0, c1, c2, c3;
@@ -700,11 +698,11 @@ CanvasRadialGradient.prototype =
                     dangle = (1.0 / cr);
                     for (angle = 0; angle < pi2; angle += dangle)
                     {
-                        /*jslint bitwise: false*/
+                        /*jshint bitwise: false*/
                         cx = ((x + (cr * cos(angle))) | 0);
                         cy = ((y + (cr * sin(angle))) | 0);
                         p = ((cx + (cy * width)) << 2);
-                        /*jslint bitwise: true*/
+                        /*jshint bitwise: true*/
                         if (pixelData[p + 3] === undefined)
                         {
                             pixelData[p] = c0;
@@ -718,11 +716,11 @@ CanvasRadialGradient.prototype =
                 dangle = (1.0 / r);
                 for (angle = 0; angle < pi2; angle += dangle)
                 {
-                    /*jslint bitwise: false*/
+                    /*jshint bitwise: false*/
                     cx = ((x + (r * cos(angle))) | 0);
                     cy = ((y + (r * sin(angle))) | 0);
                     p = ((cx + (cy * width)) << 2);
-                    /*jslint bitwise: true*/
+                    /*jshint bitwise: true*/
                     if (pixelData[p + 3] === undefined)
                     {
                         pixelData[p] = c0;
@@ -840,23 +838,31 @@ CanvasContext.prototype =
         'miter' : 1
     },
 
-    arrayTypeConstructor : [].constructor,
-
     //
     // Public canvas 2D context API
     //
     save : function saveFn()
     {
         var statesStack = this.statesStack;
-        statesStack[statesStack.length] = this.getStates();
+        var numStatesInStack = this.numStatesInStack;
+        var states = statesStack[numStatesInStack];
+        if (!states)
+        {
+            statesStack[numStatesInStack] = states = this.createStatesObject();
+        }
+        this.numStatesInStack = (numStatesInStack + 1);
+        this.setStates(states, this);
     },
 
     restore : function restoreFn()
     {
-        var statesStack = this.statesStack;
-        if (statesStack.length >= 1)
+        var numStatesInStack = this.numStatesInStack;
+        if (0 < numStatesInStack)
         {
-            this.setStates(statesStack.pop());
+            numStatesInStack -= 1;
+            this.numStatesInStack = numStatesInStack;
+            var states = this.statesStack[numStatesInStack];
+            this.setStates(this, states);
         }
     },
 
@@ -948,8 +954,8 @@ CanvasContext.prototype =
     {
         if (w > 0 && h > 0)
         {
-            var rect = this.transformRect(x, y, w, h);
-            this.fillFlatVertices(rect, 4);
+            var rect = this.transformRect(x, y, w, h, this.tempRect);
+            this.fillFlatBuffer(rect, 4);
 
             var technique = this.flatTechniques.copy;
             var gd = this.gd;
@@ -967,8 +973,8 @@ CanvasContext.prototype =
     {
         if (w > 0 && h > 0)
         {
-            var rect = this.transformRect(x, y, w, h);
-            this.fillFlatVertices(rect, 4);
+            var rect = this.transformRect(x, y, w, h, this.tempRect);
+            this.fillFlatBuffer(rect, 4);
 
             var primitive = this.triangleStripPrimitive;
             var style = this.fillStyle;
@@ -989,45 +995,58 @@ CanvasContext.prototype =
     {
         if (w > 0 || h > 0)
         {
-            var rect = this.transformRect(x, y, w, h);
-            var points = [rect[2], rect[3], rect[1], rect[0], rect[2]];
+            var rect = this.transformRect(x, y, w, h, this.tempRect);
 
             var style = this.strokeStyle;
             var lineWidth = this.lineWidth;
             var thinLines = (lineWidth < 2 && !this.forceFatLines);
 
             var primitive;
-            var vertices;
-            var numVertices = 0;
+            var numVertices;
+            var bufferData;
 
             if (thinLines)
             {
                 primitive = this.lineStripPrimitive;
-                vertices = points;
                 numVertices = 5;
+                bufferData = this.getFlatBuffer(5);
+                if (bufferData)
+                {
+                    bufferData[0] = rect[4];
+                    bufferData[1] = rect[5];
+                    bufferData[2] = rect[6];
+                    bufferData[3] = rect[7];
+                    bufferData[4] = rect[2];
+                    bufferData[5] = rect[3];
+                    bufferData[6] = rect[0];
+                    bufferData[7] = rect[1];
+                    bufferData[8] = rect[4];
+                    bufferData[9] = rect[5];
+                    this.fillFlatBuffer(bufferData, 5);
+                }
             }
             else
             {
+                var p0 = [rect[0], rect[1]];
+                var p1 = [rect[2], rect[3]];
+                var p2 = [rect[4], rect[5]];
+                var p3 = [rect[6], rect[7]];
+                var points = [p2, p3, p1, p0, p2];
+
                 primitive = this.triangleStripPrimitive;
-                vertices = this.tempVertices;
-                numVertices = this.triangulateFatStrip(points, 5, lineWidth, vertices, numVertices);
+                numVertices = this.fillFatStrip(points, 5, lineWidth);
             }
 
-            if (numVertices > 0)
+            var gd = this.gd;
+
+            if (this.setShadowStyle(style))
             {
-                this.fillFlatVertices(vertices, numVertices);
-
-                var gd = this.gd;
-
-                if (this.setShadowStyle(style))
-                {
-                    gd.draw(primitive, numVertices);
-                }
-
-                this.setStyle(style);
-
                 gd.draw(primitive, numVertices);
             }
+
+            this.setStyle(style);
+
+            gd.draw(primitive, numVertices);
         }
     },
 
@@ -1050,8 +1069,9 @@ CanvasContext.prototype =
             if (numCurrentSubPathElements > 2)
             {
                 var lastPoint = currentSubPath[numCurrentSubPathElements - 1];
-                if (firstPoint[0] !== lastPoint[0] &&
-                    firstPoint[1] !== lastPoint[2])
+                var abs = Math.abs;
+                if (abs(firstPoint[0] - lastPoint[0]) >= 1.0 ||
+                    abs(firstPoint[1] - lastPoint[1]) >= 1.0)
                 {
                     currentSubPath[numCurrentSubPathElements] = firstPoint;
                 }
@@ -1108,9 +1128,9 @@ CanvasContext.prototype =
         var y2 = p2[1];
 
         var abs = Math.abs;
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         var numSteps = ((0.5 * (abs(x2 - x1) + abs(y2 - y1))) | 0);
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
         var dt = (1.0 / numSteps);
         for (var t = dt; 1 < numSteps; t += dt, numSteps -= 1)
         {
@@ -1152,9 +1172,9 @@ CanvasContext.prototype =
         var y2 = p2[1];
 
         var abs = Math.abs;
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         var numSteps = ((0.5 * (abs(x2 - x1) + abs(y2 - y1))) | 0);
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
         var dt = (1.0 / numSteps);
         for (var t = dt; 1 < numSteps; t += dt, numSteps -= 1)
         {
@@ -1299,11 +1319,11 @@ CanvasContext.prototype =
             numSubPaths += 1;
         }
 
-        var rect = this.transformRect(x, y, w, h);
-        var p0 = rect[0];
-        var p1 = rect[1];
-        var p2 = rect[2];
-        var p3 = rect[3];
+        var rect = this.transformRect(x, y, w, h, this.tempRect);
+        var p0 = [rect[0], rect[1]];
+        var p1 = [rect[2], rect[3]];
+        var p2 = [rect[4], rect[5]];
+        var p3 = [rect[6], rect[7]];
 
         subPaths[numSubPaths] = [p2, p3, p1, p0, p2];
 
@@ -1928,7 +1948,7 @@ CanvasContext.prototype =
             var lineWidth = this.lineWidth;
             var thinLines = (lineWidth < 2 && !this.forceFatLines);
 
-            var points, numPoints, primitive, vertices, numVertices;
+            var points, numPoints, primitive, numVertices;
 
             for (var i = 0; i < numSubPaths; i += 1)
             {
@@ -1937,17 +1957,18 @@ CanvasContext.prototype =
                 if (thinLines)
                 {
                     primitive = this.lineStripPrimitive;
-                    vertices = points;
                     numVertices = numPoints;
+                    this.fillFlatVertices(points, numPoints);
                 }
                 else if (numPoints > 1)
                 {
                     primitive = this.triangleStripPrimitive;
-                    vertices = this.tempVertices;
-                    numVertices = this.triangulateFatStrip(points, numPoints, lineWidth, vertices, 0);
+                    numVertices = this.fillFatStrip(points, numPoints, lineWidth);
                 }
-
-                this.fillFlatVertices(vertices, numVertices);
+                else
+                {
+                    continue;
+                }
 
                 if (this.setShadowStyle(style))
                 {
@@ -1966,17 +1987,18 @@ CanvasContext.prototype =
                 if (thinLines)
                 {
                     primitive = this.lineStripPrimitive;
-                    vertices = points;
                     numVertices = numPoints;
+                    this.fillFlatVertices(points, numPoints);
                 }
                 else if (numPoints > 1)
                 {
                     primitive = this.triangleStripPrimitive;
-                    vertices = this.tempVertices;
-                    numVertices = this.triangulateFatStrip(points, numPoints, lineWidth, vertices, 0);
+                    numVertices = this.fillFatStrip(points, numPoints, lineWidth);
                 }
-
-                this.fillFlatVertices(vertices, numVertices);
+                else
+                {
+                    return;
+                }
 
                 if (this.setShadowStyle(style))
                 {
@@ -2204,15 +2226,13 @@ CanvasContext.prototype =
 
         gd.setTechnique(technique);
 
-        technique.screen = this.screen;
-
         technique.color = color;
 
-        var rect = this.transformRect(x, y, maxWidth, maxWidth);
-        var p1 = rect[1];
-        var p2 = rect[2];
-        x = p2[0];
-        y = p2[1];
+        var rect = this.transformRect(x, y, maxWidth, maxWidth, this.tempRect);
+        x = rect[4];
+        y = rect[5];
+        var w = (rect[2] - x);
+        var h = (rect[3] - y);
 
         var scale = this.calculateFontScale(font);
 
@@ -2231,7 +2251,7 @@ CanvasContext.prototype =
         }
 
         var params = {
-            rect : [x, y, (p1[0] - x), (p1[1] - y)],
+            rect : [x, y, w, h],
             scale : scale,
             spacing : 0
         };
@@ -2340,31 +2360,29 @@ CanvasContext.prototype =
 
         if (dw > 0 && dh > 0)
         {
-            var writer = this.mapTextureBuffer(4);
-            if (writer)
+            var bufferData = this.getTextureBuffer(4);
+            if (bufferData)
             {
-                var rect = this.transformRect(dx, dy, dw, dh);
-                var p0 = rect[0];
-                var p1 = rect[1];
-                var p2 = rect[2];
-                var p3 = rect[3];
+                var rect = this.transformRect(dx, dy, dw, dh, this.tempRect);
 
-                var x0 = p0[0];
-                var y0 = p0[1];
-                var x1 = p1[0];
-                var y1 = p1[1];
-                var x2 = p2[0];
-                var y2 = p2[1];
-                var x3 = p3[0];
-                var y3 = p3[1];
+                bufferData[0] = rect[0];
+                bufferData[1] = rect[1];
+                bufferData[2] = u0;
+                bufferData[3] = v1;
+                bufferData[4] = rect[2];
+                bufferData[5] = rect[3];
+                bufferData[6] = u1;
+                bufferData[7] = v1;
+                bufferData[8] = rect[4];
+                bufferData[9] = rect[5];
+                bufferData[10] = u0;
+                bufferData[11] = v0;
+                bufferData[12] = rect[6];
+                bufferData[13] = rect[7];
+                bufferData[14] = u1;
+                bufferData[15] = v0;
 
-                writer(x0, y0, u0, v1);
-                writer(x1, y1, u1, v1);
-                writer(x2, y2, u0, v0);
-                writer(x3, y3, u1, v0);
-
-                this.unmapTextureBuffer(writer);
-                writer = null;
+                this.fillTextureBuffer(bufferData, 4);
 
                 var primitive = this.triangleStripPrimitive;
                 var gd = this.gd;
@@ -2382,7 +2400,6 @@ CanvasContext.prototype =
 
                 gd.setTechnique(technique);
 
-                technique.screen = this.screen;
                 technique.texture = image;
 
                 var globalAlpha = this.globalAlpha;
@@ -2421,7 +2438,7 @@ CanvasContext.prototype =
         }
 
         var numValues = (sw * sh * 4);
-        var pixelData = new this.arrayTypeConstructor(numValues);
+        var pixelData = new Array(numValues);
         for (var i = 0; i < numValues; i += 1)
         {
             pixelData[i] = 0;
@@ -2501,8 +2518,8 @@ CanvasContext.prototype =
             var viewport = this.viewport;
             gd.setScissor(viewport[0], viewport[1], viewport[2], viewport[3]);
 
-            var writer = this.mapTextureBuffer(4);
-            if (writer)
+            var bufferData = this.getTextureBuffer(4);
+            if (bufferData)
             {
                 var invCanvasWidth  = 2.0 / this.width;
                 var invCanvasHeight = 2.0 / this.height;
@@ -2518,13 +2535,24 @@ CanvasContext.prototype =
                 var u1 = ((dirtyX + dirtyWidth)  * invImageWidth);
                 var v1 = ((dirtyY + dirtyHeight) * invImageHeight);
 
-                writer(x0, y1, u0, v1);
-                writer(x1, y1, u1, v1);
-                writer(x0, y0, u0, v0);
-                writer(x1, y0, u1, v0);
+                bufferData[0] = x0;
+                bufferData[1] = y1;
+                bufferData[2] = u0;
+                bufferData[3] = v1;
+                bufferData[4] = x1;
+                bufferData[5] = y1;
+                bufferData[6] = u1;
+                bufferData[7] = v1;
+                bufferData[8] = x0;
+                bufferData[9] = y0;
+                bufferData[10] = u0;
+                bufferData[11] = v0;
+                bufferData[12] = x1;
+                bufferData[13] = y0;
+                bufferData[14] = u1;
+                bufferData[15] = v0;
 
-                this.unmapTextureBuffer(writer);
-                writer = null;
+                this.fillTextureBuffer(bufferData, 4);
 
                 var technique = this.imageTechnique;
 
@@ -2653,91 +2681,109 @@ CanvasContext.prototype =
         }
     },
 
-    getStates : function getStatesFn()
+    createStatesObject : function createStatesObjectFn()
     {
         return {
-            globalAlpha : this.globalAlpha,
-            globalCompositeOperation : this.globalCompositeOperation,
-            strokeStyle : this.strokeStyle,
-            fillStyle : this.fillStyle,
-            lineWidth : this.lineWidth,
-            lineCap : this.lineCap,
-            lineJoin : this.lineJoin,
-            miterLimit : this.miterLimit,
-            shadowOffsetX : this.shadowOffsetX,
-            shadowOffsetY : this.shadowOffsetY,
-            shadowBlur : this.shadowBlur,
-            shadowColor : this.shadowColor,
-            font : this.font,
-            textAlign : this.textAlign,
-            textBaseline : this.textBaseline,
-            matrix : this.matrix.slice(),
-            scale : this.scale,
-            translate : this.translate,
-            transform : this.transform,
-            setTransform : this.setTransform,
-            transformPoint : this.transformPoint,
-            transformRect : this.transformRect,
-            clipExtents : this.clipExtents.slice()
+            globalAlpha : 0.0,
+            globalCompositeOperation : null,
+            strokeStyle : null,
+            fillStyle : null,
+            lineWidth : 0.0,
+            lineCap : null,
+            lineJoin : null,
+            miterLimit : 0,
+            shadowOffsetX : 0,
+            shadowOffsetY : 0,
+            shadowBlur : 0,
+            shadowColor : null,
+            font : null,
+            textAlign : null,
+            textBaseline : null,
+            matrix : new this.arrayConstructor(6),
+            scale : null,
+            translate : null,
+            transform : null,
+            setTransform : null,
+            transformPoint : null,
+            transformRect : null,
+            clipExtents : new this.arrayConstructor(4)
         };
     },
 
-    setStates : function setStatesFn(states)
+    setStates : function setStatesFn(dest, src)
     {
-        this.globalAlpha = states.globalAlpha;
-        this.globalCompositeOperation = states.globalCompositeOperation;
-        this.strokeStyle = states.strokeStyle;
-        this.fillStyle = states.fillStyle;
-        this.lineWidth = states.lineWidth;
-        this.lineCap = states.lineCap;
-        this.lineJoin = states.lineJoin;
-        this.miterLimit = states.miterLimit;
-        this.shadowOffsetX = states.shadowOffsetX;
-        this.shadowOffsetY = states.shadowOffsetY;
-        this.shadowBlur = states.shadowBlur;
-        this.shadowColor = states.shadowColor;
-        this.font = states.font;
-        this.textAlign = states.textAlign;
-        this.textBaseline = states.textBaseline;
+        dest.globalAlpha = src.globalAlpha;
+        dest.globalCompositeOperation = src.globalCompositeOperation;
+        dest.strokeStyle = src.strokeStyle;
+        dest.fillStyle = src.fillStyle;
+        dest.lineWidth = src.lineWidth;
+        dest.lineCap = src.lineCap;
+        dest.lineJoin = src.lineJoin;
+        dest.miterLimit = src.miterLimit;
+        dest.shadowOffsetX = src.shadowOffsetX;
+        dest.shadowOffsetY = src.shadowOffsetY;
+        dest.shadowBlur = src.shadowBlur;
+        dest.shadowColor = src.shadowColor;
+        dest.font = src.font;
+        dest.textAlign = src.textAlign;
+        dest.textBaseline = src.textBaseline;
 
         // Have to copy array elements because if we keep a reference we modify the default ones
-        var newMatrix = states.matrix;
-        var oldMatrix = this.matrix;
-        oldMatrix[0] = newMatrix[0];
-        oldMatrix[1] = newMatrix[1];
-        oldMatrix[2] = newMatrix[2];
-        oldMatrix[3] = newMatrix[3];
-        oldMatrix[4] = newMatrix[4];
-        oldMatrix[5] = newMatrix[5];
+        var destMatrix = dest.matrix;
+        var srcMatrix = src.matrix;
+        destMatrix[0] = srcMatrix[0];
+        destMatrix[1] = srcMatrix[1];
+        destMatrix[2] = srcMatrix[2];
+        destMatrix[3] = srcMatrix[3];
+        destMatrix[4] = srcMatrix[4];
+        destMatrix[5] = srcMatrix[5];
 
-        this.scale = states.scale;
-        this.translate = states.translate;
-        this.transform = states.transform;
-        this.setTransform = states.setTransform;
-        this.transformPoint = states.transformPoint;
-        this.transformRect = states.transformRect;
+        dest.scale = src.scale;
+        dest.translate = src.translate;
+        dest.transform = src.transform;
+        dest.setTransform = src.setTransform;
+        dest.transformPoint = src.transformPoint;
+        dest.transformRect = src.transformRect;
 
-        var newExtents = states.clipExtents;
-        var oldExtents = this.clipExtents;
-        oldExtents[0] = newExtents[0];
-        oldExtents[1] = newExtents[1];
-        oldExtents[2] = newExtents[2];
-        oldExtents[3] = newExtents[3];
+        var destExtents = dest.clipExtents;
+        var srcExtents = src.clipExtents;
+        destExtents[0] = srcExtents[0];
+        destExtents[1] = srcExtents[1];
+        destExtents[2] = srcExtents[2];
+        destExtents[3] = srcExtents[3];
+
+        return dest;
     },
 
     resetState : function resetStateFn()
     {
-        this.statesStack.length = 0;
+        this.numStatesInStack = 0;
 
         this.beginPath();
 
-        this.setStates(this.defaultStates);
+        this.setStates(this, this.defaultStates);
 
         var clipExtents = this.clipExtents;
         clipExtents[0] = 0;
         clipExtents[1] = 0;
         clipExtents[2] = this.width;
         clipExtents[3] = this.height;
+
+        this.resetTechniqueParameters();
+    },
+
+    resetTechniqueParameters : function resetTechniqueParametersFn()
+    {
+        // The screen value of texture techniques is updated here
+        var screen = this.screen;
+        var textureTechniques = this.textureTechniques;
+        for (var p in textureTechniques)
+        {
+            if (textureTechniques.hasOwnProperty(p))
+            {
+                textureTechniques[p].screen = screen;
+            }
+        }
     },
 
     updateScissor : function updateScissorFn()
@@ -2803,7 +2849,7 @@ CanvasContext.prototype =
                 ((x * m[3]) + (y * m[4]) + m[5])];
     },
 
-    transformRect : function transformRectFn(x, y, w, h)
+    transformRect : function transformRectFn(x, y, w, h, rect)
     {
         var m = this.matrix;
         var m0 = m[0];
@@ -2820,10 +2866,16 @@ CanvasContext.prototype =
         var dx1 = (w * m3);
         var dy1 = (h * m4);
 
-        return [[(bx + dy0), (by + dy1)],
-                [(bx + dx0 + dy0), (by + dx1 + dy1)],
-                [bx, by],
-                [(bx + dx0), (by + dx1)]];
+        rect[0] = (bx + dy0);
+        rect[1] = (by + dy1);
+        rect[2] = (bx + dx0 + dy0);
+        rect[3] = (by + dx1 + dy1);
+        rect[4] = bx;
+        rect[5] = by;
+        rect[6] = (bx + dx0);
+        rect[7] = (by + dx1);
+
+        return rect;
     },
 
     untransformPoint : function untransformPointFn(p)
@@ -2870,7 +2922,7 @@ CanvasContext.prototype =
                 ((x * r3) + (y * r4) + r5)];
     },
 
-    calculateUVtransform : function calculateUVtransformFn(gradientMatrix)
+    calculateGradientUVtransform : function calculateGradientUVtransformFn(gradientMatrix)
     {
         var m = this.matrix;
         var m0 = m[0];
@@ -2921,12 +2973,71 @@ CanvasContext.prototype =
             }
         }
 
-        return [(g0 * r0 + g1 * r3),
-                (g0 * r1 + g1 * r4),
-                (g0 * r2 + g1 * r5 + g2),
-                (g3 * r0 + g4 * r3),
-                (g3 * r1 + g4 * r4),
-                (g3 * r2 + g4 * r5 + g5)];
+        var uvtransform = this.uvtransform;
+        uvtransform[0] = (g0 * r0 + g1 * r3);
+        uvtransform[1] = (g0 * r1 + g1 * r4);
+        uvtransform[2] = (g0 * r2 + g1 * r5 + g2);
+        uvtransform[3] = (g3 * r0 + g4 * r3);
+        uvtransform[4] = (g3 * r1 + g4 * r4);
+        uvtransform[5] = (g3 * r2 + g4 * r5 + g5);
+        return uvtransform;
+    },
+
+    calculatePatternUVtransform : function calculatePatternUVtransformFn(imageWidth, imageHeight)
+    {
+        var m = this.matrix;
+        var m0 = m[0];
+        var m1 = m[1];
+        var m2 = m[2];
+        var m3 = m[3];
+        var m4 = m[4];
+        var m5 = m[5];
+
+        var invWidth = (1.0 / imageWidth);
+        var invHeight = (1.0 / imageHeight);
+
+        // invert matrix
+        var r0, r1, r2, r3, r4, r5;
+
+        var det = (m0 * m4 - m1 * m3);
+        if (det === 0.0)
+        {
+            r0 = 1.0;
+            r3 = 0.0;
+            r1 = 0.0;
+            r4 = 1.0;
+            r2 = 0.0;
+            r5 = 0.0;
+        }
+        else
+        {
+            r0 = m4;
+            r3 = -m3;
+            r1 = -m1;
+            r4 = m0;
+            r2 = (m1 * m5 - m4 * m2);
+            r5 = (m2 * m3 - m0 * m5);
+
+            if (det !== 1.0)
+            {
+                var detrecp = (1.0 / det);
+                r0 *= detrecp;
+                r3 *= detrecp;
+                r1 *= detrecp;
+                r4 *= detrecp;
+                r2 *= detrecp;
+                r5 *= detrecp;
+            }
+        }
+
+        var uvtransform = this.uvtransform;
+        uvtransform[0] = (invWidth * r0);
+        uvtransform[1] = (invWidth * r1);
+        uvtransform[2] = (invWidth * r2);
+        uvtransform[3] = (invHeight * r3);
+        uvtransform[4] = (invHeight * r4);
+        uvtransform[5] = (invHeight * r5);
+        return uvtransform;
     },
 
 
@@ -3005,7 +3116,7 @@ CanvasContext.prototype =
 
                 gd.setTechnique(technique);
 
-                technique.uvtransform = this.calculateUVtransform(style.matrix);
+                technique.uvtransform = this.calculateGradientUVtransform(style.matrix);
                 technique.gradient = texture;
             }
             else // Pattern
@@ -3022,7 +3133,7 @@ CanvasContext.prototype =
 
                 gd.setTechnique(technique);
 
-                technique.uvscale = this.md.v4Build((1.0 / imageWidth), (1.0 / imageHeight), 0, 0, this.uvscale);
+                technique.uvtransform = this.calculatePatternUVtransform(imageWidth, imageHeight);
                 technique.pattern = style;
             }
         }
@@ -3126,7 +3237,7 @@ CanvasContext.prototype =
 
             technique.screen = screen;
 
-            technique.uvtransform = this.calculateUVtransform(style.matrix);
+            technique.uvtransform = this.calculateGradientUVtransform(style.matrix);
 
             technique.gradient = texture;
             technique.alpha = globalAlpha;
@@ -3151,8 +3262,7 @@ CanvasContext.prototype =
 
             technique.screen = screen;
 
-            technique.uvscale = this.md.v4Build((1.0 / imageWidth), (1.0 / imageHeight), 0, 0, this.uvscale);
-
+            technique.uvtransform = this.calculatePatternUVtransform(imageWidth, imageHeight);
             technique.pattern = style;
             technique.alpha = this.globalAlpha;
         }
@@ -3251,12 +3361,25 @@ CanvasContext.prototype =
     },
 
 
-    mapFlatBuffer : function mapFlatBufferFn(numVertices)
+    getFlatBuffer : function getFlatBufferFn(numVertices)
+    {
+        var bufferData = this.bufferData;
+
+        if (bufferData.length < (numVertices * 2))
+        {
+            this.bufferData = bufferData = new this.arrayConstructor(numVertices * 2);
+        }
+
+        return bufferData;
+    },
+
+    fillFlatBuffer : function fillFlatBufferFn(bufferData, numVertices)
     {
         var flatVertexBuffer = this.flatVertexBuffer;
 
         if (flatVertexBuffer.numVertices < numVertices)
         {
+            flatVertexBuffer.destroy();
             this.flatVertexBuffer = flatVertexBuffer = null;
             this.flatVertexBuffer = flatVertexBuffer = this.gd.createVertexBuffer({
                 numVertices: numVertices,
@@ -3266,25 +3389,31 @@ CanvasContext.prototype =
             });
         }
 
-        return flatVertexBuffer.map(0, numVertices);
-    },
-
-    unmapFlatBuffer : function unmapFlatBufferFn(writer)
-    {
-        var flatVertexBuffer = this.flatVertexBuffer;
-
-        flatVertexBuffer.unmap(writer);
+        flatVertexBuffer.setData(bufferData, 0, numVertices);
 
         this.gd.setStream(flatVertexBuffer, this.flatSemantics);
     },
 
 
-    mapTextureBuffer : function mapTextureBufferFn(numVertices)
+    getTextureBuffer : function getTextureBufferFn(numVertices)
+    {
+        var bufferData = this.bufferData;
+
+        if (bufferData.length < (numVertices * 4))
+        {
+            this.bufferData = bufferData = new this.arrayConstructor(numVertices * 4);
+        }
+
+        return bufferData;
+    },
+
+    fillTextureBuffer : function fillTextureBufferFn(bufferData, numVertices)
     {
         var textureVertexBuffer = this.textureVertexBuffer;
 
         if (textureVertexBuffer.numVertices < numVertices)
         {
+            textureVertexBuffer.destroy();
             this.textureVertexBuffer = textureVertexBuffer = null;
             this.textureVertexBuffer = textureVertexBuffer = this.gd.createVertexBuffer({
                 numVertices: numVertices,
@@ -3294,138 +3423,124 @@ CanvasContext.prototype =
             });
         }
 
-        return textureVertexBuffer.map(0, numVertices);
-    },
-
-    unmapTextureBuffer : function unmapTextureBufferFn(writer)
-    {
-        var textureVertexBuffer = this.textureVertexBuffer;
-
-        textureVertexBuffer.unmap(writer);
+        textureVertexBuffer.setData(bufferData, 0, numVertices);
 
         this.gd.setStream(textureVertexBuffer, this.textureSemantics);
     },
 
 
-    triangulateFatLines : function triangulateFatLinesFn(points, numPoints, lineWidth, vertices, numVertices)
+    fillFatStrip : function fillFatStripFn(points, numPoints, lineWidth)
     {
-        var p, pA, pB, x0, y0, x1, y1, dx, dy, ln, a, b;
-        var sqrt = Math.sqrt;
+        var numVertices = 0;
 
-        lineWidth *= 0.5;
-        p = 0;
-        do
+        var bufferData = this.getFlatBuffer(numPoints * 2);
+        if (bufferData)
         {
-            pA = points[p];
-            pB = points[p + 1];
-            x0 = pA[0];
-            y0 = pA[1];
-            x1 = pB[0];
-            y1 = pB[1];
-            dx = (x1 - x0);
-            dy = (y1 - y0);
-            ln = ((dx * dx) + (dy * dy));
-            if (ln > 0)
+            var p, point, xB, yB, xC, yC, xAB, yAB, xBC, yBC, ln, dx, dy, n;
+            var sqrt = Math.sqrt;
+            var abs = Math.abs;
+
+            lineWidth *= 0.5;
+
+            point = points[0];
+            xB = point[0];
+            yB = point[1];
+
+            var lastPoint = points[numPoints - 1];
+            var isClosed = (abs(xB - lastPoint[0]) < 1.0 &&
+                            abs(yB - lastPoint[1]) < 1.0);
+            if (isClosed)
             {
-                ln = (lineWidth / sqrt(ln));
-                dx *= ln;
-                dy *= ln;
+                if (numPoints < 3)
+                {
+                    return 0;
+                }
 
-                // use perpendicular vector to (dx, dy) -> (dy, -dx)
-                var a0 = (x0 + dy);
-                var a1 = (y0 - dx);
-                var b0 = (x1 - dy);
-                var b1 = (y1 + dx);
-
-                a = [a0, a1];
-                b = [b0, b1];
-
-                vertices[numVertices] = [x0 - dy, y0 + dx];
-                vertices[numVertices + 1] = a;
-                vertices[numVertices + 2] = b;
-                vertices[numVertices + 3] = b;
-                vertices[numVertices + 4] = a;
-                vertices[numVertices + 5] = [x1 + dy, y1 - dx];
+                point = points[numPoints - 2];
+                xAB = (xB - point[0]);
+                yAB = (yB - point[1]);
+                ln = ((xAB * xAB) + (yAB * yAB));
+                if (ln > 0.0)
+                {
+                    ln = (1.0 / sqrt(ln));
+                    xAB *= ln;
+                    yAB *= ln;
+                }
             }
             else
             {
-                a = [x0, y0];
-                b = [x1, y1];
-
-                vertices[numVertices] = a;
-                vertices[numVertices + 1] = a;
-                vertices[numVertices + 2] = a;
-                vertices[numVertices + 3] = b;
-                vertices[numVertices + 4] = b;
-                vertices[numVertices + 5] = b;
+                xAB = 0;
+                yAB = 0;
             }
 
-            numVertices += 6;
-
-            p += 2;
-        }
-        while (p < numPoints);
-
-        return numVertices;
-    },
-
-
-    triangulateFatStrip : function triangulateFatStripFn(points, numPoints, lineWidth, vertices, numVertices)
-    {
-        var p, pA, pB, x0, y0, x1, y1, dx, dy, ln;
-        var sqrt = Math.sqrt;
-
-        var numSegments = (numPoints - 1);
-        var startNumVertices = numVertices;
-
-        lineWidth *= 0.5;
-        p = 0;
-        pA = points[0];
-        x0 = pA[0];
-        y0 = pA[1];
-        do
-        {
-            pB = points[p + 1];
-            x1 = pB[0];
-            y1 = pB[1];
-            dx = (x1 - x0);
-            dy = (y1 - y0);
-            ln = ((dx * dx) + (dy * dy));
-            if (ln > 0)
+            p = 0;
+            n = 0;
+            do
             {
-                ln = (lineWidth / sqrt(ln));
-                dx *= ln;
-                dy *= ln;
+                p += 1;
+                if (p < numPoints)
+                {
+                    point = points[p];
+                    xC = point[0];
+                    yC = point[1];
+                }
+                else if (isClosed)
+                {
+                    point = points[1];
+                    xC = point[0];
+                    yC = point[1];
+                }
+                else
+                {
+                    // use perpendicular vector to (xAB, yAB) -> (yAB, -xAB)
+                    xAB *= lineWidth;
+                    yAB *= lineWidth;
+                    bufferData[n + 0] = xB - yAB;
+                    bufferData[n + 1] = yB + xAB;
+                    bufferData[n + 2] = xB + yAB;
+                    bufferData[n + 3] = yB - xAB;
 
-                // use perpendicular vector to (dx, dy) -> (dy, -dx)
-                vertices[numVertices] = [x0 - dy, y0 + dx];
-                vertices[numVertices + 1] = [x0 + dy, y0 - dx];
-                vertices[numVertices + 2] = [x1 - dy, y1 + dx];
-                vertices[numVertices + 3] = [x1 + dy, y1 - dx];
+                    n += 4;
+                    numVertices += 2;
+                    break;
+                }
+                xBC = (xC - xB);
+                yBC = (yC - yB);
+                ln = ((xBC * xBC) + (yBC * yBC));
+                if (ln >= 1.0)
+                {
+                    ln = (1.0 / sqrt(ln));
+                    xBC *= ln;
+                    yBC *= ln;
+
+                    dx = (xAB + xBC);
+                    dy = (yAB + yBC);
+                    ln = ((dx * dx) + (dy * dy));
+                    if (ln > 0.0)
+                    {
+                        ln = (lineWidth / sqrt(ln));
+                        dx *= ln;
+                        dy *= ln;
+
+                        // use perpendicular vector to (dx, dy) -> (dy, -dx)
+                        bufferData[n + 0] = xB - dy;
+                        bufferData[n + 1] = yB + dx;
+                        bufferData[n + 2] = xB + dy;
+                        bufferData[n + 3] = yB - dx;
+
+                        n += 4;
+                        numVertices += 2;
+                    }
+
+                    xB = xC;
+                    yB = yC;
+                    xAB = xBC;
+                    yAB = yBC;
+                }
             }
-            else
-            {
-                vertices[numVertices] = pA;
-                vertices[numVertices + 1] = pA;
-                vertices[numVertices + 2] = pB;
-                vertices[numVertices + 3] = pB;
-            }
+            while (p < numPoints);
 
-            numVertices += 4;
-
-            p += 1;
-            pA = pB;
-            x0 = x1;
-            y0 = y1;
-        }
-        while (p < numSegments);
-
-        // Do we need to close the loop
-        if (points[0] === points[numSegments])
-        {
-            vertices[numVertices] = vertices[startNumVertices];
-            vertices[numVertices + 1] = vertices[startNumVertices + 1];
-            numVertices += 2;
+            this.fillFlatBuffer(bufferData, numVertices);
         }
 
         return numVertices;
@@ -3479,7 +3594,7 @@ CanvasContext.prototype =
 
         var flag = 0;
 
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         var p0 = points[numSegments - 2];
         var p1 = points[numSegments - 1];
         var p0x = p0[0];
@@ -3516,7 +3631,7 @@ CanvasContext.prototype =
             n += 1;
         }
         while (n < numSegments);
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
 
         if (flag !== 0)
         {
@@ -3954,19 +4069,22 @@ CanvasContext.prototype =
 
     fillFlatVertices : function fillFlatVerticesFn(vertices, numVertices)
     {
-        var writer = this.mapFlatBuffer(numVertices);
-        if (writer)
+        var bufferData = this.getFlatBuffer(numVertices);
+        if (bufferData)
         {
-            var p = 0;
+            var p = 0, d = 0;
             do
             {
                 var vertex = vertices[p];
-                writer(vertex[0], vertex[1]);
+                bufferData[d] = vertex[0];
+                d += 1;
+                bufferData[d] = vertex[1];
+                d += 1;
                 p += 1;
             }
             while (p < numVertices);
 
-            this.unmapFlatBuffer(writer);
+            this.fillFlatBuffer(bufferData, numVertices);
         }
     },
 
@@ -4016,7 +4134,7 @@ CanvasContext.prototype =
         return false;
     },
 
-/*jslint white: false*/
+/*jshint white: false*/
     shaderDefinition : {
  "version": 1,
  "name": "canvas.cgfx",
@@ -4054,11 +4172,6 @@ CanvasContext.prototype =
  "parameters":
  {
   "screen":
-  {
-   "type": "float",
-   "columns": 4
-  },
-  "uvscale":
   {
    "type": "float",
    "columns": 4
@@ -4450,7 +4563,7 @@ CanvasContext.prototype =
   "pattern_source_atop":
   [
    {
-    "parameters": ["screen","uvscale","alpha","pattern"],
+    "parameters": ["screen","uvtransform","alpha","pattern"],
     "semantics": ["POSITION"],
     "states":
     {
@@ -4460,13 +4573,13 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [772,771]
     },
-    "programs": ["vp_pattern","fp_pattern"]
+    "programs": ["vp_texture_uvtransform","fp_pattern"]
    }
   ],
   "pattern_source_in":
   [
    {
-    "parameters": ["screen","uvscale","alpha","pattern"],
+    "parameters": ["screen","uvtransform","alpha","pattern"],
     "semantics": ["POSITION"],
     "states":
     {
@@ -4476,13 +4589,13 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [772,0]
     },
-    "programs": ["vp_pattern","fp_pattern"]
+    "programs": ["vp_texture_uvtransform","fp_pattern"]
    }
   ],
   "pattern_source_out":
   [
    {
-    "parameters": ["screen","uvscale","alpha","pattern"],
+    "parameters": ["screen","uvtransform","alpha","pattern"],
     "semantics": ["POSITION"],
     "states":
     {
@@ -4492,13 +4605,13 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [773,0]
     },
-    "programs": ["vp_pattern","fp_pattern"]
+    "programs": ["vp_texture_uvtransform","fp_pattern"]
    }
   ],
   "pattern_source_over":
   [
    {
-    "parameters": ["screen","uvscale","alpha","pattern"],
+    "parameters": ["screen","uvtransform","alpha","pattern"],
     "semantics": ["POSITION"],
     "states":
     {
@@ -4508,13 +4621,13 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [1,771]
     },
-    "programs": ["vp_pattern","fp_pattern"]
+    "programs": ["vp_texture_uvtransform","fp_pattern"]
    }
   ],
   "pattern_destination_atop":
   [
    {
-    "parameters": ["screen","uvscale","alpha","pattern"],
+    "parameters": ["screen","uvtransform","alpha","pattern"],
     "semantics": ["POSITION"],
     "states":
     {
@@ -4524,13 +4637,13 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [773,770]
     },
-    "programs": ["vp_pattern","fp_pattern"]
+    "programs": ["vp_texture_uvtransform","fp_pattern"]
    }
   ],
   "pattern_destination_in":
   [
    {
-    "parameters": ["screen","uvscale","alpha","pattern"],
+    "parameters": ["screen","uvtransform","alpha","pattern"],
     "semantics": ["POSITION"],
     "states":
     {
@@ -4540,13 +4653,13 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [0,770]
     },
-    "programs": ["vp_pattern","fp_pattern"]
+    "programs": ["vp_texture_uvtransform","fp_pattern"]
    }
   ],
   "pattern_destination_out":
   [
    {
-    "parameters": ["screen","uvscale","alpha","pattern"],
+    "parameters": ["screen","uvtransform","alpha","pattern"],
     "semantics": ["POSITION"],
     "states":
     {
@@ -4556,13 +4669,13 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [0,771]
     },
-    "programs": ["vp_pattern","fp_pattern"]
+    "programs": ["vp_texture_uvtransform","fp_pattern"]
    }
   ],
   "pattern_destination_over":
   [
    {
-    "parameters": ["screen","uvscale","alpha","pattern"],
+    "parameters": ["screen","uvtransform","alpha","pattern"],
     "semantics": ["POSITION"],
     "states":
     {
@@ -4572,13 +4685,13 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [773,1]
     },
-    "programs": ["vp_pattern","fp_pattern"]
+    "programs": ["vp_texture_uvtransform","fp_pattern"]
    }
   ],
   "pattern_lighter":
   [
    {
-    "parameters": ["screen","uvscale","alpha","pattern"],
+    "parameters": ["screen","uvtransform","alpha","pattern"],
     "semantics": ["POSITION"],
     "states":
     {
@@ -4588,13 +4701,13 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [1,1]
     },
-    "programs": ["vp_pattern","fp_pattern"]
+    "programs": ["vp_texture_uvtransform","fp_pattern"]
    }
   ],
   "pattern_copy":
   [
    {
-    "parameters": ["screen","uvscale","alpha","pattern"],
+    "parameters": ["screen","uvtransform","alpha","pattern"],
     "semantics": ["POSITION"],
     "states":
     {
@@ -4603,13 +4716,13 @@ CanvasContext.prototype =
      "CullFaceEnable": false,
      "BlendEnable": false
     },
-    "programs": ["vp_pattern","fp_pattern"]
+    "programs": ["vp_texture_uvtransform","fp_pattern"]
    }
   ],
   "pattern_xor":
   [
    {
-    "parameters": ["screen","uvscale","alpha","pattern"],
+    "parameters": ["screen","uvtransform","alpha","pattern"],
     "semantics": ["POSITION"],
     "states":
     {
@@ -4619,7 +4732,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [773,771]
     },
-    "programs": ["vp_pattern","fp_pattern"]
+    "programs": ["vp_texture_uvtransform","fp_pattern"]
    }
   ],
   "gradient_source_atop":
@@ -4635,7 +4748,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [772,771]
     },
-    "programs": ["vp_gradient","fp_gradient"]
+    "programs": ["vp_texture_uvtransform","fp_gradient"]
    }
   ],
   "gradient_source_in":
@@ -4651,7 +4764,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [772,0]
     },
-    "programs": ["vp_gradient","fp_gradient"]
+    "programs": ["vp_texture_uvtransform","fp_gradient"]
    }
   ],
   "gradient_source_out":
@@ -4667,7 +4780,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [773,0]
     },
-    "programs": ["vp_gradient","fp_gradient"]
+    "programs": ["vp_texture_uvtransform","fp_gradient"]
    }
   ],
   "gradient_source_over":
@@ -4683,7 +4796,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [1,771]
     },
-    "programs": ["vp_gradient","fp_gradient"]
+    "programs": ["vp_texture_uvtransform","fp_gradient"]
    }
   ],
   "gradient_destination_atop":
@@ -4699,7 +4812,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [773,770]
     },
-    "programs": ["vp_gradient","fp_gradient"]
+    "programs": ["vp_texture_uvtransform","fp_gradient"]
    }
   ],
   "gradient_destination_in":
@@ -4715,7 +4828,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [0,770]
     },
-    "programs": ["vp_gradient","fp_gradient"]
+    "programs": ["vp_texture_uvtransform","fp_gradient"]
    }
   ],
   "gradient_destination_out":
@@ -4731,7 +4844,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [0,771]
     },
-    "programs": ["vp_gradient","fp_gradient"]
+    "programs": ["vp_texture_uvtransform","fp_gradient"]
    }
   ],
   "gradient_destination_over":
@@ -4747,7 +4860,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [773,1]
     },
-    "programs": ["vp_gradient","fp_gradient"]
+    "programs": ["vp_texture_uvtransform","fp_gradient"]
    }
   ],
   "gradient_lighter":
@@ -4763,7 +4876,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [1,1]
     },
-    "programs": ["vp_gradient","fp_gradient"]
+    "programs": ["vp_texture_uvtransform","fp_gradient"]
    }
   ],
   "gradient_copy":
@@ -4778,7 +4891,7 @@ CanvasContext.prototype =
      "CullFaceEnable": false,
      "BlendEnable": false
     },
-    "programs": ["vp_gradient","fp_gradient"]
+    "programs": ["vp_texture_uvtransform","fp_gradient"]
    }
   ],
   "gradient_xor":
@@ -4794,7 +4907,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [773,771]
     },
-    "programs": ["vp_gradient","fp_gradient"]
+    "programs": ["vp_texture_uvtransform","fp_gradient"]
    }
   ],
   "texture_shadow":
@@ -4816,7 +4929,7 @@ CanvasContext.prototype =
   "pattern_shadow":
   [
    {
-    "parameters": ["screen","uvscale","color","pattern"],
+    "parameters": ["screen","uvtransform","color","pattern"],
     "semantics": ["POSITION"],
     "states":
     {
@@ -4826,7 +4939,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [1,771]
     },
-    "programs": ["vp_pattern","fp_pattern_shadow"]
+    "programs": ["vp_texture_uvtransform","fp_pattern_shadow"]
    }
   ],
   "gradient_shadow":
@@ -4842,7 +4955,7 @@ CanvasContext.prototype =
      "BlendEnable": true,
      "BlendFunc": [1,771]
     },
-    "programs": ["vp_gradient","fp_gradient_shadow"]
+    "programs": ["vp_texture_uvtransform","fp_gradient_shadow"]
    }
   ],
   "image":
@@ -4866,71 +4979,66 @@ CanvasContext.prototype =
   "fp_image":
   {
    "type": "fragment",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nvarying vec4 tz_TexCoord[8];\nvec4 _ret_0;uniform sampler2D image;void main()\n{_ret_0=texture2D(image,tz_TexCoord[0].xy);gl_FragColor=_ret_0;}"
+   "code": "#ifdef GL_ES\n#define TZ_LOWP lowp\nprecision mediump float;\nprecision mediump int;\n#else\n#define TZ_LOWP\n#endif\nvarying vec4 tz_TexCoord[8];\nuniform sampler2D image;void main()\n{gl_FragColor=texture2D(image,tz_TexCoord[0].xy);}"
   },
   "vp_image":
   {
    "type": "vertex",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nvarying vec4 tz_TexCoord[8];attribute vec4 ATTR8;attribute vec4 ATTR0;\nstruct VS_TEXTURE_OUT{vec4 _Position;vec2 _UV;};void main()\n{VS_TEXTURE_OUT _Out;_Out._Position=vec4(ATTR0.x,ATTR0.y,0.0,1.0);tz_TexCoord[0].xy=ATTR8.xy;gl_Position=_Out._Position;}"
+   "code": "#ifdef GL_ES\n#define TZ_LOWP lowp\nprecision mediump float;\nprecision mediump int;\n#else\n#define TZ_LOWP\n#endif\nvarying vec4 tz_TexCoord[8];attribute vec4 ATTR8;attribute vec4 ATTR0;\nvoid main()\n{vec4 tmpvar_1;tmpvar_1.zw=vec2(0.0,1.0);tmpvar_1.x=ATTR0.x;tmpvar_1.y=ATTR0.y;tz_TexCoord[0].xy=ATTR8.xy;gl_Position=tmpvar_1;}"
   },
   "fp_gradient_shadow":
   {
    "type": "fragment",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nvarying vec4 tz_TexCoord[8];\nvec4 _ret_0;uniform vec4 color;uniform sampler2D gradient;void main()\n{_ret_0=color*texture2D(gradient,tz_TexCoord[0].xy).w;gl_FragColor=_ret_0;}"
+   "code": "#ifdef GL_ES\n#define TZ_LOWP lowp\nprecision mediump float;\nprecision mediump int;\n#else\n#define TZ_LOWP\n#endif\nvarying vec4 tz_TexCoord[8];\nuniform sampler2D gradient;uniform vec4 color;void main()\n{gl_FragColor=(color*texture2D(gradient,tz_TexCoord[0].xy).w);}"
   },
-  "vp_gradient":
+  "vp_texture_uvtransform":
   {
    "type": "vertex",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nvarying vec4 tz_TexCoord[8];attribute vec4 ATTR0;\nstruct VS_TEXTURE_OUT{vec4 _Position;vec2 _UV;};uniform vec4 screen;uniform vec3 uvtransform[2];void main()\n{VS_TEXTURE_OUT _Out;vec3 _position;vec2 _TMP10;_TMP10=ATTR0.xy*screen.xy+screen.zw;_Out._Position=vec4(_TMP10.x,_TMP10.y,0.0,1.0);_position=vec3(ATTR0.x,ATTR0.y,1.0);_Out._UV.x=dot(_position,uvtransform[0]);_Out._UV.y=dot(_position,uvtransform[1]);tz_TexCoord[0].xy=_Out._UV;gl_Position=_Out._Position;}"
+   "code": "#ifdef GL_ES\n#define TZ_LOWP lowp\nprecision mediump float;\nprecision mediump int;\n#else\n#define TZ_LOWP\n#endif\nvarying vec4 tz_TexCoord[8];attribute vec4 ATTR0;\nuniform vec3 uvtransform[2];uniform vec4 screen;void main()\n{vec2 tmpvar_1;vec2 tmpvar_2;tmpvar_2=((ATTR0.xy*screen.xy)+screen.zw);vec4 tmpvar_3;tmpvar_3.zw=vec2(0.0,1.0);tmpvar_3.x=tmpvar_2.x;tmpvar_3.y=tmpvar_2.y;vec3 tmpvar_4;tmpvar_4.z=1.0;tmpvar_4.x=ATTR0.x;tmpvar_4.y=ATTR0.y;tmpvar_1.x=dot(tmpvar_4,uvtransform[0]);tmpvar_1.y=dot(tmpvar_4,uvtransform[1]);tz_TexCoord[0].xy=tmpvar_1;gl_Position=tmpvar_3;}"
   },
   "fp_pattern_shadow":
   {
    "type": "fragment",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nvarying vec4 tz_TexCoord[8];\nvec4 _ret_0;uniform vec4 color;uniform sampler2D pattern;void main()\n{_ret_0=color*texture2D(pattern,tz_TexCoord[0].xy).w;gl_FragColor=_ret_0;}"
-  },
-  "vp_pattern":
-  {
-   "type": "vertex",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nvarying vec4 tz_TexCoord[8];attribute vec4 ATTR0;\nstruct VS_TEXTURE_OUT{vec4 _Position;vec2 _UV;};uniform vec4 screen;uniform vec4 uvscale;void main()\n{VS_TEXTURE_OUT _Out;vec2 _TMP9;_TMP9=ATTR0.xy*screen.xy+screen.zw;_Out._Position=vec4(_TMP9.x,_TMP9.y,0.0,1.0);_Out._UV=ATTR0.xy*uvscale.xy+uvscale.zw;tz_TexCoord[0].xy=_Out._UV;gl_Position=_Out._Position;}"
+   "code": "#ifdef GL_ES\n#define TZ_LOWP lowp\nprecision mediump float;\nprecision mediump int;\n#else\n#define TZ_LOWP\n#endif\nvarying vec4 tz_TexCoord[8];\nuniform sampler2D pattern;uniform vec4 color;void main()\n{gl_FragColor=(color*texture2D(pattern,tz_TexCoord[0].xy).w);}"
   },
   "fp_texture_shadow":
   {
    "type": "fragment",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nvarying vec4 tz_TexCoord[8];\nvec4 _ret_0;uniform vec4 color;uniform sampler2D texture;void main()\n{_ret_0=color*texture2D(texture,tz_TexCoord[0].xy).w;gl_FragColor=_ret_0;}"
+   "code": "#ifdef GL_ES\n#define TZ_LOWP lowp\nprecision mediump float;\nprecision mediump int;\n#else\n#define TZ_LOWP\n#endif\nvarying vec4 tz_TexCoord[8];\nuniform sampler2D texture;uniform vec4 color;void main()\n{gl_FragColor=(color*texture2D(texture,tz_TexCoord[0].xy).w);}"
   },
   "vp_texture":
   {
    "type": "vertex",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nvarying vec4 tz_TexCoord[8];attribute vec4 ATTR8;attribute vec4 ATTR0;\nstruct VS_TEXTURE_OUT{vec4 _Position;vec2 _UV;};uniform vec4 screen;void main()\n{VS_TEXTURE_OUT _Out;vec2 _TMP9;_TMP9=ATTR0.xy*screen.xy+screen.zw;_Out._Position=vec4(_TMP9.x,_TMP9.y,0.0,1.0);tz_TexCoord[0].xy=ATTR8.xy;gl_Position=_Out._Position;}"
+   "code": "#ifdef GL_ES\n#define TZ_LOWP lowp\nprecision mediump float;\nprecision mediump int;\n#else\n#define TZ_LOWP\n#endif\nvarying vec4 tz_TexCoord[8];attribute vec4 ATTR8;attribute vec4 ATTR0;\nuniform vec4 screen;void main()\n{vec2 tmpvar_1;tmpvar_1=((ATTR0.xy*screen.xy)+screen.zw);vec4 tmpvar_2;tmpvar_2.zw=vec2(0.0,1.0);tmpvar_2.x=tmpvar_1.x;tmpvar_2.y=tmpvar_1.y;tz_TexCoord[0].xy=ATTR8.xy;gl_Position=tmpvar_2;}"
   },
   "fp_gradient":
   {
    "type": "fragment",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nvarying vec4 tz_TexCoord[8];\nuniform float alpha;uniform sampler2D gradient;void main()\n{vec4 _fg;_fg=texture2D(gradient,tz_TexCoord[0].xy);_fg.w=_fg.w*alpha;_fg.xyz=_fg.xyz*_fg.www;gl_FragColor=_fg;}"
+   "code": "#ifdef GL_ES\n#define TZ_LOWP lowp\nprecision mediump float;\nprecision mediump int;\n#else\n#define TZ_LOWP\n#endif\nvarying vec4 tz_TexCoord[8];\nuniform sampler2D gradient;uniform float alpha;void main()\n{vec4 _fg;vec4 tmpvar_1;tmpvar_1=texture2D(gradient,tz_TexCoord[0].xy);_fg=tmpvar_1;_fg.w=(tmpvar_1.w*alpha);_fg.xyz=(tmpvar_1.xyz*_fg.w);gl_FragColor=_fg;}"
   },
   "fp_pattern":
   {
    "type": "fragment",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nvarying vec4 tz_TexCoord[8];\nuniform float alpha;uniform sampler2D pattern;void main()\n{vec4 _fg;_fg=texture2D(pattern,tz_TexCoord[0].xy);_fg.w=_fg.w*alpha;_fg.xyz=_fg.xyz*_fg.www;gl_FragColor=_fg;}"
+   "code": "#ifdef GL_ES\n#define TZ_LOWP lowp\nprecision mediump float;\nprecision mediump int;\n#else\n#define TZ_LOWP\n#endif\nvarying vec4 tz_TexCoord[8];\nuniform sampler2D pattern;uniform float alpha;void main()\n{vec4 _fg;vec4 tmpvar_1;tmpvar_1=texture2D(pattern,tz_TexCoord[0].xy);_fg=tmpvar_1;_fg.w=(tmpvar_1.w*alpha);_fg.xyz=(tmpvar_1.xyz*_fg.w);gl_FragColor=_fg;}"
   },
   "fp_texture":
   {
    "type": "fragment",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nvarying vec4 tz_TexCoord[8];\nuniform vec4 color;uniform sampler2D texture;void main()\n{vec4 _fg;_fg=texture2D(texture,tz_TexCoord[0].xy)*color;_fg.xyz=_fg.xyz*_fg.www;gl_FragColor=_fg;}"
+   "code": "#ifdef GL_ES\n#define TZ_LOWP lowp\nprecision mediump float;\nprecision mediump int;\n#else\n#define TZ_LOWP\n#endif\nvarying vec4 tz_TexCoord[8];\nuniform sampler2D texture;uniform vec4 color;void main()\n{vec4 _fg;vec4 tmpvar_1;tmpvar_1=(texture2D(texture,tz_TexCoord[0].xy)*color);_fg=tmpvar_1;_fg.xyz=(tmpvar_1.xyz*tmpvar_1.w);gl_FragColor=_fg;}"
   },
   "fp_flat":
   {
    "type": "fragment",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nuniform vec4 color;void main()\n{gl_FragColor=color;}"
+   "code": "#ifdef GL_ES\n#define TZ_LOWP lowp\nprecision mediump float;\nprecision mediump int;\n#else\n#define TZ_LOWP\n#endif\nuniform vec4 color;void main()\n{gl_FragColor=color;}"
   },
   "vp_flat":
   {
    "type": "vertex",
-   "code": "#ifdef GL_ES\nprecision mediump float;precision mediump int;\n#endif\nattribute vec4 ATTR0;\nvec4 _ret_0;uniform vec4 screen;void main()\n{vec2 _TMP9;_TMP9=ATTR0.xy*screen.xy+screen.zw;_ret_0=vec4(_TMP9.x,_TMP9.y,0.0,1.0);gl_Position=_ret_0;}"
+   "code": "#ifdef GL_ES\n#define TZ_LOWP lowp\nprecision mediump float;\nprecision mediump int;\n#else\n#define TZ_LOWP\n#endif\nattribute vec4 ATTR0;\nuniform vec4 screen;void main()\n{vec2 tmpvar_1;tmpvar_1=((ATTR0.xy*screen.xy)+screen.zw);vec4 tmpvar_2;tmpvar_2.zw=vec2(0.0,1.0);tmpvar_2.x=tmpvar_1.x;tmpvar_2.y=tmpvar_1.y;gl_Position=tmpvar_2;}"
   }
  }
 }
-/*jslint white: true*/
+/*jshint white: true*/
 };
 
 // Constructor function
@@ -4972,7 +5080,8 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
 
     c.screen = md.v4Build((2 / width), (-2 / height), -1, 1);
 
-    c.statesStack = [];
+    c.statesStack = [c.createStatesObject()]; // Preallocate one state objet
+    c.numStatesInStack = 0;
 
     c.subPaths = [];
     c.currentSubPath = [];
@@ -4990,7 +5099,7 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
     c.textureSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0']);
 
     c.textureVertexBuffer = gd.createVertexBuffer({
-        numVertices: 256,
+        numVertices: 4,
         attributes: c.textureVertexFormats,
         dynamic: true,
         'transient': true
@@ -5006,6 +5115,12 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
         'transient': true
     });
 
+    var arrayConstructor = c.arrayConstructor;
+
+    c.bufferData = new arrayConstructor(512);
+
+    c.tempRect = new arrayConstructor(8);
+
     c.tempVertices = [];
 
     c.v4Zero = md.v4BuildZero();
@@ -5014,7 +5129,14 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
     c.cachedColors = {};
     c.numCachedColors = 0;
 
-    c.uvscale = md.v4BuildZero();
+    c.uvtransform = new arrayConstructor(6);
+    c.uvtransform[0] = 1;
+    c.uvtransform[1] = 0;
+    c.uvtransform[2] = 0;
+    c.uvtransform[3] = 0;
+    c.uvtransform[4] = 1;
+    c.uvtransform[5] = 0;
+
     c.tempColor = md.v4BuildZero();
     c.tempScreen = md.v4BuildZero();
 
@@ -5046,6 +5168,8 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
     c.patternShadowTechnique = shader.getTechnique('pattern_shadow');
     c.gradientShadowTechnique = shader.getTechnique('gradient_shadow');
 
+    c.resetTechniqueParameters();
+
 /*
     c.renderTexture = gd.createTexture({
         name       : "canvas.backbuffer",
@@ -5066,8 +5190,13 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
     //
     // Transformation matrix and related operations
     //
-    c.matrix = [1, 0, 0,
-                0, 1, 0];
+    c.matrix = new arrayConstructor(6);
+    c.matrix[0] = 1;
+    c.matrix[1] = 0;
+    c.matrix[2] = 0;
+    c.matrix[3] = 0;
+    c.matrix[4] = 1;
+    c.matrix[5] = 0;
 
     var CanvasPrototype = CanvasContext.prototype;
     var scale = CanvasPrototype.scale;
@@ -5100,20 +5229,30 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
         resetTransformMethods();
     }
 
-    function translatePoint(x, y)
+    function transformPointTranslate(x, y)
     {
         var m = this.matrix;
         return [(x + m[2]), (y + m[5])];
     }
 
-    function translateRect(x, y, w, h)
+    function transformRectTranslate(x, y, w, h, rect)
     {
         var m = this.matrix;
         var x0 = (x + m[2]);
         var y0 = (y + m[5]);
         var x1 = (x0 + w);
         var y1 = (y0 + h);
-        return [[x0, y1], [x1, y1], [x0, y0], [x1, y0]];
+
+        rect[0] = x0;
+        rect[1] = y1;
+        rect[2] = x1;
+        rect[3] = y1;
+        rect[4] = x0;
+        rect[5] = y0;
+        rect[6] = x1;
+        rect[7] = y0;
+
+        return rect;
     }
 
     function scaleIdentity(x, y)
@@ -5133,8 +5272,8 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
 
         this.translate = translate;
         this.transform = transformTranslate;
-        this.transformPoint = translatePoint;
-        this.transformRect = translateRect;
+        this.transformPoint = transformPointTranslate;
+        this.transformRect = transformRectTranslate;
     }
 
     function setTransformIdentity(a, b, c, d, e, f)
@@ -5155,11 +5294,21 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
         return [x, y];
     }
 
-    function transformRectIdentity(x, y, w, h)
+    function transformRectIdentity(x, y, w, h, rect)
     {
         var x1 = (x + w);
         var y1 = (y + h);
-        return [[x, y1], [x1, y1], [x, y], [x1, y]];
+
+        rect[0] = x;
+        rect[1] = y1;
+        rect[2] = x1;
+        rect[3] = y1;
+        rect[4] = x;
+        rect[5] = y;
+        rect[6] = x1;
+        rect[7] = y;
+
+        return rect;
     }
 
     c.scale = scaleIdentity;
@@ -5172,10 +5321,14 @@ CanvasContext.create = function canvasCreateFn(canvas, gd, md, width, height)
     //
     // Clipping
     //
-    c.clipExtents = [0, 0, width, height];
+    c.clipExtents = new arrayConstructor(4);
+    c.clipExtents[0] = 0;
+    c.clipExtents[1] = 0;
+    c.clipExtents[2] = width;
+    c.clipExtents[3] = height;
 
     //
-    c.defaultStates = c.getStates();
+    c.defaultStates = c.setStates(c.createStatesObject(), c);
 
     return c;
 };
@@ -5304,3 +5457,17 @@ Canvas.create = function canvasCreateFn(gd, md)
 
     return c;
 };
+
+// Detect correct typed arrays
+(function () {
+    CanvasContext.prototype.arrayConstructor = Array;
+    if (typeof Float32Array !== "undefined")
+    {
+        var testArray = new Float32Array(4);
+        var textDescriptor = Object.prototype.toString.call(testArray);
+        if (textDescriptor === '[object Float32Array]')
+        {
+            CanvasContext.prototype.arrayConstructor = Float32Array;
+        }
+    }
+}());

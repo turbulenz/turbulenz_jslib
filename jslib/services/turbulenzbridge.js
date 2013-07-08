@@ -1,8 +1,7 @@
 // Copyright (c) 2011-2012 Turbulenz Limited
 /*global window: false*/
-/*jslint nomen: false*/
-
-
+/*global TurbulenzServices: false*/
+/*jshint nomen: false*/
 
 /*
  * An object that takes care of communication with the gamesite and, among
@@ -35,6 +34,11 @@ var TurbulenzBridge = {
             this.emit = bridge.emit;
             this.addListener = bridge.addListener;
             this.setListener = bridge.setListener;
+        }
+
+        if (typeof TurbulenzServices !== 'undefined')
+        {
+            TurbulenzServices.addBridgeEvents();
         }
     },
 
@@ -94,6 +98,29 @@ var TurbulenzBridge = {
         this.emit('userbadge.update', badge);
     },
 
+    /**
+     * Update a leaderboard. Used by the LeaderboardManager
+     */
+    updateLeaderBoard: function updateLeaderBoardFn(score)
+    {
+        this.emit('leaderboards.update', score);
+    },
+
+
+    /**
+     * Handle multiplayer join events
+     */
+    setOnMultiplayerSessionToJoin: function setOnMultiplayerSessionToJoinFn(callback) {
+        this.setListener('multiplayer.session.join', callback);
+    },
+
+    triggerJoinedMultiplayerSession: function triggerJoinedMultiplayerSessionFn(session) {
+        this.emit('multiplayer.session.joined', session);
+    },
+
+    triggerLeaveMultiplayerSession: function triggerLeaveMultiplayerSessionFn(sessionId) {
+        this.emit('multiplayer.session.leave', sessionId);
+    },
 
     /**
      * Methods to signal changes of the viewport's aspect ratio to the page.
@@ -130,15 +157,11 @@ var TurbulenzBridge = {
         this.setListener('change.user.state', callback);
     },
 
-    setOnMultiplayerSessionJoinRequest: function setOnMultiplayerSessionJoinRequestFn(callback) {
-        this.setListener('multiplayer.request.joinsession', callback);
-    },
-
-
     /**
      * Methods to send trigger event-emission on the page. These prompt the  page to trigger
      * the aforementioned corresponding onXXXX methods.
      */
+
     triggerOnFullscreen: function triggerOnFullscreenQueryFn() {
         this.emit('trigger.viewport.fullscreen');
     },
@@ -154,7 +177,6 @@ var TurbulenzBridge = {
     triggerOnUserStateChange: function triggerOnUserStateQueryFn() {
         this.emit('trigger.user.state');
     },
-
 
     /**
      * Methods to send requests for information to the page. These methods can be used to send

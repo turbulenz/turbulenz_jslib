@@ -71,18 +71,11 @@ GeometryInstance.prototype =
         var newInstance = GeometryInstance.create(this.geometry,
                                                   this.surface,
                                                   this.sharedMaterial);
-        newInstance.halfExtents = this.halfExtents.slice();
-        if (this.center)
-        {
-            newInstance.center = this.center.slice();
-        }
+
         if (this.disabled)
         {
             newInstance.disabled = true;
         }
-
-        newInstance.worldExtents = [];
-        newInstance.worldExtentsUpdate = -1;
 
         return newInstance;
     },
@@ -142,7 +135,7 @@ GeometryInstance.prototype =
 
         this.sharedMaterial = material;
 
-        delete this.rendererInfo;
+        this.rendererInfo = undefined;
     },
 
     //
@@ -323,16 +316,36 @@ GeometryInstance.create = function geometryInstanceCreateFn(geometry,
     instance.geometryType = geometry.type;
     instance.surface = surface;
     instance.semantics = geometry.semantics;
+
     instance.halfExtents = geometry.halfExtents;
     instance.center = geometry.center;
+
     instance.techniqueParameters = graphicsDevice ? graphicsDevice.createTechniqueParameters(): null;
     instance.sharedMaterial = sharedMaterial;
     if (instance.sharedMaterial)
     {
         instance.sharedMaterial.reference.add();
     }
-    instance.worldExtents = [];
+    instance.worldExtents = new instance.arrayConstructor(6);
+    instance.worldExtentsUpdate = -1;
     instance.worldUpdate = -1;
+
+    instance.node = undefined;
+    instance.rendererInfo = undefined;
 
     return instance;
 };
+
+// Detect correct typed arrays
+(function () {
+    GeometryInstance.prototype.arrayConstructor = Array;
+    if (typeof Float32Array !== "undefined")
+    {
+        var testArray = new Float32Array(4);
+        var textDescriptor = Object.prototype.toString.call(testArray);
+        if (textDescriptor === '[object Float32Array]')
+        {
+            GeometryInstance.prototype.arrayConstructor = Float32Array;
+        }
+    }
+}());

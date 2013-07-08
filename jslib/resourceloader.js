@@ -1,4 +1,6 @@
-// Copyright (c) 2010-2011 Turbulenz Limited
+// Copyright (c) 2010-2012 Turbulenz Limited
+/*global TurbulenzEngine:false*/
+/*global VMath:false*/
 
 //
 // ResourceLoader
@@ -129,32 +131,27 @@ ResourceLoader.prototype =
             currentLoader.data.animations = anims;
         }
 
-
-        var resolveRef = function (currentScene)
+        function postLoadReference(sceneText)
         {
-            var postLoadReference = function (sceneText)
+            if (sceneText)
             {
-                if (sceneText)
+                var sceneData = JSON.parse(sceneText);
+                var animations = sceneData.animations;
+                for (var anim in animations)
                 {
-                    var sceneData = JSON.parse(sceneText);
-                    for (var anim in sceneData.animations)
+                    if (animations.hasOwnProperty(anim))
                     {
-                        if (sceneData.animations.hasOwnProperty(anim))
-                        {
-                            anims[anim] = sceneData.animations[anim];
-                        }
+                        anims[anim] = animations[anim];
                     }
                 }
-                //Utilities.log("resolved ref for " + anim + " count now " + (currentLoader.numReferencesPending-1));
-                currentLoader.numReferencesPending -= 1;
-                if (currentLoader.numReferencesPending <= 0)
-                {
-                    currentLoader.endLoading(loadParams.onload);
-                }
-            };
-
-            return postLoadReference;
-        };
+            }
+            //Utilities.log("resolved ref for " + anim + " count now " + (currentLoader.numReferencesPending-1));
+            currentLoader.numReferencesPending -= 1;
+            if (currentLoader.numReferencesPending <= 0)
+            {
+                currentLoader.endLoading(loadParams.onload);
+            }
+        }
 
         // Import animations
         var requestOwner = (loadParams.request ? loadParams : TurbulenzEngine);
@@ -175,7 +172,7 @@ ResourceLoader.prototype =
                         loadParams.requestHandler.request({
                             src: reference,
                             requestOwner: requestOwner,
-                            onload: resolveRef(this)
+                            onload: postLoadReference
                         });
                     }
                 }
@@ -197,7 +194,6 @@ ResourceLoader.prototype =
 
         var references = this.referencesPending;
         var numReferences = 0;
-        var nodes = this.nodes;
         var nodesMap = this.nodesMap;
 
         var currentLoader = this;
@@ -346,7 +342,6 @@ ResourceLoader.prototype =
 
         var fileNodes = sceneData.nodes;
         var parentNode = loadParams.parentNode;
-        var emptyNode = {};
         for (var fn in fileNodes)
         {
             if (fileNodes.hasOwnProperty(fn) && fileNodes[fn])
@@ -433,7 +428,6 @@ ResourceLoader.prototype =
             return new F();
         }
 
-        var fileShapes = sceneData.geometries;
         var fileModels = sceneData.physicsmodels;
         var targetFileModels = this.data.physicsmodels;
         if (!targetFileModels)

@@ -7,6 +7,7 @@
 /*global Int16Array*/
 /*global Int32Array*/
 /*global Uint8Array*/
+/*global Uint8ClampedArray*/
 /*global Uint16Array*/
 /*global Uint32Array*/
 /*global Float32Array*/
@@ -469,6 +470,54 @@ WebGLTexture.prototype =
             delete this.sampler;
             delete this.gd;
         }
+    },
+
+    typedArrayIsValid : function textureTypedArrayIsValidFn(typedArray)
+    {
+        var gd = this.gd;
+        var format = this.format;
+
+        if (gd)
+        {
+            if ((format === gd.PIXELFORMAT_A8) ||
+                (format === gd.PIXELFORMAT_L8) ||
+                (format === gd.PIXELFORMAT_S8))
+            {
+                return ((typedArray instanceof Uint8Array) ||
+                        (typedArray instanceof Uint8ClampedArray)) &&
+                    (typedArray.length ===
+                     this.width * this.height * this.depth);
+            }
+            if (format === gd.PIXELFORMAT_L8A8)
+            {
+                return ((typedArray instanceof Uint8Array) ||
+                        (typedArray instanceof Uint8ClampedArray)) &&
+                    (typedArray.length ===
+                     2 * this.width * this.height * this.depth);
+            }
+            if (format === gd.PIXELFORMAT_R8G8B8)
+            {
+                return ((typedArray instanceof Uint8Array) ||
+                        (typedArray instanceof Uint8ClampedArray)) &&
+                    (typedArray.length ===
+                     3 * this.width * this.height * this.depth);
+            }
+            if (format === gd.PIXELFORMAT_R8G8B8A8)
+            {
+                return ((typedArray instanceof Uint8Array) ||
+                        (typedArray instanceof Uint8ClampedArray)) &&
+                    (typedArray.length ===
+                     4 * this.width * this.height * this.depth);
+            }
+            if ((format === gd.PIXELFORMAT_R5G5B5A1) ||
+                (format === gd.PIXELFORMAT_R5G6B5))
+            {
+                return (typedArray instanceof Uint16Array) &&
+                    (typedArray.length ===
+                     this.width * this.height * this.depth);
+            }
+        }
+        return false;
     }
 };
 
@@ -571,7 +620,6 @@ WebGLTexture.create = function webGLTextureCreateFn(gd, params)
                     {
                         tex.width = width;
                         tex.height = height;
-                        tex.depth = 1;
                         tex.format = format;
                         tex.cubemap = cubemap;
                         tex.depth = depth;
@@ -666,25 +714,13 @@ WebGLTexture.create = function webGLTextureCreateFn(gd, params)
         };
         if (data)
         {
-            var arrayToSring = function arrayToSringFn(bytes)
-            {
-                var numBytes = bytes.length;
-                var a = [];
-                a.length = numBytes;
-                for (var n = 0; n < numBytes; n += 1)
-                {
-                    a[n] = bytes[n];
-                }
-                return String.fromCharCode.apply(null, a);
-            };
-
             if (extension === '.jpg' || extension === '.jpeg')
             {
-                src = 'data:image/jpeg;base64,' + window.btoa(arrayToSring(data));
+                src = 'data:image/jpeg;base64,' + TurbulenzEngine.base64encode(data);
             }
             else if (extension === '.png')
             {
-                src = 'data:image/png;base64,' + window.btoa(arrayToSring(data));
+                src = 'data:image/png;base64,' + TurbulenzEngine.base64encode(data);
             }
         }
         else
@@ -814,6 +850,18 @@ WebGLRenderTarget.prototype =
 {
     version : 1,
 
+    // Shared because there can only be one active at a time
+    oldViewportBox : [],
+    oldScissorBox : [],
+
+    copyBox : function copyBoxFn(dst, src)
+    {
+        dst[0] = src[0];
+        dst[1] = src[1];
+        dst[2] = src[2];
+        dst[3] = src[3];
+    },
+
     bind : function bindFn()
     {
         var gd = this.gd;
@@ -828,8 +876,8 @@ WebGLRenderTarget.prototype =
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.glObject);
 
         var state = gd.state;
-        this.oldViewportBox = state.viewportBox.slice();
-        this.oldScissorBox = state.scissorBox.slice();
+        this.copyBox(this.oldViewportBox, state.viewportBox);
+        this.copyBox(this.oldScissorBox, state.scissorBox);
         gd.setViewport(0, 0, this.width, this.height);
         gd.setScissor(0, 0, this.width, this.height);
 
@@ -1339,67 +1387,33 @@ WebGLVertexBuffer.prototype =
             var maxNumValues = (numVertices * numValuesPerVertex);
             var format = attributes[0].format;
 
-            if (this.bufferData)
+            if (format === gl.BYTE)
             {
-                if (format === gl.BYTE)
-                {
-                    data = new Int8Array(this.bufferData, 0, maxNumValues);
-                }
-                else if (format === gl.UNSIGNED_BYTE)
-                {
-                    data = new Uint8Array(this.bufferData, 0, maxNumValues);
-                }
-                else if (format === gl.SHORT)
-                {
-                    data = new Int16Array(this.bufferData, 0, maxNumValues);
-                }
-                else if (format === gl.UNSIGNED_SHORT)
-                {
-                    data = new Uint16Array(this.bufferData, 0, maxNumValues);
-                }
-                else if (format === gl.INT)
-                {
-                    data = new Int32Array(this.bufferData, 0, maxNumValues);
-                }
-                else if (format === gl.UNSIGNED_INT)
-                {
-                    data = new Uint32Array(this.bufferData, 0, maxNumValues);
-                }
-                else if (format === gl.FLOAT)
-                {
-                    data = new Float32Array(this.bufferData, 0, maxNumValues);
-                }
+                data = new Int8Array(maxNumValues);
             }
-            else
+            else if (format === gl.UNSIGNED_BYTE)
             {
-                if (format === gl.BYTE)
-                {
-                    data = new Int8Array(maxNumValues);
-                }
-                else if (format === gl.UNSIGNED_BYTE)
-                {
-                    data = new Uint8Array(maxNumValues);
-                }
-                else if (format === gl.SHORT)
-                {
-                    data = new Int16Array(maxNumValues);
-                }
-                else if (format === gl.UNSIGNED_SHORT)
-                {
-                    data = new Uint16Array(maxNumValues);
-                }
-                else if (format === gl.INT)
-                {
-                    data = new Int32Array(maxNumValues);
-                }
-                else if (format === gl.UNSIGNED_INT)
-                {
-                    data = new Uint32Array(maxNumValues);
-                }
-                else if (format === gl.FLOAT)
-                {
-                    data = new Float32Array(maxNumValues);
-                }
+                data = new Uint8Array(maxNumValues);
+            }
+            else if (format === gl.SHORT)
+            {
+                data = new Int16Array(maxNumValues);
+            }
+            else if (format === gl.UNSIGNED_SHORT)
+            {
+                data = new Uint16Array(maxNumValues);
+            }
+            else if (format === gl.INT)
+            {
+                data = new Int32Array(maxNumValues);
+            }
+            else if (format === gl.UNSIGNED_INT)
+            {
+                data = new Uint32Array(maxNumValues);
+            }
+            else if (format === gl.FLOAT)
+            {
+                data = new Float32Array(maxNumValues);
             }
 
             writer = function vertexBufferWriterSingleFn()
@@ -1484,17 +1498,11 @@ WebGLVertexBuffer.prototype =
             var destOffset = 0;
             var bufferSize = (numVertices * this.strideInBytes);
 
+            data = new ArrayBuffer(bufferSize);
+
             if (typeof DataView !== 'undefined' && 'setFloat32' in DataView.prototype)
             {
-                if (this.bufferData)
-                {
-                    data = new DataView(this.bufferData, 0, bufferSize);
-                }
-                else
-                {
-                    data = new ArrayBuffer(bufferSize);
-                    data = new DataView(data);
-                }
+                var dataView = new DataView(data);
 
                 writer = function vertexBufferWriterDataViewFn()
                 {
@@ -1519,7 +1527,7 @@ WebGLVertexBuffer.prototype =
                                     {
                                         value *= attribute.normalizationScale;
                                     }
-                                    setter.call(data, destOffset, value, true);
+                                    setter.call(dataView, destOffset, value, true);
                                     destOffset += componentStride;
                                     currentComponent += 1;
                                     numValues += 1;
@@ -1536,7 +1544,7 @@ WebGLVertexBuffer.prototype =
                                         var scale = attribute.normalizationScale;
                                         for (j = 0; j < numSubArguments; j += 1)
                                         {
-                                            setter.call(data, destOffset, (value[j] * scale), true);
+                                            setter.call(dataView, destOffset, (value[j] * scale), true);
                                             destOffset += componentStride;
                                             currentComponent += 1;
                                             numValues += 1;
@@ -1546,7 +1554,7 @@ WebGLVertexBuffer.prototype =
                                     {
                                         for (j = 0; j < numSubArguments; j += 1)
                                         {
-                                            setter.call(data, destOffset, value[j], true);
+                                            setter.call(dataView, destOffset, value[j], true);
                                             destOffset += componentStride;
                                             currentComponent += 1;
                                             numValues += 1;
@@ -1580,16 +1588,6 @@ WebGLVertexBuffer.prototype =
             }
             else
             {
-                if (this.bufferData &&
-                    this.bufferData.byteLength === bufferSize)
-                {
-                    data = this.bufferData;
-                }
-                else
-                {
-                    data = new ArrayBuffer(bufferSize);
-                }
-
                 writer = function vertexBufferWriterMultiFn()
                 {
                     var numArguments = arguments.length;
@@ -1716,12 +1714,10 @@ WebGLVertexBuffer.prototype =
             }
             else
             {
-                if ((numVertices * stride) < data.byteLength)
+                var numBytes = (numVertices * stride);
+                if (numBytes < data.byteLength)
                 {
-                    if (typeof DataView !== 'undefined')
-                    {
-                        data = new DataView(data.buffer, 0, (numVertices * stride));
-                    }
+                    data = data.slice(0, numBytes);
                 }
             }
 
@@ -1755,100 +1751,107 @@ WebGLVertexBuffer.prototype =
         var gd = this.gd;
         var gl = gd.gl;
         var strideInBytes = this.strideInBytes;
+
+        // Fast path for ArrayBuffer data
+
+        if (data.constructor === ArrayBuffer)
+        {
+            gd.bindVertexBuffer(this.glBuffer);
+
+            if (numVertices < this.numVertices)
+            {
+                gl.bufferSubData(gl.ARRAY_BUFFER, (offset * strideInBytes), data);
+            }
+            else
+            {
+                gl.bufferData(gl.ARRAY_BUFFER, data, this.usage);
+            }
+            return;
+        }
+
         var attributes = this.attributes;
         var numAttributes = this.numAttributes;
-        var attribute, format, bufferData;
+        var attribute, format, bufferData, TypedArrayConstructor;
+
         if (this.hasSingleFormat)
         {
             attribute = attributes[0];
             format = attribute.format;
 
-            if (attribute.normalized)
-            {
-                data = this.scaleValues(data, attribute.normalizationScale);
-            }
-
             if (format === gl.BYTE)
             {
-                if (data instanceof Int8Array)
+                if (!(data instanceof Int8Array))
                 {
-                    bufferData = data;
-                }
-                else
-                {
-                    bufferData = new Int8Array(data);
+                    TypedArrayConstructor = Int8Array;
                 }
             }
             else if (format === gl.UNSIGNED_BYTE)
             {
-                if (data instanceof Uint8Array)
+                if (!(data instanceof Uint8Array))
                 {
-                    bufferData = data;
-                }
-                else
-                {
-                    bufferData = new Uint8Array(data);
+                    TypedArrayConstructor = Uint8Array;
                 }
             }
             else if (format === gl.SHORT)
             {
-                if (data instanceof Int16Array)
+                if (!(data instanceof Int16Array))
                 {
-                    bufferData = data;
-                }
-                else
-                {
-                    bufferData = new Int16Array(data);
+                    TypedArrayConstructor = Int16Array;
                 }
             }
             else if (format === gl.UNSIGNED_SHORT)
             {
-                if (data instanceof Uint16Array)
+                if (!(data instanceof Uint16Array))
                 {
-                    bufferData = data;
-                }
-                else
-                {
-                    bufferData = new Uint16Array(data);
+                    TypedArrayConstructor = Uint16Array;
                 }
             }
             else if (format === gl.INT)
             {
-                if (data instanceof Int32Array)
+                if (!(data instanceof Int32Array))
                 {
-                    bufferData = data;
-                }
-                else
-                {
-                    bufferData = new Int32Array(data);
+                    TypedArrayConstructor = Int32Array;
                 }
             }
             else if (format === gl.UNSIGNED_INT)
             {
-                if (data instanceof Uint32Array)
+                if (!(data instanceof Uint32Array))
                 {
-                    bufferData = data;
-                }
-                else
-                {
-                    bufferData = new Uint32Array(data);
+                    TypedArrayConstructor = Uint32Array;
                 }
             }
             else if (format === gl.FLOAT)
             {
-                if (data instanceof Float32Array)
+                if (!(data instanceof Float32Array))
                 {
-                    bufferData = data;
-                }
-                else
-                {
-                    bufferData = new Float32Array(data);
+                    TypedArrayConstructor = Float32Array;
                 }
             }
 
             var numValuesPerVertex = this.stride;
             var numValues = (numVertices * numValuesPerVertex);
-            if (numValues < bufferData.length)
+
+            if (TypedArrayConstructor)
+            {
+                // Data has to be put into a Typed Array and
+                // potentially normalized.
+
+                if (attribute.normalized)
+                {
+                    data = this.scaleValues(data, attribute.normalizationScale, numValues);
+                }
+                bufferData = new TypedArrayConstructor(data);
+                if (numValues < bufferData.length)
+                {
+                    bufferData = bufferData.subarray(0, numValues);
+                }
+            }
+            else
+            {
+                bufferData = data;
+            }
+
+            if (numValues < data.length)
             {
                 bufferData = bufferData.subarray(0, numValues);
             }
@@ -1857,18 +1860,12 @@ WebGLVertexBuffer.prototype =
         {
             var bufferSize = (numVertices * strideInBytes);
 
+            bufferData = new ArrayBuffer(bufferSize);
+
             var srcOffset = 0, destOffset = 0, v, c, a, numComponents, componentStride, scale;
             if (typeof DataView !== 'undefined' && 'setFloat32' in DataView.prototype)
             {
-                if (this.bufferData)
-                {
-                    bufferData = new DataView(this.bufferData, 0, bufferSize);
-                }
-                else
-                {
-                    bufferData = new ArrayBuffer(bufferSize);
-                    bufferData = new DataView(bufferData);
-                }
+                var dataView = new DataView(bufferData);
 
                 for (v = 0; v < numVertices; v += 1)
                 {
@@ -1883,7 +1880,7 @@ WebGLVertexBuffer.prototype =
                             scale = attribute.normalizationScale;
                             for (c = 0; c < numComponents; c += 1)
                             {
-                                setter.call(bufferData, destOffset, (data[srcOffset] * scale), true);
+                                setter.call(dataView, destOffset, (data[srcOffset] * scale), true);
                                 destOffset += componentStride;
                                 srcOffset += 1;
                             }
@@ -1892,7 +1889,7 @@ WebGLVertexBuffer.prototype =
                         {
                             for (c = 0; c < numComponents; c += 1)
                             {
-                                setter.call(bufferData, destOffset, data[srcOffset], true);
+                                setter.call(dataView, destOffset, data[srcOffset], true);
                                 destOffset += componentStride;
                                 srcOffset += 1;
                             }
@@ -1902,16 +1899,6 @@ WebGLVertexBuffer.prototype =
             }
             else
             {
-                if (this.bufferData &&
-                    this.bufferData.byteLength === bufferSize)
-                {
-                    bufferData = this.bufferData;
-                }
-                else
-                {
-                    bufferData = new ArrayBuffer(bufferSize);
-                }
-
                 for (v = 0; v < numVertices; v += 1)
                 {
                     for (a = 0; a < numAttributes; a += 1)
@@ -1956,9 +1943,12 @@ WebGLVertexBuffer.prototype =
     },
 
     // Internal
-    scaleValues : function scaleValuesFn(values, scale)
+    scaleValues : function scaleValuesFn(values, scale, numValues)
     {
-        var numValues = values.length;
+        if (numValues === undefined)
+        {
+            numValues = values.length;
+        }
         var scaledValues = new values.constructor(numValues);
         for (var n = 0; n < numValues; n += 1)
         {
@@ -1975,7 +1965,7 @@ WebGLVertexBuffer.prototype =
         var vertexAttributes = this.attributes;
         var stride = this.strideInBytes;
         var attributeMask = 0;
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         for (var n = 0; n < numAttributes; n += 1)
         {
             var vertexAttribute = vertexAttributes[n];
@@ -1993,7 +1983,7 @@ WebGLVertexBuffer.prototype =
 
             offset += vertexAttribute.stride;
         }
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
         return attributeMask;
     },
 
@@ -2033,22 +2023,6 @@ WebGLVertexBuffer.prototype =
         return stride;
     },
 
-    createInternalBuffer : function createInternalBufferFn(bufferSize)
-    {
-        this.bufferData = null;
-        if (this.dynamic)
-        {
-            // This check is mainly for Firefox that lacks DataView
-            // and hence does not have an optimal way of mapping small subsets of the buffer
-            if (this.hasSingleFormat ||
-                (typeof DataView !== 'undefined' && 'setFloat32' in DataView.prototype) ||
-                this.numVertices <= 8)
-            {
-                this.bufferData = new ArrayBuffer(bufferSize);
-            }
-        }
-    },
-
     resize : function resizeFn(size)
     {
         if (size !== (this.strideInBytes * this.numVertices))
@@ -2063,8 +2037,6 @@ WebGLVertexBuffer.prototype =
 
             var bufferSize = gl.getBufferParameter(bufferType, gl.BUFFER_SIZE);
             this.numVertices = Math.floor(bufferSize / this.strideInBytes);
-
-            this.createInternalBuffer(bufferSize);
         }
     },
 
@@ -2085,7 +2057,6 @@ WebGLVertexBuffer.prototype =
                 delete this.glBuffer;
             }
 
-            delete this.bufferData;
             delete this.gd;
         }
     }
@@ -2104,17 +2075,15 @@ WebGLVertexBuffer.create = function webGLVertexBufferCreateFn(gd, params)
 
     var strideInBytes = vb.setAttributes(params.attributes);
 
-    /*jslint sub: true*/
+    /*jshint sub: true*/
     // Avoid dot notation lookup to prevent Google Closure complaining about transient being a keyword
     vb['transient'] = (params['transient'] || false);
     vb.dynamic = (params.dynamic || vb['transient']);
     vb.usage = (vb['transient'] ? gl.STREAM_DRAW : (vb.dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW));
-    /*jslint sub: false*/
+    /*jshint sub: false*/
     vb.glBuffer = gl.createBuffer();
 
     var bufferSize = (numVertices * strideInBytes);
-
-    vb.createInternalBuffer(bufferSize);
 
     if (params.data)
     {
@@ -2143,7 +2112,7 @@ WebGLPass.prototype =
     {
         var gl = gd.gl;
 
-        delete this.dirty;
+        this.dirty = false;
 
         // Set parameters
         var hasProperty = Object.prototype.hasOwnProperty;
@@ -2155,7 +2124,7 @@ WebGLPass.prototype =
                 var parameter = parameters[p];
                 if (parameter.dirty)
                 {
-                    delete parameter.dirty;
+                    parameter.dirty = 0;
 
                     var paramInfo = parameter.info;
                     var location = parameter.location;
@@ -2163,18 +2132,62 @@ WebGLPass.prototype =
                         null !== location)
                     {
                         var parameterValues = paramInfo.values;
-                        var sampler = paramInfo.sampler;
+                        var sampler = parameter.sampler;
                         if (sampler)
                         {
                             gd.setTexture(parameter.textureUnit, parameterValues, sampler);
                         }
                         else if (1 < paramInfo.numValues)
                         {
-                            paramInfo.setter.call(gl, location, parameterValues);
+                            parameter.setter.call(gl, location, parameterValues);
                         }
                         else //if (1 === paramInfo.numValues)
                         {
-                            paramInfo.setter.call(gl, location, parameterValues[0]);
+                            parameter.setter.call(gl, location, parameterValues[0]);
+                        }
+                    }
+                }
+            }
+        }
+    },
+
+    initializeParameters : function passInitializeParametersFn(gd)
+    {
+        var gl = gd.gl;
+
+        var glProgram = this.glProgram;
+
+        gd.setProgram(glProgram);
+
+        var passParameters = this.parameters;
+        for (var p in passParameters)
+        {
+            if (passParameters.hasOwnProperty(p))
+            {
+                var parameter = passParameters[p];
+
+                var paramInfo = parameter.info;
+                if (paramInfo)
+                {
+                    var location = gl.getUniformLocation(glProgram, p);
+                    if (null !== location)
+                    {
+                        parameter.location = location;
+
+                        if (parameter.sampler)
+                        {
+                            gl.uniform1i(location, parameter.textureUnit);
+                        }
+                        else
+                        {
+                            if (1 < paramInfo.numValues)
+                            {
+                                parameter.setter.call(gl, location, paramInfo.values);
+                            }
+                            else //if (1 === paramInfo.numValues)
+                            {
+                                parameter.setter.call(gl, location, paramInfo.values[0]);
+                            }
                         }
                     }
                 }
@@ -2232,7 +2245,7 @@ WebGLPass.create = function webGLPassCreateFn(gd, shader, params)
             }
         }
 
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         var numSemantics = semanticNames.length;
         semanticsMask = 0;
         for (s = 0; s < numSemantics; s += 1)
@@ -2245,22 +2258,9 @@ WebGLPass.create = function webGLPassCreateFn(gd, shader, params)
                 gl.bindAttribLocation(glProgram, attribute, ("ATTR" + attribute));
             }
         }
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
 
         gl.linkProgram(glProgram);
-
-        var linked = gl.getProgramParameter(glProgram, gl.LINK_STATUS);
-        if (linked)
-        {
-            gd.setProgram(glProgram);
-        }
-        else
-        {
-            //var info = gl.getProgramInfoLog(glProgram);
-            //console.log(info);
-            gl.deleteProgram(glProgram);
-            glProgram = null;
-        }
 
         shader.linkedPrograms[compoundProgramName] = {
                 glProgram : glProgram,
@@ -2271,10 +2271,6 @@ WebGLPass.create = function webGLPassCreateFn(gd, shader, params)
     {
         //console.log('Reused program ' + compoundProgramName);
         glProgram = linkedProgram.glProgram;
-        if (glProgram)
-        {
-            gd.setProgram(glProgram);
-        }
         semanticsMask = linkedProgram.semanticsMask;
     }
 
@@ -2285,7 +2281,7 @@ WebGLPass.create = function webGLPassCreateFn(gd, shader, params)
     var numTextureUnits = 0;
     var passParameters = {};
     pass.parameters = passParameters;
-    var numParameters = parameterNames.length;
+    var numParameters = parameterNames ? parameterNames.length : 0;
     for (p = 0; p < numParameters; p += 1)
     {
         var parameterName = parameterNames[p];
@@ -2297,37 +2293,19 @@ WebGLPass.create = function webGLPassCreateFn(gd, shader, params)
         parameter.info = paramInfo;
         if (paramInfo)
         {
-            var location = gl.getUniformLocation(glProgram, parameterName);
-            if (null !== location)
+            parameter.location = null;
+            if (paramInfo.sampler)
             {
-                parameter.location = location;
-
-                if (paramInfo.sampler)
-                {
-                    parameter.textureUnit = numTextureUnits;
-
-                    if (linkedProgram === undefined)
-                    {
-                        gl.uniform1i(location, numTextureUnits);
-                    }
-
-                    numTextureUnits += 1;
-                }
-                else
-                {
-                    if (linkedProgram === undefined)
-                    {
-                        if (1 < paramInfo.numValues)
-                        {
-                            paramInfo.setter.call(gl, location, paramInfo.values);
-                        }
-                        else //if (1 === paramInfo.numValues)
-                        {
-                            paramInfo.setter.call(gl, location, paramInfo.values[0]);
-                        }
-                    }
-                }
+                parameter.sampler = paramInfo.sampler;
+                parameter.textureUnit = numTextureUnits;
+                numTextureUnits += 1;
             }
+            else
+            {
+                parameter.sampler = undefined;
+                parameter.textureUnit = undefined;
+            }
+            parameter.setter = paramInfo.setter;
         }
     }
     pass.numTextureUnits = numTextureUnits;
@@ -2413,9 +2391,9 @@ WebGLTechnique.prototype =
         }
         else
         {
-            /*jslint bitwise: false*/
+            /*jshint bitwise: false*/
             id = (id | 0);
-            /*jslint bitwise: true*/
+            /*jshint bitwise: true*/
             if (id < numPasses)
             {
                 return passes[id];
@@ -2424,101 +2402,15 @@ WebGLTechnique.prototype =
         return null;
     },
 
-    setParametersImmediate : function setParametersImmediateFn(gd, techniqueParameters)
-    {
-        var gl = gd.gl;
-
-        var pass = this.passes[0];
-        var parameters = pass.parameters;
-        /*jslint forin: true*/
-        for (var p in techniqueParameters)
-        {
-            var parameter = parameters[p];
-            if (parameter)
-            {
-                var paramInfo = parameter.info;
-                var sampler = paramInfo.sampler;
-                var parameterValues = techniqueParameters[p];
-                if (parameterValues !== undefined)
-                {
-                    if (sampler)
-                    {
-                        gd.setTexture(parameter.textureUnit, parameterValues, sampler);
-                    }
-                    else
-                    {
-                        paramInfo.setter.call(gl, parameter.location, parameterValues);
-                    }
-                }
-                else
-                {
-                    delete techniqueParameters[p];
-                    if (sampler)
-                    {
-                        gd.setTexture(parameter.textureUnit);
-                    }
-                }
-            }
-        }
-        /*jslint forin: false*/
-    },
-
-    setParametersDeferred : function setParametersDeferredFn(gd, techniqueParameters)
-    {
-        var passes = this.passes;
-        var numPasses = passes.length;
-        var min = Math.min;
-        var max = Math.max;
-        for (var n = 0; n < numPasses; n += 1)
-        {
-            var pass = this.passes[n];
-            var parameters = pass.parameters;
-            pass.dirty = true;
-
-            /*jslint forin: true*/
-            for (var p in techniqueParameters)
-            {
-                var parameter = parameters[p];
-                if (parameter)
-                {
-                    var paramInfo = parameter.info;
-                    var parameterValues = techniqueParameters[p];
-                    if (parameterValues !== undefined)
-                    {
-                        if (paramInfo.sampler)
-                        {
-                            paramInfo.values = parameterValues;
-                            parameter.dirty = 1;
-                        }
-                        else if (typeof parameterValues !== 'number')
-                        {
-                            var values = paramInfo.values;
-                            var numValues = min(paramInfo.numValues, parameterValues.length);
-                            for (var v = 0; v < numValues; v += 1)
-                            {
-                                values[v] = parameterValues[v];
-                            }
-                            parameter.dirty = max(numValues, (parameter.dirty || 0));
-                        }
-                        else
-                        {
-                            paramInfo.values[0] = parameterValues;
-                            parameter.dirty = (parameter.dirty || 1);
-                        }
-                    }
-                    else
-                    {
-                        delete techniqueParameters[p];
-                    }
-                }
-            }
-            /*jslint forin: false*/
-        }
-    },
-
     activate : function activateFn(gd)
     {
         this.device = gd;
+
+        if (!this.initialized)
+        {
+            this.shader.initialize(gd);
+            this.initialize(gd);
+        }
     },
 
     deactivate : function deactivateFn()
@@ -2545,13 +2437,14 @@ WebGLTechnique.prototype =
 
         if (fakeTechniqueParameters)
         {
-            if (this.passes.length === 1)
+            var passes = this.passes;
+            if (passes.length === 1)
             {
-                this.setParametersImmediate(gd, fakeTechniqueParameters);
+                gd.setParametersImmediate(gd, passes, fakeTechniqueParameters);
             }
             else
             {
-                this.setParametersDeferred(gd, fakeTechniqueParameters);
+                gd.setParametersDeferred(gd, passes, fakeTechniqueParameters);
             }
 
             var hasProperty = Object.prototype.hasOwnProperty;
@@ -2563,6 +2456,32 @@ WebGLTechnique.prototype =
                 }
             }
         }
+    },
+
+    initialize : function techniqueInitializeFn(gd)
+    {
+        if (this.initialized)
+        {
+            return;
+        }
+
+        var passes = this.passes;
+        if (passes)
+        {
+            var numPasses = passes.length;
+            var n;
+            for (n = 0; n < numPasses; n += 1)
+            {
+                passes[n].initializeParameters(gd);
+            }
+        }
+
+        if (Object.defineProperty)
+        {
+            this.initializeParametersSetters(gd);
+        }
+
+        this.initialized = true;
     },
 
     initializeParametersSetters : function initializeParametersSettersFn(gd)
@@ -2788,7 +2707,7 @@ WebGLTechnique.prototype =
                     {
                         if (undefined !== parameter.location)
                         {
-                            if (paramInfo.sampler)
+                            if (parameter.sampler)
                             {
                                 setter = make_sampler_setter(pass, parameter);
                             }
@@ -2879,6 +2798,8 @@ WebGLTechnique.create = function webGLTechniqueCreateFn(gd, shader, name, passes
 {
     var technique = new WebGLTechnique();
 
+    technique.initialized = false;
+    technique.shader = shader;
     technique.name = name;
 
     var numPasses = passes.length, n;
@@ -2888,7 +2809,10 @@ WebGLTechnique.create = function webGLTechniqueCreateFn(gd, shader, name, passes
     for (n = 0; n < numPasses; n += 1)
     {
         var passParams = passes[n];
-        numParameters += passParams.parameters.length;
+        if (passParams.parameters)
+        {
+            numParameters += passParams.parameters.length;
+        }
         technique.passes[n] = WebGLPass.create(gd, shader, passParams);
     }
 
@@ -2896,10 +2820,6 @@ WebGLTechnique.create = function webGLTechniqueCreateFn(gd, shader, name, passes
 
     technique.device = null;
 
-    if (Object.defineProperty)
-    {
-        technique.initializeParametersSetters(gd);
-    }
 
     return technique;
 };
@@ -2947,9 +2867,9 @@ WebGLShader.prototype =
         }
         else
         {
-            /*jslint bitwise: false*/
+            /*jshint bitwise: false*/
             name = (name | 0);
-            /*jslint bitwise: true*/
+            /*jshint bitwise: true*/
             var parameters = this.parameters;
             for (var p in parameters)
             {
@@ -2967,6 +2887,57 @@ WebGLShader.prototype =
             }
             return null;
         }
+    },
+
+    initialize : function shaderInitializeFn(gd)
+    {
+        if (this.initialized)
+        {
+            return;
+        }
+
+        var gl = gd.gl;
+        var p;
+
+        // Check copmpiled programs as late as possible
+        var shaderPrograms = this.programs;
+        for (p in shaderPrograms)
+        {
+            if (shaderPrograms.hasOwnProperty(p))
+            {
+                var compiledProgram = shaderPrograms[p];
+                var compiled = gl.getShaderParameter(compiledProgram, gl.COMPILE_STATUS);
+                if (!compiled)
+                {
+                    var compilerInfo = gl.getShaderInfoLog(compiledProgram);
+                    TurbulenzEngine.callOnError(
+                        'Program "' + p + '" failed to compile: ' + compilerInfo);
+                }
+            }
+        }
+
+        // Check linked programs as late as possible
+        var linkedPrograms = this.linkedPrograms;
+        for (p in linkedPrograms)
+        {
+            if (linkedPrograms.hasOwnProperty(p))
+            {
+                var linkedProgram = linkedPrograms[p];
+                var glProgram = linkedProgram.glProgram;
+                if (glProgram)
+                {
+                    var linked = gl.getProgramParameter(glProgram, gl.LINK_STATUS);
+                    if (!linked)
+                    {
+                        var linkerInfo = gl.getProgramInfoLog(glProgram);
+                        TurbulenzEngine.callOnError(
+                            'Program "' + p + '" failed to link: ' + linkerInfo);
+                    }
+                }
+            }
+        }
+
+        this.initialized = true;
     },
 
     destroy : function shaderDestroyFn()
@@ -3042,6 +3013,8 @@ WebGLShader.create = function webGLShaderCreateFn(gd, params)
 
     var shader = new WebGLShader();
 
+    shader.initialized = false;
+
     var techniques = params.techniques;
     var parameters = params.parameters;
     var programs = params.programs;
@@ -3051,8 +3024,38 @@ WebGLShader.create = function webGLShaderCreateFn(gd, params)
     shader.gd = gd;
     shader.name = params.name;
 
-    shader.linkedPrograms = {};
+    // Compile programs as early as possible
+    var shaderPrograms = {};
+    shader.programs = shaderPrograms;
+    for (p in programs)
+    {
+        if (programs.hasOwnProperty(p))
+        {
+            var program = programs[p];
 
+            var glShaderType;
+            if (program.type === 'fragment')
+            {
+                glShaderType = gl.FRAGMENT_SHADER;
+            }
+            else if (program.type === 'vertex')
+            {
+                glShaderType = gl.VERTEX_SHADER;
+            }
+            var glShader = gl.createShader(glShaderType);
+
+            gl.shaderSource(glShader, program.code);
+
+            gl.compileShader(glShader);
+
+            shaderPrograms[p] = glShader;
+        }
+    }
+
+    var linkedPrograms = {};
+    shader.linkedPrograms = linkedPrograms;
+
+    // Samplers
     var defaultSampler = gd.DEFAULT_SAMPLER;
     var maxAnisotropy = gd.maxAnisotropy;
 
@@ -3101,6 +3104,7 @@ WebGLShader.create = function webGLShaderCreateFn(gd, params)
         }
     }
 
+    // Parameters
     var numParameters = 0;
     shader.parameters = {};
     for (p in parameters)
@@ -3221,49 +3225,15 @@ WebGLShader.create = function webGLShaderCreateFn(gd, params)
     }
     shader.numParameters = numParameters;
 
-    shader.programs = {};
-    for (p in programs)
-    {
-        if (programs.hasOwnProperty(p))
-        {
-            var program = programs[p];
-
-            var glShaderType;
-            if (program.type === 'fragment')
-            {
-                glShaderType = gl.FRAGMENT_SHADER;
-            }
-            else if (program.type === 'vertex')
-            {
-                glShaderType = gl.VERTEX_SHADER;
-            }
-            var glShader = gl.createShader(glShaderType);
-
-            gl.shaderSource(glShader, program.code);
-
-            gl.compileShader(glShader);
-
-            var compiled = gl.getShaderParameter(glShader, gl.COMPILE_STATUS);
-            if (!compiled)
-            {
-                var info = gl.getShaderInfoLog(glShader);
-                TurbulenzEngine.callOnError(
-                    'Program "' + p + '" failed to compile: ' + info);
-                gl.deleteShader(glShader);
-                glShader = null;
-            }
-
-            shader.programs[p] = glShader;
-        }
-    }
-
+    // Techniques and passes
+    var shaderTechniques = {};
     var numTechniques = 0;
-    shader.techniques = {};
+    shader.techniques = shaderTechniques;
     for (p in techniques)
     {
         if (techniques.hasOwnProperty(p))
         {
-            shader.techniques[p] = WebGLTechnique.create(gd, shader, p, techniques[p]);
+            shaderTechniques[p] = WebGLTechnique.create(gd, shader, p, techniques[p]);
             numTechniques += 1;
         }
     }
@@ -3272,10 +3242,42 @@ WebGLShader.create = function webGLShaderCreateFn(gd, params)
     return shader;
 };
 
+//
+// WebGLTechniqueParameters
+//
+function WebGLTechniqueParameters() {}
+
+// Constructor function
+WebGLTechniqueParameters.create = function WebGLTechniqueParametersFn(params)
+{
+    var techniqueParameters = new WebGLTechniqueParameters();
+
+    if (params)
+    {
+        for (var p in params)
+        {
+            if (params.hasOwnProperty(p))
+            {
+                techniqueParameters[p] = params[p];
+            }
+        }
+    }
+
+    return techniqueParameters;
+};
 
 //
 // WebGLTechniqueParameterBuffer
 //
+function techniqueParameterBufferSetData(data, offset, numValues)
+{
+    for (var n = 0, o = offset; n < numValues; n += 1, o += 1)
+    {
+        this[o] = data[n];
+    }
+    return o;
+}
+
 function techniqueParameterBufferCreate(params)
 {
     if (Float32Array.prototype.map === undefined)
@@ -3285,10 +3287,10 @@ function techniqueParameterBufferCreate(params)
             {
                 offset = 0;
             }
-            var data = this;
+            var buffer = this;
             if (numFloats === undefined)
             {
-                numFloats = data.length;
+                numFloats = this.length;
             }
             function techniqueParameterBufferWriter()
             {
@@ -3298,17 +3300,12 @@ function techniqueParameterBufferCreate(params)
                     var value = arguments[a];
                     if (typeof value === 'number')
                     {
-                        data[offset] = value;
+                        buffer[offset] = value;
                         offset += 1;
                     }
                     else
                     {
-                        var numValues = value.length;
-                        for (var n = 0; n < numValues; n += 1)
-                        {
-                            data[offset] = value[n];
-                            offset += 1;
-                        }
+                        offset = techniqueParameterBufferSetData.call(buffer, value, offset, value.length);
                     }
                 }
             }
@@ -3384,6 +3381,7 @@ WebGLDrawParameters.create = function webGLDrawParametersFn(params)
     drawParameters.technique = null;
     drawParameters.indexBuffer = null;
     drawParameters.primitive = -1;
+    drawParameters.userData = null;
 
     return drawParameters;
 };
@@ -3460,10 +3458,14 @@ WebGLGraphicsDevice.prototype =
         var gl = this.gl;
         var indexBuffer = this.activeIndexBuffer;
 
-        var offset = first;
-        if (offset)
+        var offset;
+        if (first)
         {
-            offset *= indexBuffer.stride;
+            offset = (first * indexBuffer.stride);
+        }
+        else
+        {
+            offset = 0;
         }
 
         var format = indexBuffer.format;
@@ -3477,7 +3479,7 @@ WebGLGraphicsDevice.prototype =
 
         activeTechnique.checkProperties(this);
 
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         if (1 === numPasses)
         {
             mask = (passes[0].semanticsMask & attributeMask);
@@ -3505,7 +3507,7 @@ WebGLGraphicsDevice.prototype =
                 gl.drawElements(primitive, numIndices, format, offset);
             }
         }
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
     },
 
     draw : function drawFn(primitive, numVertices, first)
@@ -3521,7 +3523,7 @@ WebGLGraphicsDevice.prototype =
 
         activeTechnique.checkProperties(this);
 
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         if (1 === numPasses)
         {
             mask = (passes[0].semanticsMask & attributeMask);
@@ -3549,17 +3551,152 @@ WebGLGraphicsDevice.prototype =
                 gl.drawArrays(primitive, first, numVertices);
             }
         }
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
     },
 
     setTechniqueParameters : function setTechniqueParametersFn()
     {
         var activeTechnique = this.activeTechnique;
-        var setParameters = (1 === activeTechnique.passes.length ? activeTechnique.setParametersImmediate : activeTechnique.setParametersDeferred);
+        var passes = activeTechnique.passes;
+        var setParameters = (1 === passes.length ? this.setParametersImmediate : this.setParametersDeferred);
         var numTechniqueParameters = arguments.length;
         for (var t = 0; t < numTechniqueParameters; t += 1)
         {
-            setParameters.call(activeTechnique, this, arguments[t]);
+            setParameters(this, passes, arguments[t]);
+        }
+    },
+
+    //Internal
+
+    setParametersImmediate : function setParametersImmediateFn(gd, passes, techniqueParameters)
+    {
+        var gl = gd.gl;
+
+        var parameters = passes[0].parameters;
+        /*jshint forin: true*/
+        for (var p in techniqueParameters)
+        {
+            var parameter = parameters[p];
+            if (parameter !== undefined)
+            {
+                var sampler = parameter.sampler;
+                var parameterValues = techniqueParameters[p];
+                if (parameterValues !== undefined)
+                {
+                    if (sampler !== undefined)
+                    {
+                        gd.setTexture(parameter.textureUnit, parameterValues, sampler);
+                    }
+                    else
+                    {
+                        parameter.setter.call(gl, parameter.location, parameterValues);
+                    }
+                }
+                else
+                {
+                    delete techniqueParameters[p];
+                    if (sampler)
+                    {
+                        gd.setTexture(parameter.textureUnit);
+                    }
+                }
+            }
+        }
+        /*jshint forin: false*/
+    },
+
+    // ONLY USE FOR SINGLE PASS TECHNIQUES ON DRAWARRAY
+    setParametersCaching : function setParametersCachingFn(gd, passes, techniqueParameters)
+    {
+        var gl = gd.gl;
+
+        var parameters = passes[0].parameters;
+        /*jshint forin: true*/
+        for (var p in techniqueParameters)
+        {
+            var parameter = parameters[p];
+            if (parameter !== undefined)
+            {
+                var parameterValues = techniqueParameters[p];
+                if (parameter.value !== parameterValues)
+                {
+                    parameter.value = parameterValues;
+
+                    var sampler = parameter.sampler;
+                    if (parameterValues !== undefined)
+                    {
+                        if (sampler !== undefined)
+                        {
+                            gd.setTexture(parameter.textureUnit, parameterValues, sampler);
+                        }
+                        else
+                        {
+                            parameter.setter.call(gl, parameter.location, parameterValues);
+                        }
+                    }
+                    else
+                    {
+                        delete techniqueParameters[p];
+                        if (sampler)
+                        {
+                            gd.setTexture(parameter.textureUnit);
+                        }
+                    }
+                }
+            }
+        }
+        /*jshint forin: false*/
+    },
+
+    setParametersDeferred : function setParametersDeferredFn(gd, passes, techniqueParameters)
+    {
+        var numPasses = passes.length;
+        var min = Math.min;
+        var max = Math.max;
+        for (var n = 0; n < numPasses; n += 1)
+        {
+            var pass = passes[n];
+            var parameters = pass.parameters;
+            pass.dirty = true;
+
+            /*jshint forin: true*/
+            for (var p in techniqueParameters)
+            {
+                var parameter = parameters[p];
+                if (parameter)
+                {
+                    var paramInfo = parameter.info;
+                    var parameterValues = techniqueParameters[p];
+                    if (parameterValues !== undefined)
+                    {
+                        if (parameter.sampler)
+                        {
+                            paramInfo.values = parameterValues;
+                            parameter.dirty = 1;
+                        }
+                        else if (typeof parameterValues !== 'number')
+                        {
+                            var values = paramInfo.values;
+                            var numValues = min(paramInfo.numValues, parameterValues.length);
+                            for (var v = 0; v < numValues; v += 1)
+                            {
+                                values[v] = parameterValues[v];
+                            }
+                            parameter.dirty = max(numValues, (parameter.dirty || 0));
+                        }
+                        else
+                        {
+                            paramInfo.values[0] = parameterValues;
+                            parameter.dirty = (parameter.dirty || 1);
+                        }
+                    }
+                    else
+                    {
+                        delete techniqueParameters[p];
+                    }
+                }
+            }
+            /*jshint forin: false*/
         }
     },
 
@@ -3585,6 +3722,36 @@ WebGLGraphicsDevice.prototype =
         }
     },
 
+    // ONLY USE FOR SINGLE PASS TECHNIQUES ON DRAWARRAY
+    setTechniqueCaching : function setTechniqueCachingFn(technique)
+    {
+        var pass = technique.passes[0];
+
+        var activeTechnique = this.activeTechnique;
+        if (activeTechnique !== technique)
+        {
+            if (activeTechnique)
+            {
+                activeTechnique.deactivate();
+            }
+
+            this.activeTechnique = technique;
+
+            technique.activate(this);
+
+            this.setPass(pass);
+        }
+
+        var parameters = pass.parameters;
+        for (var p in parameters)
+        {
+            if (parameters.hasOwnProperty(p))
+            {
+                parameters[p].value = null;
+            }
+        }
+    },
+
     setStream : function setStreamFn(vertexBuffer, semantics, offset)
     {
         if (offset)
@@ -3605,9 +3772,9 @@ WebGLGraphicsDevice.prototype =
             numAttributes = vertexBuffer.numAttributes;
         }
 
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         this.attributeMask |= vertexBuffer.bindAttributes(numAttributes, attributes, offset);
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
     },
 
     setIndexBuffer : function setIndexBufferFn(indexBuffer)
@@ -3637,34 +3804,42 @@ WebGLGraphicsDevice.prototype =
         var drawArrays = gl.drawArrays;
         var ELEMENT_ARRAY_BUFFER = gl.ELEMENT_ARRAY_BUFFER;
 
-        var setTechnique = this.setTechnique;
-        var setTechniqueParameters = this.setTechniqueParameters;
+        var setTechniqueCaching = this.setTechniqueCaching;
+        var setParametersCaching = this.setParametersCaching;
+        var setTechniqueStandard = this.setTechnique;
+        var setParametersDeferred = this.setParametersDeferred;
+
         var setStream = this.setStream;
         var enableClientState = this.enableClientState;
+
+        var numGlobalTechniqueParameters = globalTechniqueParametersArray.length;
 
         var numDrawParameters = drawParametersArray.length;
         if (numDrawParameters > 1 && sortMode)
         {
             if (sortMode > 0)
             {
-                drawParametersArray.sort(function (a, b) {
+                drawParametersArray.sort(function drawArraySortPositive(a, b) {
                     return (b.sortKey - a.sortKey);
                 });
             }
             else if (sortMode < 0)
             {
-                drawParametersArray.sort(function (a, b) {
+                drawParametersArray.sort(function drawArraySortNegative(a, b) {
                     return (a.sortKey - b.sortKey);
                 });
             }
         }
 
+
         var activeIndexBuffer = this.activeIndexBuffer;
+        var setTechnique = null;
+        var setParameters = null;
         var lastTechnique = null;
         var lastNumStreams = -1;
         var lastStreams = null;
         var v, streamsMatch, offset;
-        var passes, numPasses, mask, attributeMask, p, pass, format;
+        var passes, numPasses, mask, attributeMask, p, pass, format, t;
 
         for (var n = 0; n < numDrawParameters; n += 1)
         {
@@ -3684,17 +3859,34 @@ WebGLGraphicsDevice.prototype =
 
                 passes = technique.passes;
                 numPasses = passes.length;
+                if (1 === numPasses)
+                {
+                    setTechnique = setTechniqueCaching;
+                    setParameters = setParametersCaching;
+                }
+                else
+                {
+                    setTechnique = setTechniqueStandard;
+                    setParameters = setParametersDeferred;
+                }
 
                 setTechnique.call(this, technique);
 
                 technique.checkProperties(this);
 
-                setTechniqueParameters.apply(this, globalTechniqueParametersArray);
+                for (t = 0; t < numGlobalTechniqueParameters; t += 1)
+                {
+                    setParameters(this, passes, globalTechniqueParametersArray[t]);
+                }
             }
 
             if (techniqueParametersArray)
             {
-                setTechniqueParameters.apply(this, techniqueParametersArray);
+                var numTechniqueParameters = techniqueParametersArray.length;
+                for (t = 0; t < numTechniqueParameters; t += 1)
+                {
+                    setParameters(this, passes, techniqueParametersArray[t]);
+                }
             }
 
             streamsMatch = (lastNumStreams === numStreams);
@@ -3718,7 +3910,7 @@ WebGLGraphicsDevice.prototype =
                 attributeMask = this.attributeMask;
             }
 
-            /*jslint bitwise: false*/
+            /*jshint bitwise: false*/
             if (indexBuffer)
             {
                 if (activeIndexBuffer !== indexBuffer)
@@ -3793,7 +3985,7 @@ WebGLGraphicsDevice.prototype =
                     }
                 }
             }
-            /*jslint bitwise: true*/
+            /*jshint bitwise: true*/
         }
 
         this.activeIndexBuffer = activeIndexBuffer;
@@ -3807,10 +3999,6 @@ WebGLGraphicsDevice.prototype =
             var n;
             var immediateSemantics = this.immediateSemantics;
             var attributes = semantics;
-            if (!attributes)
-            {
-                attributes = semantics;
-            }
             var numAttributes = attributes.length;
             immediateSemantics.length = numAttributes;
             for (n = 0; n < numAttributes; n += 1)
@@ -3860,7 +4048,7 @@ WebGLGraphicsDevice.prototype =
             var stride = immediateVertexBuffer.strideInBytes;
             var offset = 0;
 
-            /*jslint bitwise: false*/
+            /*jshint bitwise: false*/
             var vertexAttributes = immediateVertexBuffer.attributes;
 
             var semantics = this.immediateSemantics;
@@ -3884,7 +4072,7 @@ WebGLGraphicsDevice.prototype =
                 offset += vertexAttribute.stride;
             }
             this.attributeMask |= deltaAttributeMask;
-            /*jslint bitwise: true*/
+            /*jshint bitwise: true*/
 
             this.draw(this.immediatePrimitive, numVerticesWritten, 0);
         }
@@ -4034,11 +4222,12 @@ WebGLGraphicsDevice.prototype =
 
         this.attributeMask = 0;
 
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         var clientStateMask = this.clientStateMask;
+        var n;
         if (clientStateMask)
         {
-            for (var n = 0; n < 16; n += 1)
+            for (n = 0; n < 16; n += 1)
             {
                 if (clientStateMask & (1 << n))
                 {
@@ -4047,9 +4236,12 @@ WebGLGraphicsDevice.prototype =
             }
             this.clientStateMask = 0;
         }
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
 
         this.resetStates();
+
+        this.setScissor(0, 0, this.width, this.height);
+        this.setViewport(0, 0, this.width, this.height);
 
         return true;
     },
@@ -4099,7 +4291,7 @@ WebGLGraphicsDevice.prototype =
         }
 
         this.numFrames += 1;
-        var currentFrameTime = Date.now();
+        var currentFrameTime = TurbulenzEngine.getTime();
         var diffTime = (currentFrameTime - this.previousFrameTime);
         if (diffTime >= 1000.0)
         {
@@ -4125,18 +4317,7 @@ WebGLGraphicsDevice.prototype =
 
     createTechniqueParameters : function createTechniqueParametersFn(params)
     {
-        var techniqueParameters = {};
-        if (params)
-        {
-            for (var p in params)
-            {
-                if (params.hasOwnProperty(p))
-                {
-                    techniqueParameters[p] = params[p];
-                }
-            }
-        }
-        return techniqueParameters;
+        return WebGLTechniqueParameters.create(params);
     },
 
     createSemantics : function createSemanticsFn(attributes)
@@ -4234,6 +4415,10 @@ WebGLGraphicsDevice.prototype =
                 }
             }
         }
+        else if ("TEXTURE_ETC1" === name)
+        {
+            return false;
+        }
         else if ("INDEXFORMAT_UINT" === name)
         {
             if (gl.getExtension('OES_element_index_uint'))
@@ -4242,7 +4427,7 @@ WebGLGraphicsDevice.prototype =
             }
             return false;
         }
-        return false;
+        return undefined;
     },
 
     maxSupported : function maxSupportedFn(name)
@@ -4608,7 +4793,7 @@ WebGLGraphicsDevice.prototype =
         var oldMask = this.clientStateMask;
         this.clientStateMask = mask;
 
-        /*jslint bitwise: false*/
+        /*jshint bitwise: false*/
         var disableMask = (oldMask & (~mask));
         var enableMask  = ((~oldMask) & mask);
         var n;
@@ -4658,7 +4843,7 @@ WebGLGraphicsDevice.prototype =
             }
             while (enableMask);
         }
-        /*jslint bitwise: true*/
+        /*jshint bitwise: true*/
     },
 
     setTexture : function setTextureFn(textureUnitIndex, texture, sampler)
@@ -4674,8 +4859,8 @@ WebGLGraphicsDevice.prototype =
         {
             var gltarget = texture.target;
             var globject = texture.glTexture;
-            if (oldgltarget !== gltarget ||
-                oldglobject !== globject)
+            if (oldglobject !== globject ||
+                oldgltarget !== gltarget)
             {
                 textureUnit.target = gltarget;
                 textureUnit.texture = globject;
@@ -4910,7 +5095,15 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
     gd.width = width;
     gd.height = height;
 
-    var extensions = gl.getSupportedExtensions().join(' ');
+    var extensions = gl.getSupportedExtensions();
+    if (extensions)
+    {
+        extensions = extensions.join(' ');
+    }
+    else
+    {
+        extensions = '';
+    }
     gd.extensions = extensions;
     gd.shadingLanguageVersion = gl.getParameter(gl.SHADING_LANGUAGE_VERSION);
     gd.rendererVersion = gl.getParameter(gl.VERSION);
@@ -5759,7 +5952,7 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
 
     gd.fps = 0;
     gd.numFrames = 0;
-    gd.previousFrameTime = Date.now();
+    gd.previousFrameTime = TurbulenzEngine.getTime();
 
     return gd;
 };

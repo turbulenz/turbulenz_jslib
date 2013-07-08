@@ -128,6 +128,7 @@ DeferredRendering.prototype =
                 {
                     if (light.global)
                     {
+                        l += 1;
                         continue;
                     }
 
@@ -1241,6 +1242,11 @@ DeferredRendering.prototype =
         this.mixTechniqueParameters.lightingScale = scale;
     },
 
+    getDefaultSkinBufferSize: function getDefaultSkinBufferSizeFn()
+    {
+        return this.defaultSkinBufferSize;
+    },
+
     destroy: function destroyFn()
     {
         delete this.deferredShader;
@@ -1344,7 +1350,7 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
     dr.lightSemantics = gd.createSemantics(['POSITION']);
     dr.quadSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0']);
 
-    /*jslint white: false*/
+    /*jshint white: false*/
     dr.spotLightVolumeVertexBuffer = gd.createVertexBuffer({
             numVertices: 8,
             attributes: ['FLOAT3'],
@@ -1394,7 +1400,7 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
                  1.0, -1.0, 1.0, 0.0
             ]
         });
-    /*jslint white: true*/
+    /*jshint white: true*/
 
     dr.deferredShader = null;
 
@@ -1408,8 +1414,15 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
     dr.pointLights = [];
     dr.fogLights = [];
 
+
+    var onShaderLoaded = function onShaderLoadedFn(shader)
+    {
+        var skinBones = shader.getParameter("skinBones");
+        dr.defaultSkinBufferSize = skinBones.rows * skinBones.columns;
+    };
+
     shaderManager.load("shaders/deferredlights.cgfx");
-    shaderManager.load("shaders/deferredopaque.cgfx");
+    shaderManager.load("shaders/deferredopaque.cgfx", onShaderLoaded);
     shaderManager.load("shaders/deferredtransparent.cgfx");
 
     // Prepare effects
@@ -2623,6 +2636,34 @@ DeferredRendering.create = function deferredRenderingCreateFn(gd, md, shaderMana
     effectManager.map("default", "blinn");
     effectManager.map("lambert", "blinn");
     effectManager.map("phong", "blinn");
+
+    //
+    // glowmap
+    //
+    effect = Effect.create("glowmap");
+    effectManager.add(effect);
+
+    effectTypeData = {  prepare : deferredPrepareFn,
+                        shaderName : "shaders/deferredopaque.cgfx",
+                        techniqueName : "glowmap",
+                        update : deferredUpdateFn,
+                        shadowMappingShaderName : "shaders/shadowmapping.cgfx",
+                        shadowMappingTechniqueName : "rigid",
+                        shadowMappingUpdate : shadowMappingUpdateFn,
+                        loadTechniques : loadTechniques };
+    effectTypeData.loadTechniques(shaderManager);
+    effect.add(rigid, effectTypeData);
+
+    effectTypeData = {  prepare : deferredPrepareFn,
+                        shaderName : "shaders/deferredopaque.cgfx",
+                        techniqueName : "glowmap_skinned",
+                        update : deferredSkinnedUpdateFn,
+                        shadowMappingShaderName : "shaders/shadowmapping.cgfx",
+                        shadowMappingTechniqueName : "skinned",
+                        shadowMappingUpdate : shadowMappingSkinnedUpdateFn,
+                        loadTechniques : loadTechniques };
+    effectTypeData.loadTechniques(shaderManager);
+    effect.add(skinned, effectTypeData);
 
     return dr;
 };

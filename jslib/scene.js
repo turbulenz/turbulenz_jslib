@@ -612,12 +612,16 @@ Scene.prototype =
                 var areaMaxExtent0 = areaExtent[3];
                 var areaMaxExtent1 = areaExtent[4];
                 var areaMaxExtent2 = areaExtent[5];
-                var combinedExtents = [(areaMinExtent0 < cameraMinExtent0 ? cameraMinExtent0 : areaMinExtent0),
-                                       (areaMinExtent1 < cameraMinExtent1 ? cameraMinExtent1 : areaMinExtent1),
-                                       (areaMinExtent2 < cameraMinExtent2 ? cameraMinExtent2 : areaMinExtent2),
-                                       (areaMaxExtent0 > cameraMaxExtent0 ? cameraMaxExtent0 : areaMaxExtent0),
-                                       (areaMaxExtent1 > cameraMaxExtent1 ? cameraMaxExtent1 : areaMaxExtent1),
-                                       (areaMaxExtent2 > cameraMaxExtent2 ? cameraMaxExtent2 : areaMaxExtent2)];
+                var combinedExtents = (this.float32ArrayConstructor ?
+                                       new this.float32ArrayConstructor(6) :
+                                       new Array(6));
+                combinedExtents[0] = (areaMinExtent0 < cameraMinExtent0 ? cameraMinExtent0 : areaMinExtent0);
+                combinedExtents[1] = (areaMinExtent1 < cameraMinExtent1 ? cameraMinExtent1 : areaMinExtent1);
+                combinedExtents[2] = (areaMinExtent2 < cameraMinExtent2 ? cameraMinExtent2 : areaMinExtent2);
+                combinedExtents[3] = (areaMaxExtent0 > cameraMaxExtent0 ? cameraMaxExtent0 : areaMaxExtent0);
+                combinedExtents[4] = (areaMaxExtent1 > cameraMaxExtent1 ? cameraMaxExtent1 : areaMaxExtent1);
+                combinedExtents[5] = (areaMaxExtent2 > cameraMaxExtent2 ? cameraMaxExtent2 : areaMaxExtent2);
+
                 dynamicSpatialMap.getOverlappingNodes(combinedExtents, nodes);
 
                 numNodes = nodes.length;
@@ -714,16 +718,27 @@ Scene.prototype =
                 var cameraMaxExtent1 = this.cameraExtents[4];
                 var cameraMaxExtent2 = this.cameraExtents[5];
 
+                var externalNodesStack = this.externalNodesStack;
+
                 var areaExtent;
                 var areaMinExtent0, areaMinExtent1, areaMinExtent2;
                 var areaMaxExtent0, areaMaxExtent1, areaMaxExtent2;
-                var combinedExtents = [];
+                var combinedExtents = (this.float32ArrayConstructor ?
+                                       new this.float32ArrayConstructor(6) :
+                                       new Array(6));
 
                 var area, na, nodes, numNodes;
                 var numAreas = areas.length;
                 for (na = 0; na < numAreas; na += 1)
                 {
-                    areas[na].externalNodes = null;
+                    area = areas[na];
+                    nodes = area.externalNodes;
+                    if (nodes)
+                    {
+                        nodes.length = 0;
+                        externalNodesStack.push(nodes);
+                        area.externalNodes = null;
+                    }
                 }
 
                 var isInsidePlanesAABB = this.isInsidePlanesAABB;
@@ -743,7 +758,14 @@ Scene.prototype =
 
                 if (!nodes)
                 {
-                    nodes = [];
+                    if (0 < externalNodesStack.length)
+                    {
+                        nodes = externalNodesStack.pop();
+                    }
+                    else
+                    {
+                        nodes = [];
+                    }
                     area.externalNodes = nodes;
 
                     areaExtent = area.extents;
@@ -775,7 +797,7 @@ Scene.prototype =
                         if (nodeAreaIndex >= 0 &&
                             areaIndex !== nodeAreaIndex)
                         {
-                            overlappingAreas = findOverlappingAreas.call(this, nodeAreaIndex, nodeExtents);
+                            overlappingAreas = findOverlappingAreas.call(this, nodeAreaIndex, nodeExtents, true);
                             numOverlappingAreas = overlappingAreas.length;
                             for (na = 0; na < numOverlappingAreas; na += 1)
                             {
@@ -824,7 +846,14 @@ Scene.prototype =
 
                     if (!nodes)
                     {
-                        nodes = [];
+                        if (0 < externalNodesStack.length)
+                        {
+                            nodes = externalNodesStack.pop();
+                        }
+                        else
+                        {
+                            nodes = [];
+                        }
                         area.externalNodes = nodes;
 
                         areaExtent = area.extents;
@@ -856,7 +885,7 @@ Scene.prototype =
                             if (nodeAreaIndex >= 0 &&
                                 areaIndex !== nodeAreaIndex)
                             {
-                                overlappingAreas = findOverlappingAreas.call(this, nodeAreaIndex, nodeExtents);
+                                overlappingAreas = findOverlappingAreas.call(this, nodeAreaIndex, nodeExtents, true);
                                 numOverlappingAreas = overlappingAreas.length;
                                 for (na = 0; na < numOverlappingAreas; na += 1)
                                 {
@@ -995,6 +1024,11 @@ Scene.prototype =
         for (n = 0; n < numPortals; n += 1)
         {
             portal = portals[n];
+            if (portal.disabled)
+            {
+                continue;
+            }
+
             portal.queryCounter = queryCounter;
 
             portalExtents = portal.extents;
@@ -1047,7 +1081,8 @@ Scene.prototype =
                     portal = portals[n];
                     nextArea = portal.area;
                     if (nextArea !== areaIndex &&
-                        portal.queryCounter !== queryCounter)
+                        portal.queryCounter !== queryCounter &&
+                        !portal.disabled)
                     {
                         portalExtents = portal.extents;
                         if (portalExtents[0] < max0 &&
@@ -1109,11 +1144,20 @@ Scene.prototype =
             var areaIndex = this.findAreaIndex(this.bspNodes, cX, cY, cZ);
             if (areaIndex >= 0)
             {
-                var na, nodes, numNodes;
+                var externalNodesStack = this.externalNodesStack;
+
+                var na, area, nodes, numNodes;
                 var numAreas = areas.length;
                 for (na = 0; na < numAreas; na += 1)
                 {
-                    areas[na].externalNodes = null;
+                    area = areas[na];
+                    nodes = area.externalNodes;
+                    if (nodes)
+                    {
+                        nodes.length = 0;
+                        externalNodesStack.push(nodes);
+                        area.externalNodes = null;
+                    }
                 }
 
                 var minExtent0 = extents[0];
@@ -1123,14 +1167,14 @@ Scene.prototype =
                 var maxExtent1 = extents[4];
                 var maxExtent2 = extents[5];
 
-                var area = areas[areaIndex];
-                var testExtents = area.extents;
-                var testMinExtent0 = testExtents[0];
-                var testMinExtent1 = testExtents[1];
-                var testMinExtent2 = testExtents[2];
-                var testMaxExtent0 = testExtents[3];
-                var testMaxExtent1 = testExtents[4];
-                var testMaxExtent2 = testExtents[5];
+                area = areas[areaIndex];
+                var areaExtents = area.extents;
+                var testMinExtent0 = areaExtents[0];
+                var testMinExtent1 = areaExtents[1];
+                var testMinExtent2 = areaExtents[2];
+                var testMaxExtent0 = areaExtents[3];
+                var testMaxExtent1 = areaExtents[4];
+                var testMaxExtent2 = areaExtents[5];
 
                 var overlappingPortals = [];
                 this.findOverlappingPortals(areaIndex, cX, cY, cZ, extents, overlappingPortals);
@@ -1142,14 +1186,24 @@ Scene.prototype =
                 var portalPlanes;
                 var n, node, np, portalItem;
 
-                nodes = [];
+                if (0 < externalNodesStack.length)
+                {
+                    nodes = externalNodesStack.pop();
+                }
+                else
+                {
+                    nodes = [];
+                }
                 area.externalNodes = nodes;
-                testExtents = [(testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0),
-                               (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1),
-                               (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2),
-                               (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0),
-                               (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1),
-                               (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2)];
+
+                var testExtents = this.testExtents;
+                testExtents[0] = (testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0);
+                testExtents[1] = (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1);
+                testExtents[2] = (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2);
+                testExtents[3] = (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0);
+                testExtents[4] = (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1);
+                testExtents[5] = (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2);
+
                 tree.getOverlappingNodes(testExtents, nodes);
 
                 numNodes = nodes.length;
@@ -1170,22 +1224,30 @@ Scene.prototype =
 
                     if (!nodes)
                     {
-                        nodes = [];
+                        if (0 < externalNodesStack.length)
+                        {
+                            nodes = externalNodesStack.pop();
+                        }
+                        else
+                        {
+                            nodes = [];
+                        }
                         area.externalNodes = nodes;
-                        testExtents = area.extents;
-                        testMinExtent0 = testExtents[0];
-                        testMinExtent1 = testExtents[1];
-                        testMinExtent2 = testExtents[2];
-                        testMaxExtent0 = testExtents[3];
-                        testMaxExtent1 = testExtents[4];
-                        testMaxExtent2 = testExtents[5];
+                        areaExtents = area.extents;
+                        testMinExtent0 = areaExtents[0];
+                        testMinExtent1 = areaExtents[1];
+                        testMinExtent2 = areaExtents[2];
+                        testMaxExtent0 = areaExtents[3];
+                        testMaxExtent1 = areaExtents[4];
+                        testMaxExtent2 = areaExtents[5];
 
-                        testExtents = [(testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0),
-                                         (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1),
-                                         (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2),
-                                         (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0),
-                                         (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1),
-                                         (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2)];
+                        testExtents[0] = (testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0);
+                        testExtents[1] = (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1);
+                        testExtents[2] = (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2);
+                        testExtents[3] = (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0);
+                        testExtents[4] = (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1);
+                        testExtents[5] = (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2);
+
                         tree.getOverlappingNodes(testExtents, nodes);
                     }
 
@@ -1267,21 +1329,30 @@ Scene.prototype =
             var areaIndex = this.findAreaIndex(this.bspNodes, cX, cY, cZ);
             if (areaIndex >= 0)
             {
-                var na, nodes;
+                var externalNodesStack = this.externalNodesStack;
+
+                var na, area, nodes;
                 var numAreas = areas.length;
                 for (na = 0; na < numAreas; na += 1)
                 {
-                    areas[na].externalNodes = null;
+                    area = areas[na];
+                    nodes = area.externalNodes;
+                    if (nodes)
+                    {
+                        nodes.length = 0;
+                        externalNodesStack.push(nodes);
+                        area.externalNodes = null;
+                    }
                 }
 
-                var area = areas[areaIndex];
-                var testExtents = area.extents;
-                var testMinExtent0 = testExtents[0];
-                var testMinExtent1 = testExtents[1];
-                var testMinExtent2 = testExtents[2];
-                var testMaxExtent0 = testExtents[3];
-                var testMaxExtent1 = testExtents[4];
-                var testMaxExtent2 = testExtents[5];
+                area = areas[areaIndex];
+                var areaExtents = area.extents;
+                var testMinExtent0 = areaExtents[0];
+                var testMinExtent1 = areaExtents[1];
+                var testMinExtent2 = areaExtents[2];
+                var testMaxExtent0 = areaExtents[3];
+                var testMaxExtent1 = areaExtents[4];
+                var testMaxExtent2 = areaExtents[5];
 
                 var overlappingPortals = [];
                 this.findOverlappingPortals(areaIndex, cX, cY, cZ, extents, overlappingPortals);
@@ -1294,14 +1365,24 @@ Scene.prototype =
                 var n, np, portalItem;
                 var allVisible;
 
-                nodes = [];
+                if (0 < externalNodesStack.length)
+                {
+                    nodes = externalNodesStack.pop();
+                }
+                else
+                {
+                    nodes = [];
+                }
                 area.externalNodes = nodes;
-                testExtents = [(testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0),
-                               (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1),
-                               (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2),
-                               (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0),
-                               (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1),
-                               (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2)];
+
+                var testExtents = this.testExtents;
+                testExtents[0] = (testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0);
+                testExtents[1] = (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1);
+                testExtents[2] = (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2);
+                testExtents[3] = (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0);
+                testExtents[4] = (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1);
+                testExtents[5] = (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2);
+
                 tree.getOverlappingNodes(testExtents, nodes);
 
                 numNodes = nodes.length;
@@ -1366,22 +1447,30 @@ Scene.prototype =
 
                     if (!nodes)
                     {
-                        nodes = [];
+                        if (0 < externalNodesStack.length)
+                        {
+                            nodes = externalNodesStack.pop();
+                        }
+                        else
+                        {
+                            nodes = [];
+                        }
                         area.externalNodes = nodes;
-                        testExtents = area.extents;
-                        testMinExtent0 = testExtents[0];
-                        testMinExtent1 = testExtents[1];
-                        testMinExtent2 = testExtents[2];
-                        testMaxExtent0 = testExtents[3];
-                        testMaxExtent1 = testExtents[4];
-                        testMaxExtent2 = testExtents[5];
+                        areaExtents = area.extents;
+                        testMinExtent0 = areaExtents[0];
+                        testMinExtent1 = areaExtents[1];
+                        testMinExtent2 = areaExtents[2];
+                        testMaxExtent0 = areaExtents[3];
+                        testMaxExtent1 = areaExtents[4];
+                        testMaxExtent2 = areaExtents[5];
 
-                        testExtents = [(testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0),
-                                       (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1),
-                                       (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2),
-                                       (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0),
-                                       (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1),
-                                       (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2)];
+                        testExtents[0] = (testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0);
+                        testExtents[1] = (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1);
+                        testExtents[2] = (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2);
+                        testExtents[3] = (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0);
+                        testExtents[4] = (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1);
+                        testExtents[5] = (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2);
+
                         tree.getOverlappingNodes(testExtents, nodes);
                     }
 
@@ -1622,11 +1711,11 @@ Scene.prototype =
         var numVisibleNodes = 0;
 
         var visibleRenderables = this.visibleRenderables;
-        this.visibleRenderables.length = 0;
+        visibleRenderables.length = 0;
         var numVisibleRenderables = 0;
 
         var visibleLights = this.visibleLights;
-        this.visibleLights.length = 0;
+        visibleLights.length = 0;
         var numVisibleLights = 0;
 
         this.extractFrustumPlanes(camera);
@@ -1876,6 +1965,9 @@ Scene.prototype =
 
         // findVisibleNodes
         var cameraExtents = this.cameraExtents;
+        var cameraMinExtent0, cameraMinExtent1, cameraMinExtent2;
+        var cameraMaxExtent0, cameraMaxExtent1, cameraMaxExtent2;
+
         camera.getFrustumExtents(cameraExtents);
 
         var frustumPlanes = this.frustumPlanes;
@@ -1893,12 +1985,12 @@ Scene.prototype =
 
             if (areaIndex >= 0)
             {
-                var cameraMinExtent0 = cameraExtents[0];
-                var cameraMinExtent1 = cameraExtents[1];
-                var cameraMinExtent2 = cameraExtents[2];
-                var cameraMaxExtent0 = cameraExtents[3];
-                var cameraMaxExtent1 = cameraExtents[4];
-                var cameraMaxExtent2 = cameraExtents[5];
+                cameraMinExtent0 = cameraExtents[0];
+                cameraMinExtent1 = cameraExtents[1];
+                cameraMinExtent2 = cameraExtents[2];
+                cameraMaxExtent0 = cameraExtents[3];
+                cameraMaxExtent1 = cameraExtents[4];
+                cameraMaxExtent2 = cameraExtents[5];
 
                 this.findVisiblePortals(areaIndex, cX, cY, cZ);
 
@@ -1933,12 +2025,16 @@ Scene.prototype =
                 var areaMaxExtent0 = areaExtent[3];
                 var areaMaxExtent1 = areaExtent[4];
                 var areaMaxExtent2 = areaExtent[5];
-                var combinedExtents = [(areaMinExtent0 < cameraMinExtent0 ? cameraMinExtent0 : areaMinExtent0),
-                                       (areaMinExtent1 < cameraMinExtent1 ? cameraMinExtent1 : areaMinExtent1),
-                                       (areaMinExtent2 < cameraMinExtent2 ? cameraMinExtent2 : areaMinExtent2),
-                                       (areaMaxExtent0 > cameraMaxExtent0 ? cameraMaxExtent0 : areaMaxExtent0),
-                                       (areaMaxExtent1 > cameraMaxExtent1 ? cameraMaxExtent1 : areaMaxExtent1),
-                                       (areaMaxExtent2 > cameraMaxExtent2 ? cameraMaxExtent2 : areaMaxExtent2)];
+                var combinedExtents = (this.float32ArrayConstructor ?
+                                       new this.float32ArrayConstructor(6) :
+                                       new Array(6));
+                combinedExtents[0] = (areaMinExtent0 < cameraMinExtent0 ? cameraMinExtent0 : areaMinExtent0);
+                combinedExtents[1] = (areaMinExtent1 < cameraMinExtent1 ? cameraMinExtent1 : areaMinExtent1);
+                combinedExtents[2] = (areaMinExtent2 < cameraMinExtent2 ? cameraMinExtent2 : areaMinExtent2);
+                combinedExtents[3] = (areaMaxExtent0 > cameraMaxExtent0 ? cameraMaxExtent0 : areaMaxExtent0);
+                combinedExtents[4] = (areaMaxExtent1 > cameraMaxExtent1 ? cameraMaxExtent1 : areaMaxExtent1);
+                combinedExtents[5] = (areaMaxExtent2 > cameraMaxExtent2 ? cameraMaxExtent2 : areaMaxExtent2);
+
                 dynamicSpatialMap.getOverlappingNodes(combinedExtents, nodes);
 
                 numNodes = nodes.length;
@@ -2024,6 +2120,119 @@ Scene.prototype =
         }
 
         this.maxDistance = (maxDistance + camera.nearPlane);
+
+        if (this.maxDistance < camera.farPlane)
+        {
+            var oldNumVisibleRenderables = numVisibleRenderables;
+            var oldNumVisibleLights = numVisibleLights;
+            var renderable, lightInstance, extents;
+
+            // The camera extents may be different and some objects could be discarded
+            camera.getFrustumExtents(cameraExtents, this.maxDistance);
+            cameraMinExtent0 = cameraExtents[0];
+            cameraMinExtent1 = cameraExtents[1];
+            cameraMinExtent2 = cameraExtents[2];
+            cameraMaxExtent0 = cameraExtents[3];
+            cameraMaxExtent1 = cameraExtents[4];
+            cameraMaxExtent2 = cameraExtents[5];
+
+            n = 0;
+            while (n < numVisibleRenderables)
+            {
+                renderable = visibleRenderables[n];
+                extents = renderable.getWorldExtents();
+                if (extents[0] > cameraMaxExtent0 ||
+                    extents[1] > cameraMaxExtent1 ||
+                    extents[2] > cameraMaxExtent2 ||
+                    extents[3] < cameraMinExtent0 ||
+                    extents[4] < cameraMinExtent1 ||
+                    extents[5] < cameraMinExtent2)
+                {
+                    renderable.frameVisible -= 1;
+                    numVisibleRenderables -= 1;
+                    if (n < numVisibleRenderables)
+                    {
+                        visibleRenderables[n] = visibleRenderables[numVisibleRenderables];
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                else
+                {
+                    n += 1;
+                }
+            }
+
+            n = 0;
+            while (n < numVisibleLights)
+            {
+                lightInstance = visibleLights[n];
+                extents = lightInstance.getWorldExtents();
+                if (extents[0] > cameraMaxExtent0 ||
+                    extents[1] > cameraMaxExtent1 ||
+                    extents[2] > cameraMaxExtent2 ||
+                    extents[3] < cameraMinExtent0 ||
+                    extents[4] < cameraMinExtent1 ||
+                    extents[5] < cameraMinExtent2)
+                {
+                    lightInstance.frameVisible -= 1;
+                    numVisibleLights -= 1;
+                    if (n < numVisibleLights)
+                    {
+                        visibleLights[n] = visibleLights[numVisibleLights];
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                else
+                {
+                    n += 1;
+                }
+            }
+
+            if (oldNumVisibleRenderables !== numVisibleRenderables ||
+                oldNumVisibleLights !== numVisibleLights)
+            {
+                visibleRenderables.length = numVisibleRenderables;
+                visibleLights.length = numVisibleLights;
+
+                n = 0;
+                while (n < numVisibleNodes)
+                {
+                    node = visibleNodes[n];
+                    extents = node.worldExtents;
+                    if (extents[0] > cameraMaxExtent0 ||
+                        extents[1] > cameraMaxExtent1 ||
+                        extents[2] > cameraMaxExtent2 ||
+                        extents[3] < cameraMinExtent0 ||
+                        extents[4] < cameraMinExtent1 ||
+                        extents[5] < cameraMinExtent2)
+                    {
+                        node.frameVisible -= 1;
+                        numVisibleNodes -= 1;
+                        if (n < numVisibleNodes)
+                        {
+                            visibleNodes[n] = visibleNodes[numVisibleNodes];
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        n += 1;
+                    }
+                }
+
+                visibleNodes.length = numVisibleNodes;
+            }
+        }
+
         this.frameIndex += 1;
     },
 
@@ -2103,6 +2312,7 @@ Scene.prototype =
     {
         var rootStaticNode = this.staticSpatialMap.getRootNode();
         var rootDynamicNode = this.dynamicSpatialMap.getRootNode();
+        var sceneExtents = this.extents;
 
         var extents;
         if (rootStaticNode)
@@ -2129,27 +2339,44 @@ Scene.prototype =
                 maxDynamicY = extents[4];
                 maxDynamicZ = extents[5];
 
-                this.extents = [(minStaticX < minDynamicX ? minStaticX : minDynamicX),
-                                  (minStaticY < minDynamicY ? minStaticY : minDynamicY),
-                                  (minStaticZ < minDynamicZ ? minStaticZ : minDynamicZ),
-                                  (maxStaticX > maxDynamicX ? maxStaticX : maxDynamicX),
-                                  (maxStaticY > maxDynamicY ? maxStaticY : maxDynamicY),
-                                  (maxStaticZ > maxDynamicZ ? maxStaticZ : maxDynamicZ)];
+                sceneExtents[0] = (minStaticX < minDynamicX ? minStaticX : minDynamicX);
+                sceneExtents[1] = (minStaticY < minDynamicY ? minStaticY : minDynamicY);
+                sceneExtents[2] = (minStaticZ < minDynamicZ ? minStaticZ : minDynamicZ);
+                sceneExtents[3] = (maxStaticX > maxDynamicX ? maxStaticX : maxDynamicX);
+                sceneExtents[4] = (maxStaticY > maxDynamicY ? maxStaticY : maxDynamicY);
+                sceneExtents[5] = (maxStaticZ > maxDynamicZ ? maxStaticZ : maxDynamicZ);
             }
             else
             {
-                this.extents = extents.slice();
+                sceneExtents[0] = extents[0];
+                sceneExtents[1] = extents[1];
+                sceneExtents[2] = extents[2];
+                sceneExtents[3] = extents[3];
+                sceneExtents[4] = extents[4];
+                sceneExtents[5] = extents[5];
             }
         }
         else
         {
             if (rootDynamicNode)
             {
-                this.extents = rootDynamicNode.extents.slice();
+                extents = rootDynamicNode.extents;
+
+                sceneExtents[0] = extents[0];
+                sceneExtents[1] = extents[1];
+                sceneExtents[2] = extents[2];
+                sceneExtents[3] = extents[3];
+                sceneExtents[4] = extents[4];
+                sceneExtents[5] = extents[5];
             }
             else
             {
-                this.extents = [0, 0, 0, 0, 0, 0];
+                sceneExtents[0] = 0;
+                sceneExtents[1] = 0;
+                sceneExtents[2] = 0;
+                sceneExtents[3] = 0;
+                sceneExtents[4] = 0;
+                sceneExtents[5] = 0;
             }
         }
     },
@@ -2414,15 +2641,22 @@ Scene.prototype =
         this.frustumPlanes = [];
         this.animations = {};
         this.skeletons = {};
+        this.extents = [];
         this.visibleNodes = [];
         this.visibleRenderables = [];
         this.visibleLights = [];
         this.cameraAreaIndex = -1;
-        this.cameraExtents = [];
+        this.cameraExtents = (this.float32ArrayConstructor ?
+                              new this.float32ArrayConstructor(6) :
+                              new Array(6));
         this.visiblePortals = [];
         this.frameIndex = 0;
         this.queryCounter = 0;
         this.staticNodesChangeCounter = 0;
+        this.testExtents = (this.float32ArrayConstructor ?
+                            new this.float32ArrayConstructor(6) :
+                            new Array(6));
+        this.externalNodesStack = [];
     },
 
     //
@@ -2473,10 +2707,23 @@ Scene.prototype =
                 var max0 = extents[3];
                 var max1 = extents[4];
                 var max2 = extents[5];
-                var area, areaExtents, na;
-                var cX = (min0 + max0) * 0.5;
-                var cY = (min1 + max1) * 0.5;
-                var cZ = (min2 + max2) * 0.5;
+                var area, na;
+                var cX, cY, cZ;
+                if (!this.hasRenderables() &&
+                    this.lightInstances.length === 1 &&
+                    this.lightInstances[0].light.spot)
+                {
+                    var world = this.world;
+                    cX = world[9];
+                    cY = world[10];
+                    cZ = world[11];
+                }
+                else
+                {
+                    cX = (min0 + max0) * 0.5;
+                    cY = (min1 + max1) * 0.5;
+                    cZ = (min2 + max2) * 0.5;
+                }
                 var areaIndex = findAreaIndex(bspNodes, cX, cY, cZ);
                 if (areaIndex >= 0)
                 {
@@ -2493,6 +2740,7 @@ Scene.prototype =
                 else
                 {
                     var areaFound = false;
+                    var areaExtents;
                     for (;;)
                     {
                         var areaIndices = findAreaIndicesAABB(bspNodes, min0, min1, min2, max0, max1, max2);
@@ -2569,7 +2817,7 @@ Scene.prototype =
     //
     // findOverlappingAreas
     //
-    findOverlappingAreas: function sceneFindOverlappingAreasFn(startAreaIndex, extents)
+    findOverlappingAreas: function sceneFindOverlappingAreasFn(startAreaIndex, extents, avoidDisabled)
     {
         var area, portals, numPortals, n, portal, plane, d0, d1, d2, portalExtents, areaIndex, nextArea;
         var queryCounter = this.getQueryCounter();
@@ -2594,6 +2842,10 @@ Scene.prototype =
         for (n = 0; n < numPortals; n += 1)
         {
             portal = portals[n];
+            if (avoidDisabled && portal.disabled)
+            {
+                continue;
+            }
             portal.queryCounter = queryCounter;
 
             portalExtents = portal.extents;
@@ -2635,6 +2887,10 @@ Scene.prototype =
             for (n = 0; n < numPortals; n += 1)
             {
                 portal = portals[n];
+                if (avoidDisabled && portal.disabled)
+                {
+                    continue;
+                }
                 nextArea = portal.area;
                 if (nextArea !== areaIndex &&
                     nextArea !== startAreaIndex &&
@@ -2779,14 +3035,12 @@ Scene.prototype =
                 if (extents)
                 {
                     areaExtents = area.extents;
-                    area.extents = [
-                            (extents[0] < areaExtents[0] ? extents[0] : areaExtents[0]),
-                            (extents[1] < areaExtents[1] ? extents[1] : areaExtents[1]),
-                            (extents[2] < areaExtents[2] ? extents[2] : areaExtents[2]),
-                            (extents[3] > areaExtents[3] ? extents[3] : areaExtents[3]),
-                            (extents[4] > areaExtents[4] ? extents[4] : areaExtents[4]),
-                            (extents[5] > areaExtents[5] ? extents[5] : areaExtents[5])
-                        ];
+                    areaExtents[0] = (extents[0] < areaExtents[0] ? extents[0] : areaExtents[0]);
+                    areaExtents[1] = (extents[1] < areaExtents[1] ? extents[1] : areaExtents[1]);
+                    areaExtents[2] = (extents[2] < areaExtents[2] ? extents[2] : areaExtents[2]);
+                    areaExtents[3] = (extents[3] > areaExtents[3] ? extents[3] : areaExtents[3]);
+                    areaExtents[4] = (extents[4] > areaExtents[4] ? extents[4] : areaExtents[4]);
+                    areaExtents[5] = (extents[5] > areaExtents[5] ? extents[5] : areaExtents[5]);
                 }
             }
 
@@ -3672,17 +3926,29 @@ Scene.prototype =
                     var max0 = maxPos[0];
                     var max1 = maxPos[1];
                     var max2 = maxPos[2];
+
+                    var halfExtents = (this.float32ArrayConstructor ?
+                                       new this.float32ArrayConstructor(3) :
+                                       new Array(3));
+                    shape.halfExtents = halfExtents;
                     if (min0 !== -max0 || min1 !== -max1 || min2 !== -max2)
                     {
-                        var c0 = (min0 + max0) * 0.5;
-                        var c1 = (min1 + max1) * 0.5;
-                        var c2 = (min2 + max2) * 0.5;
-                        shape.center      = [c0, c1, c2];
-                        shape.halfExtents = [(max0 - c0), (max1 - c1), (max2 - c2)];
+                        var center = (this.float32ArrayConstructor ?
+                                      new this.float32ArrayConstructor(3) :
+                                      new Array(3));
+                        shape.center = center;
+                        center[0] = (min0 + max0) * 0.5;
+                        center[1] = (min1 + max1) * 0.5;
+                        center[2] = (min2 + max2) * 0.5;
+                        halfExtents[0] = (max0 - center[0]);
+                        halfExtents[1] = (max1 - center[1]);
+                        halfExtents[2] = (max2 - center[2]);
                     }
                     else
                     {
-                        shape.halfExtents = [(max0 - min0) * 0.5, (max1 - min1) * 0.5, (max2 - min2) * 0.5];
+                        halfExtents[0] = (max0 - min0) * 0.5;
+                        halfExtents[1] = (max1 - min1) * 0.5;
+                        halfExtents[2] = (max2 - min2) * 0.5;
                     }
                 }
                 //else
@@ -3836,7 +4102,7 @@ Scene.prototype =
                 // Convert to MathDevice objects
                 lightParams.color = fileLight.color && v3Build.apply(md, fileLight.color);
 
-                /*jslint white: false*/
+                /*jshint white: false*/
                 lightParams.origin = fileLight.origin && v3Build.apply(md, fileLight.origin);
                 lightParams.center = fileLight.center && v3Build.apply(md, fileLight.center);
                 lightParams.target = fileLight.target && v3Build.apply(md, fileLight.target);
@@ -3845,7 +4111,7 @@ Scene.prototype =
                 lightParams.start =  fileLight.start  && v3Build.apply(md, fileLight.start);
                 lightParams.end =    fileLight.end    && v3Build.apply(md, fileLight.end);
                 lightParams.direction = fileLight.direction && v3Build.apply(md, fileLight.direction);
-                /*jslint white: true*/
+                /*jshint white: true*/
 
                 lightParams.halfExtents = fileLight.halfextents && v3Build.apply(md, fileLight.halfextents);
 
@@ -4290,42 +4556,71 @@ Scene.prototype =
                     var p0 = (m0 * fp0 + m3 * fp1 + m6 * fp2 + m9);
                     var p1 = (m1 * fp0 + m4 * fp1 + m7 * fp2 + m10);
                     var p2 = (m2 * fp0 + m5 * fp1 + m8 * fp2 + m11);
-                    /*jslint white: false */
+                    /*jshint white: false */
                     if (p0 < minX) { minX = p0; }
                     if (p1 < minY) { minY = p1; }
                     if (p2 < minZ) { minZ = p2; }
                     if (p0 > maxX) { maxX = p0; }
                     if (p1 > maxY) { maxY = p1; }
                     if (p2 > maxZ) { maxZ = p2; }
-                    /*jslint white: true */
+                    /*jshint white: true */
                     c0 += p0;
                     c1 += p1;
                     c2 += p2;
                     points.push(md.v3Build(p0, p1, p2));
                 }
-                /*jslint white: false */
+                /*jshint white: false */
                 if (minX < minAreaX) { minAreaX = minX; }
                 if (minY < minAreaY) { minAreaY = minY; }
                 if (minZ < minAreaZ) { minAreaZ = minZ; }
                 if (maxX > maxAreaX) { maxAreaX = maxX; }
                 if (maxY > maxAreaY) { maxAreaY = maxY; }
                 if (maxZ > maxAreaZ) { maxAreaZ = maxZ; }
-                /*jslint white: true */
+                /*jshint white: true */
                 var normal = md.v3Cross(md.v3Sub(points[1], points[0]), md.v3Sub(points[2], points[0]));
+
+                var portalExtents = (this.float32ArrayConstructor ?
+                                     new this.float32ArrayConstructor(6) :
+                                     new Array(6));
+                portalExtents[0] = minX;
+                portalExtents[1] = minY;
+                portalExtents[2] = minZ;
+                portalExtents[3] = maxX;
+                portalExtents[4] = maxY;
+                portalExtents[5] = maxZ;
+
+                var portalOrigin = (this.float32ArrayConstructor ?
+                                    new this.float32ArrayConstructor(3) :
+                                    new Array(3));
+                portalOrigin[0] = (c0 / numPoints);
+                portalOrigin[1] = (c1 / numPoints);
+                portalOrigin[2] = (c2 / numPoints);
+
                 var portal = {
                     area: (baseIndex + filePortal.area),
                     points: points,
-                    origin: [(c0 / numPoints), (c1 / numPoints), (c2 / numPoints)],
-                    extents: [minX, minY, minZ, maxX, maxY, maxZ],
-                    plane: planeNormalize([normal[0], normal[1], normal[2], md.v3Dot(normal, points[0])])
+                    origin: portalOrigin,
+                    extents: portalExtents,
+                    plane: planeNormalize(normal[0], normal[1], normal[2], md.v3Dot(normal, points[0]))
                 };
                 portals.push(portal);
             }
 
+            var areaExtents = (this.float32ArrayConstructor ?
+                               new this.float32ArrayConstructor(6) :
+                               new Array(6));
+            areaExtents[0] = minAreaX;
+            areaExtents[1] = minAreaY;
+            areaExtents[2] = minAreaZ;
+            areaExtents[3] = maxAreaX;
+            areaExtents[4] = maxAreaY;
+            areaExtents[5] = maxAreaZ;
+
             var area = {
                 target: target,
                 portals: portals,
-                extents: [minAreaX, minAreaY, minAreaZ, maxAreaX, maxAreaY, maxAreaZ]
+                extents: areaExtents,
+                externalNodes: null
             };
             areas.push(area);
         }
@@ -4403,21 +4698,34 @@ Scene.prototype =
         }
     },
 
-    planeNormalize : function scenePlaneNormalizeFn(plane)
+    planeNormalize : function scenePlaneNormalizeFn(a, b, c, d, output)
     {
-        var a = plane[0];
-        var b = plane[1];
-        var c = plane[2];
+        if (!output)
+        {
+            var float32ArrayConstructor = Scene.prototype.float32ArrayConstructor;
+            output = (float32ArrayConstructor ?
+                      new float32ArrayConstructor(4) :
+                      new Array(4));
+        }
+
         var lsq = ((a * a) + (b * b) + (c * c));
         if (lsq > 0.0)
         {
             var lr = 1.0 / Math.sqrt(lsq);
-            return [(a * lr), (b * lr), (c * lr), (plane[3] * lr)];
+            output[0] = (a * lr);
+            output[1] = (b * lr);
+            output[2] = (c * lr);
+            output[3] = (d * lr);
         }
         else
         {
-            return [0, 0, 0, 0];
+            output[0] = 0;
+            output[1] = 0;
+            output[2] = 0;
+            output[3] = 0;
         }
+
+        return output;
     },
 
     isInsidePlanesAABB : function sceneIsInsidePlanesAABBFn(extents, planes)
@@ -4495,10 +4803,10 @@ Scene.prototype =
         var planes = this.frustumPlanes;
 
         // Negate 'd' here to avoid doing it on the isVisible functions
-        planes[0] = planeNormalize([(m3 + m0), (m7 + m4), (m11 + m8), -(m15 + m12)]); // left
-        planes[1] = planeNormalize([(m3 - m0), (m7 - m4), (m11 - m8), -(m15 - m12)]); // right
-        planes[2] = planeNormalize([(m3 - m1), (m7 - m5), (m11 - m9), -(m15 - m13)]); // top
-        planes[3] = planeNormalize([(m3 + m1), (m7 + m5), (m11 + m9), -(m15 + m13)]); // bottom
+        planes[0] = planeNormalize((m3 + m0), (m7 + m4), (m11 + m8), -(m15 + m12), planes[0]); // left
+        planes[1] = planeNormalize((m3 - m0), (m7 - m4), (m11 - m8), -(m15 - m12), planes[1]); // right
+        planes[2] = planeNormalize((m3 - m1), (m7 - m5), (m11 - m9), -(m15 - m13), planes[2]); // top
+        planes[3] = planeNormalize((m3 + m1), (m7 + m5), (m11 + m9), -(m15 + m13), planes[3]); // bottom
 
         if (this.areas)
         {
@@ -4509,10 +4817,10 @@ Scene.prototype =
         }
         else
         {
-            planes[4] = planeNormalize([(m3 - m2), (m7 - m6), (m11 - m10), -(m15 - m14)]); // far
+            planes[4] = planeNormalize((m3 - m2), (m7 - m6), (m11 - m10), -(m15 - m14), planes[4]); // far
         }
 
-        this.nearPlane = planeNormalize([(m3 + m2), (m7 + m6), (m11 + m10), -(m15 + m14)]);  // near
+        this.nearPlane = planeNormalize((m3 + m2), (m7 + m6), (m11 + m10), -(m15 + m14), this.nearPlane);  // near
 
         return planes;
     },
@@ -4520,7 +4828,7 @@ Scene.prototype =
     //
     // calculateHullScreenExtents
     //
-    calculateHullScreenExtents : function sceneCalculateHullScreenExtents(polygons)
+    calculateHullScreenExtents : function sceneCalculateHullScreenExtents(polygons, screenExtents)
     {
         // Sutherland-Hodgman polygon clipping algorithm
         function clipLine(va, vb, axis, positive, out)
@@ -4699,7 +5007,18 @@ Scene.prototype =
         {
             maxY = 1.0;
         }
-        return [minX, minY, maxX, maxY];
+
+        if (!screenExtents)
+        {
+            screenExtents = (this.float32ArrayConstructor ?
+                             new this.float32ArrayConstructor(4) :
+                             new Array(4));
+        }
+        screenExtents[0] = minX;
+        screenExtents[1] = minY;
+        screenExtents[2] = maxX;
+        screenExtents[3] = maxY;
+        return screenExtents;
     },
 
     //
@@ -4711,7 +5030,7 @@ Scene.prototype =
         var numVisibleLights = visibleLights.length;
         if (numVisibleLights > 0)
         {
-            var matrix, halfExtents, center, hx, hy, hz, p0, p1, p2, p3, p4, p5, p6, p7, st, polygons;
+            var matrix, transform, halfExtents, center, hx, hy, hz, p0, p1, p2, p3, p4, p5, p6, p7, st, polygons;
             var lightInstance, light, worldViewProjectionMatrix;
             var viewProjectionMatrix = camera.viewProjectionMatrix;
             var calculateHullScreenExtents = this.calculateHullScreenExtents;
@@ -4739,7 +5058,7 @@ Scene.prototype =
 
                     if (light.spot)
                     {
-                        var transform = md.m33MulM43(light.frustum, matrix);
+                        transform = md.m33MulM43(light.frustum, matrix, transform);
 
                         worldViewProjectionMatrix = m43MulM44.call(md, transform, viewProjectionMatrix, worldViewProjectionMatrix);
 
@@ -4748,8 +5067,7 @@ Scene.prototype =
                         p2 = m44Transform.call(md, worldViewProjectionMatrix, spotC, p2);
                         p3 = m44Transform.call(md, worldViewProjectionMatrix, spotD, p3);
 
-                        st = md.m43Pos(matrix);
-                        st = v4Build.call(md, st[0], st[1], st[2], 1);
+                        st = v4Build.call(md, matrix[9], matrix[10], matrix[11], 1, st);
                         st = m44Transform.call(md, viewProjectionMatrix, st, st);
 
                         polygons = [ [st, p0, p1],
@@ -4766,7 +5084,7 @@ Scene.prototype =
                             center = light.center;
                             if (center)
                             {
-                                matrix = md.m43Offset(matrix, center);
+                                matrix = transform = md.m43Offset(matrix, center, transform);
                             }
                         }
 
@@ -4793,7 +5111,7 @@ Scene.prototype =
                                      [p1, p2, p6, p5] ];
                     }
 
-                    lightInstance.screenExtents = calculateHullScreenExtents(polygons);
+                    lightInstance.screenExtents = calculateHullScreenExtents(polygons, lightInstance.screenExtents);
                 }
 
                 n += 1;

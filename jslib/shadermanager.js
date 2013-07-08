@@ -49,7 +49,7 @@ ShaderManager.create = function shaderManagerCreateFn(gd, rh, ds, errorCallback,
     }
     else
     {
-        /*jslint white: false*/
+        /*jshint white: false*/
         var shaderParams =
         {
             "version": 1,
@@ -101,7 +101,7 @@ ShaderManager.create = function shaderManagerCreateFn(gd, rh, ds, errorCallback,
                 }
             }
         };
-        /*jslint white: true*/
+        /*jshint white: true*/
 
         defaultShader = gd.createShader(shaderParams);
         if (!defaultShader)

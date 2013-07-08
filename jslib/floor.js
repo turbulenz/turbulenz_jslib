@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2011 Turbulenz Limited
+// Copyright (c) 2009-2012 Turbulenz Limited
 
 function Floor() {}
 Floor.prototype =
@@ -196,7 +196,7 @@ Floor.create = function floorCreateFn(gd, md)
         }
     };
 
-    /*jslint white: false*/
+    /*jshint white: false*/
     var shaderParameters =
     {
         "version": 1,
@@ -253,7 +253,7 @@ Floor.create = function floorCreateFn(gd, md)
             }
         }
     };
-    /*jslint white: true*/
+    /*jshint white: true*/
 
     var shader = gd.createShader(shaderParameters);
     if (shader)

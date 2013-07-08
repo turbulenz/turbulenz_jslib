@@ -243,26 +243,29 @@ ShadowMapping.prototype =
         if (!shadowMapInfo)
         {
             shadowMapInfo = {
-                camera: Camera.create(md)
+                camera: Camera.create(md),
+                target: md.v3BuildZero()
             };
             lightInstance.shadowMapInfo = shadowMapInfo;
         }
 
+        target = shadowMapInfo.target;
+
         if (light.spot)
         {
-            frustumWorld = md.m33MulM43(light.frustum, matrix);
-            target = md.v3Add(origin, md.m43At(frustumWorld));
-            up = md.m43Up(frustumWorld);
+            frustumWorld = md.m33MulM43(light.frustum, matrix, shadowMapInfo.frustumWorld);
+            md.v3Add(origin, md.m43At(frustumWorld, target), target);
+            up = md.m43Up(frustumWorld, this.tempV3Up);
             shadowMapInfo.frustumWorld = frustumWorld;
         }
         else
         {
-            var nodeUp = md.m43Up(matrix);
-            var nodeAt = md.m43At(matrix);
-            var nodePos = md.m43Pos(matrix);
+            var nodeUp = md.m43Up(matrix, this.tempV3Up);
+            var nodeAt = md.m43At(matrix, this.tempV3At);
+            var nodePos = md.m43Pos(matrix, this.tempV3Pos);
             var abs = Math.abs;
-            target = md.v3Add(nodePos, md.v3ScalarMul(nodeUp, -halfExtents[1]));
-            var direction = md.v3Sub(target, origin);
+            md.v3Add(nodePos, md.v3ScalarMul(nodeUp, -halfExtents[1], target), target);
+            var direction = md.v3Sub(target, origin, nodePos);
             if (abs(md.v3Dot(direction, nodeAt)) < abs(md.v3Dot(direction, nodeUp)))
             {
                 up = nodeAt;
@@ -273,12 +276,10 @@ ShadowMapping.prototype =
             }
         }
 
-        shadowMapInfo.target = target;
-
         // TODO: we do this in the drawShadowMap function as well
         // could we put this on the lightInstance?
         var camera = shadowMapInfo.camera;
-        camera.lookAt(target, up, origin);
+        this.lookAt(camera, target, up, origin);
         camera.updateViewMatrix();
         var viewMatrix = camera.viewMatrix;
 
@@ -393,7 +394,6 @@ ShadowMapping.prototype =
                             lightInstance: lightInstance
                         };
                         this.shadowMapsHigh[shadowMapsHighIndex] = shadowMap;
-                        lightInstance.shadowMap = shadowMap;
                     }
                 }
                 else
@@ -442,7 +442,6 @@ ShadowMapping.prototype =
                             lightInstance: lightInstance
                         };
                         this.shadowMapsLow[shadowMapsLowIndex] = shadowMap;
-                        lightInstance.shadowMap = shadowMap;
                     }
                 }
                 else
@@ -454,6 +453,7 @@ ShadowMapping.prototype =
             this.lowIndex = (shadowMapsLowIndex + 1);
         }
 
+        lightInstance.shadowMap = null;
         lightInstance.shadows = true;
 
         var distanceScale = (1.0 / 65536);
@@ -472,12 +472,12 @@ ShadowMapping.prototype =
                 var acos = Math.acos;
                 var frustumWorld = shadowMapInfo.frustumWorld;
 
-                /*jslint white: false*/
+                /*jshint white: false*/
                 var p0 = md.m43TransformPoint(frustumWorld, md.v3Build(-1, -1, 1));
                 var p1 = md.m43TransformPoint(frustumWorld, md.v3Build( 1, -1, 1));
                 var p2 = md.m43TransformPoint(frustumWorld, md.v3Build(-1,  1, 1));
                 var p3 = md.m43TransformPoint(frustumWorld, md.v3Build( 1,  1, 1));
-                /*jslint white: true*/
+                /*jshint white: true*/
                 var farLightCenter = md.v3Sub(md.v3ScalarMul(md.v3Add4(p0, p1, p2, p3), 0.25), origin);
                 lightDepth = md.v3Length(farLightCenter);
                 if (lightDepth <= 0.0)
@@ -523,6 +523,8 @@ ShadowMapping.prototype =
             lightInstance.lightViewWindowY = lightViewWindowY;
             lightInstance.lightDepth = lightDepth;
         }
+
+        lightInstance.shadowMap = shadowMap;
 
         var lightViewOffsetX = 0;
         var lightViewOffsetY = 0;
@@ -618,7 +620,7 @@ ShadowMapping.prototype =
         var maxDepthReciprocal = (1.0 / (maxLightDistance - minLightDistance));
         var techniqueParameters = lightInstance.techniqueParameters;
         techniqueParameters.shadowProjection = md.m43MulM44(cameraMatrix, shadowProjection, techniqueParameters.shadowProjection);
-        var viewToShadowMatrix = md.m43Mul(cameraMatrix, viewMatrix);
+        var viewToShadowMatrix = md.m43Mul(cameraMatrix, viewMatrix, this.tempMatrix43);
         techniqueParameters.shadowDepth = md.v4Build(-viewToShadowMatrix[2] * maxDepthReciprocal,
                                                      -viewToShadowMatrix[5] * maxDepthReciprocal,
                                                      -viewToShadowMatrix[8] * maxDepthReciprocal,
@@ -627,16 +629,18 @@ ShadowMapping.prototype =
         techniqueParameters.shadowSize = shadowMapSize;
         techniqueParameters.shadowMapTexture = shadowMapTexture;
 
+        var frameUpdated = lightInstance.frameVisible;
+
         if (numStaticOverlappingRenderables === numOverlappingRenderables &&
             !node.dynamic) // No dynamic renderables
         {
             if (shadowMap.numRenderables === numShadowRenderables &&
                 shadowMap.lightNode === node &&
-                (shadowMap.frameUpdated + 1) === lightInstance.frameVisible)
+                (shadowMap.frameUpdated + 1) === frameUpdated)
             {
                 // No need to update shadowmap
                 //Utilities.log(numShadowRenderables);
-                shadowMap.frameUpdated = lightInstance.frameVisible;
+                shadowMap.frameUpdated = frameUpdated;
                 shadowMap.needsBlur = false;
                 return;
             }
@@ -644,12 +648,15 @@ ShadowMapping.prototype =
             {
                 shadowMap.numRenderables = numShadowRenderables;
                 shadowMap.lightNode = node;
-                shadowMap.frameUpdated = lightInstance.frameVisible;
+                shadowMap.frameUpdated = frameUpdated;
+                shadowMap.frameVisible = frameUpdated;
                 shadowMap.needsBlur = true;
             }
         }
         else
         {
+            shadowMap.numRenderables = numShadowRenderables;
+            shadowMap.frameVisible = frameUpdated;
             shadowMap.needsBlur = true;
         }
 
@@ -662,7 +669,6 @@ ShadowMapping.prototype =
 
         var shadowMapTechniqueParameters = this.techniqueParameters;
         var renderable, rendererInfo;
-        var frameUpdated = lightInstance.frameVisible;
 
         var drawParametersArray, numDrawParameters, drawParametersIndex;
         shadowMapTechniqueParameters.shadowProjection = shadowProjection;
@@ -710,8 +716,6 @@ ShadowMapping.prototype =
         }
 
         gd.drawArray(drawQueue, [shadowMapTechniqueParameters], 1);
-
-        gd.setTechnique(this.rigidTechnique);
 
         gd.endRenderTarget();
     },
@@ -772,12 +776,19 @@ ShadowMapping.prototype =
                         maxLightDistance = lightDistance;
                     }
 
+                    shadowRenderables[numShadowRenderables] = renderable;
+                    numShadowRenderables += 1;
+
                     if (0 < minLightDistance)
                     {
                         lightDistance = ((d0 * (d0 > 0 ? n0 : p0)) + (d1 * (d1 > 0 ? n1 : p1)) + (d2 * (d2 > 0 ? n2 : p2)) - offset);
                         if (lightDistance < minLightDistance)
                         {
                             minLightDistance = lightDistance;
+                            if (0 >= minLightDistance)
+                            {
+                                continue;
+                            }
                         }
 
                         lightDistance = ((r0 * (r0 > 0 ? n0 : p0)) + (r1 * (r1 > 0 ? n1 : p1)) + (r2 * (r2 > 0 ? n2 : p2)) - roffset);
@@ -804,9 +815,6 @@ ShadowMapping.prototype =
                             maxLightDistanceY = lightDistance;
                         }
                     }
-
-                    shadowRenderables[numShadowRenderables] = renderable;
-                    numShadowRenderables += 1;
                 }
             }
         }
@@ -832,12 +840,19 @@ ShadowMapping.prototype =
                         maxLightDistance = lightDistance;
                     }
 
+                    shadowRenderables[numShadowRenderables] = renderable;
+                    numShadowRenderables += 1;
+
                     if (0 < minLightDistance)
                     {
                         lightDistance = ((d0 * (d0 > 0 ? n0 : p0)) + (d1 * (d1 > 0 ? n1 : p1)) + (d2 * (d2 > 0 ? n2 : p2)) - offset);
                         if (lightDistance < minLightDistance)
                         {
                             minLightDistance = lightDistance;
+                            if (0 >= minLightDistance)
+                            {
+                                continue;
+                            }
                         }
 
                         lightDistance = ((r0 * (r0 > 0 ? n0 : p0)) + (r1 * (r1 > 0 ? n1 : p1)) + (r2 * (r2 > 0 ? n2 : p2)) - roffset);
@@ -864,9 +879,6 @@ ShadowMapping.prototype =
                             maxLightDistanceY = lightDistance;
                         }
                     }
-
-                    shadowRenderables[numShadowRenderables] = renderable;
-                    numShadowRenderables += 1;
                 }
             }
         }
@@ -987,6 +999,19 @@ ShadowMapping.prototype =
         }
     },
 
+    lookAt : function shadowMappingLookAtFn(camera, lookAt, up, eyePosition)
+    {
+        var md = this.md;
+        var v3Normalize = md.v3Normalize;
+        var v3Cross = md.v3Cross;
+        var zaxis = md.v3Sub(eyePosition, lookAt, this.tempV3AxisZ);
+        v3Normalize.call(md, zaxis, zaxis);
+        var xaxis = v3Cross.call(md, v3Normalize.call(md, up, up), zaxis, this.tempV3AxisX);
+        v3Normalize.call(md, xaxis, xaxis);
+        var yaxis = v3Cross.call(md, zaxis, xaxis, this.tempV3AxisY);
+        camera.matrix = md.m43Build(xaxis, yaxis, zaxis, eyePosition, camera.matrix);
+    },
+
     destroy: function shadowMappingDestroyFn()
     {
         delete this.shader;
@@ -996,6 +1021,13 @@ ShadowMapping.prototype =
 
         this.destroyBuffers();
 
+        delete this.tempV3AxisZ;
+        delete this.tempV3AxisY;
+        delete this.tempV3AxisX;
+        delete this.tempV3Pos;
+        delete this.tempV3At;
+        delete this.tempV3Up;
+        delete this.tempMatrix43;
         delete this.clearColor;
 
         delete this.quadPrimitive;
@@ -1009,7 +1041,6 @@ ShadowMapping.prototype =
 
         delete this.shadowMapsLow;
         delete this.shadowMapsHigh;
-        delete this.camera;
         delete this.techniqueParameters;
         delete this.drawQueue;
         delete this.md;
@@ -1027,11 +1058,18 @@ ShadowMapping.create = function shadowMappingCreateFn(gd, md, shaderManager, eff
     shadowMapping.gd = gd;
     shadowMapping.md = md;
     shadowMapping.clearColor = md.v4Build(1, 0, 0, 0);
+    shadowMapping.tempMatrix43 = md.m43BuildIdentity();
+    shadowMapping.tempV3Up = md.v3BuildZero();
+    shadowMapping.tempV3At = md.v3BuildZero();
+    shadowMapping.tempV3Pos = md.v3BuildZero();
+    shadowMapping.tempV3AxisX = md.v3BuildZero();
+    shadowMapping.tempV3AxisY = md.v3BuildZero();
+    shadowMapping.tempV3AxisZ = md.v3BuildZero();
 
     shadowMapping.quadPrimitive = gd.PRIMITIVE_TRIANGLE_STRIP;
     shadowMapping.quadSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0']);
 
-    /*jslint white: false*/
+    /*jshint white: false*/
     shadowMapping.quadVertexBuffer = gd.createVertexBuffer({
             numVertices: 4,
             attributes: ['FLOAT2', 'FLOAT2'],
@@ -1043,13 +1081,12 @@ ShadowMapping.create = function shadowMappingCreateFn(gd, md, shaderManager, eff
                  1.0, -1.0, 1.0, 0.0
             ]
         });
-    /*jslint white: true*/
+    /*jshint white: true*/
 
     shadowMapping.bufferWidth = 0;
     shadowMapping.bufferHeight = 0;
 
     shadowMapping.techniqueParameters = gd.createTechniqueParameters();
-    shadowMapping.camera = Camera.create(md);
     shadowMapping.shader = null;
     shadowMapping.shadowMapsLow = [];
     shadowMapping.shadowMapsHigh = [];

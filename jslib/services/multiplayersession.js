@@ -1,7 +1,8 @@
-// Copyright (c) 2011 Turbulenz Limited
+// Copyright (c) 2011-2012 Turbulenz Limited
 
 /*global TurbulenzEngine: false*/
 /*global TurbulenzServices: false*/
+/*global TurbulenzBridge: false*/
 /*global Utilities: false*/
 
 //
@@ -99,6 +100,8 @@ MultiPlayerSession.prototype =
                 socket.onmessage = null;
                 socket.onclose = null;
                 socket.onerror = null;
+
+                socket.close();
                 socket = null;
             }
 
@@ -106,6 +109,10 @@ MultiPlayerSession.prototype =
 
             this.onmessage = null;
             this.onclose = null;
+
+            // we can't wait for the callback as the browser doesn't
+            // call async callbacks after onbeforeunload has been called
+            TurbulenzBridge.triggerLeaveMultiplayerSession(sessionId);
 
             Utilities.ajax({
                 url: '/api/v1/multiplayer/session/leave',
@@ -174,9 +181,9 @@ MultiPlayerSession.create = function multiPlayerCreate(sessionData, createdCB, e
             var firstSplitIndex = message.indexOf(':');
             var secondSplitIndex = message.indexOf(':', (firstSplitIndex + 1));
             var senderID = message.slice(0, firstSplitIndex);
-            /*jslint bitwise:false*/
+            /*jshint bitwise:false*/
             var messageType = (message.slice((firstSplitIndex + 1), secondSplitIndex) | 0);
-            /*jslint bitwise:true*/
+            /*jshint bitwise:true*/
             var messageData = message.slice(secondSplitIndex + 1);
 
             onmessage(senderID, messageType, messageData);
@@ -266,6 +273,13 @@ MultiPlayerSession.create = function multiPlayerCreate(sessionData, createdCB, e
                 socket = null;
 
                 ms.flushQueue();
+
+                TurbulenzBridge.triggerJoinedMultiplayerSession({
+                    sessionId: ms.sessionId,
+                    playerId: ms.playerId,
+                    serverURL: serverURL,
+                    numplayers: numplayers
+                });
 
                 if (createdCB)
                 {

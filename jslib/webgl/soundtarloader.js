@@ -1,4 +1,4 @@
-// Copyright (c) 2012 Turbulenz Limited
+// Copyright (c) 2011-2012 Turbulenz Limited
 /*global TurbulenzEngine*/
 /*global Uint8Array*/
 /*global window*/
@@ -38,9 +38,9 @@ SoundTARLoader.prototype = {
 
         function getNumber(text)
         {
-            /*jslint regexp: false*/
+            /*jshint regexp: false*/
             text = text.replace(/[^\d]/g, '');
-            /*jslint regexp: true*/
+            /*jshint regexp: true*/
             return parseInt('0' + text, 8);
         }
 
@@ -73,6 +73,11 @@ SoundTARLoader.prototype = {
         var onsoundload = this.onsoundload;
         var result = true;
 
+        // This function is called for each sound in the archive,
+        // synchronously if there is an immediate error,
+        // asynchronously otherwise.  If one fails, the load result
+        // for the whole archive is false.
+
         this.soundsLoading = 0;
         var that = this;
         function onload(sound)
@@ -84,7 +89,6 @@ SoundTARLoader.prototype = {
             }
             else
             {
-                offset = totalSize;
                 result = false;
             }
         }
@@ -122,7 +126,9 @@ SoundTARLoader.prototype = {
                     this.soundsLoading += 1;
                     sd.createSound({
                         src : fileName,
-                        data : bytes.buffer.slice(offset, (offset + header.length)),
+                        data : (sd.audioContext ?
+                                bytes.buffer.slice(offset, (offset + header.length)) :
+                                bytes.subarray(offset, (offset + header.length))),
                         uncompress : uncompress,
                         onload : onload
                     });
@@ -206,7 +212,7 @@ SoundTARLoader.create = function tgaLoaderFn(params)
                         }
                         else //if (xhr.responseText !== null)
                         {
-                            /*jslint bitwise: false*/
+                            /*jshint bitwise: false*/
                             var text = xhr.responseText;
                             var numChars = text.length;
                             var i;
@@ -216,35 +222,42 @@ SoundTARLoader.create = function tgaLoaderFn(params)
                             {
                                 buffer[i] = (text.charCodeAt(i) & 0xff);
                             }
-                            /*jslint bitwise: true*/
+                            /*jshint bitwise: true*/
                         }
-                        if (loader.processBytes(new Uint8Array(buffer)))
+
+                        // Fix for loading from file
+                        if (xhrStatus === 0 && window.location.protocol === "file:")
                         {
-                            if (loader.onload)
+                            xhrStatus = 200;
+                        }
+
+                        // processBytes returns false if any of the
+                        // entries in the archive was not supported or
+                        // couldn't be loaded as a sound.
+
+                        var archiveResult =
+                            loader.processBytes(new Uint8Array(buffer));
+
+                        // Wait until all sounds have been loaded (or
+                        // failed) and return the result.
+
+                        if (loader.onload)
+                        {
+                            var callOnload = function callOnloadFn()
                             {
-                                var callOnload = function callOnloadFn()
+                                if (0 < loader.soundsLoading)
                                 {
-                                    if (0 < loader.soundsLoading)
+                                    if (!TurbulenzEngine || !TurbulenzEngine.isUnloading())
                                     {
-                                        if (!TurbulenzEngine || !TurbulenzEngine.isUnloading())
-                                        {
-                                            window.setTimeout(callOnloadFn, 100);
-                                        }
+                                        window.setTimeout(callOnloadFn, 100);
                                     }
-                                    else
-                                    {
-                                        loader.onload(true, xhrStatus);
-                                    }
-                                };
-                                callOnload();
-                            }
-                        }
-                        else
-                        {
-                            if (loader.onerror)
-                            {
-                                loader.onerror();
-                            }
+                                }
+                                else
+                                {
+                                    loader.onload(archiveResult, xhrStatus);
+                                }
+                            };
+                            callOnload();
                         }
                     }
                     else

@@ -1,5 +1,8 @@
 // Copyright (c) 2009-2012 Turbulenz Limited
 
+/*global TurbulenzEngine: false */
+/*global Utilities: false */
+
 function DrawPrimitives() {}
 DrawPrimitives.prototype =
 {
