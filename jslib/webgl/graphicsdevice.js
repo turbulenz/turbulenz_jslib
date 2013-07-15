@@ -844,11 +844,30 @@ WebGLRenderTarget.prototype = {
     bind: function bindFn() {
         var gd = this.gd;
         var gl = gd.gl;
-        gd.unbindTexture(this.colorTexture0.glTexture);
+        if(this.colorTexture0) {
+            gd.unbindTexture(this.colorTexture0.glTexture);
+            if(this.colorTexture1) {
+                gd.unbindTexture(this.colorTexture1.glTexture);
+                if(this.colorTexture2) {
+                    gd.unbindTexture(this.colorTexture2.glTexture);
+                    if(this.colorTexture3) {
+                        gd.unbindTexture(this.colorTexture3.glTexture);
+                    }
+                }
+            }
+        }
         if(this.depthTexture) {
             gd.unbindTexture(this.depthTexture.glTexture);
         }
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.glObject);
+        var drawBuffersExtension = gd.drawBuffersExtension;
+        if(drawBuffersExtension) {
+            if(gd.WEBGL_draw_buffers) {
+                drawBuffersExtension.drawBuffersWEBGL(this.buffers);
+            } else {
+                drawBuffersExtension.drawBuffersEXT(this.buffers);
+            }
+        }
         var state = gd.state;
         this.copyBox(this.oldViewportBox, state.viewportBox);
         this.copyBox(this.oldScissorBox, state.scissorBox);
@@ -860,9 +879,31 @@ WebGLRenderTarget.prototype = {
         var gd = this.gd;
         var gl = gd.gl;
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        var drawBuffersExtension = gd.drawBuffersExtension;
+        if(drawBuffersExtension) {
+            var buffers = [
+                gl.BACK
+            ];
+            if(gd.WEBGL_draw_buffers) {
+                drawBuffersExtension.drawBuffersWEBGL(buffers);
+            } else {
+                drawBuffersExtension.drawBuffersEXT(buffers);
+            }
+        }
         gd.setViewport.apply(gd, this.oldViewportBox);
         gd.setScissor.apply(gd, this.oldScissorBox);
-        this.colorTexture0.updateMipmaps(this.face);
+        if(this.colorTexture0) {
+            this.colorTexture0.updateMipmaps(this.face);
+            if(this.colorTexture1) {
+                this.colorTexture1.updateMipmaps(this.face);
+                if(this.colorTexture2) {
+                    this.colorTexture2.updateMipmaps(this.face);
+                    if(this.colorTexture3) {
+                        this.colorTexture3.updateMipmaps(this.face);
+                    }
+                }
+            }
+        }
         if(this.depthTexture) {
             this.depthTexture.updateMipmaps(this.face);
         }
@@ -909,6 +950,7 @@ WebGLRenderTarget.create = function webGLRenderTargetFn(gd, params) {
         return null;
     }
     var gl = gd.gl;
+    var colorAttachment0 = gl.COLOR_ATTACHMENT0;
     var glObject = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, glObject);
     var width, height;
@@ -922,7 +964,6 @@ WebGLRenderTarget.create = function webGLRenderTargetFn(gd, params) {
             gl.deleteFramebuffer(glObject);
             return null;
         }
-        var colorAttachment0 = gl.COLOR_ATTACHMENT0;
         if(colorTexture0.cubemap) {
             gl.framebufferTexture2D(gl.FRAMEBUFFER, colorAttachment0, (gl.TEXTURE_CUBE_MAP_POSITIVE_X + face), glTexture, 0);
         } else {
@@ -986,6 +1027,28 @@ WebGLRenderTarget.create = function webGLRenderTargetFn(gd, params) {
     renderTarget.width = width;
     renderTarget.height = height;
     renderTarget.face = face;
+    if(gd.drawBuffersExtension) {
+        var buffers;
+        if(colorTexture0) {
+            buffers = [
+                colorAttachment0
+            ];
+            if(colorTexture1) {
+                buffers.push(colorAttachment0 + 1);
+                if(colorTexture2) {
+                    buffers.push(colorAttachment0 + 2);
+                    if(colorTexture3) {
+                        buffers.push(colorAttachment0 + 3);
+                    }
+                }
+            }
+        } else {
+            buffers = [
+                gl.NONE
+            ];
+        }
+        renderTarget.buffers = buffers;
+    }
     return renderTarget;
 };
 
@@ -1196,7 +1259,9 @@ WebGLVertexBuffer.prototype = {
         if(this.hasSingleFormat) {
             var maxNumValues = (numVertices * numValuesPerVertex);
             var format = attributes[0].format;
-            if(format === gl.BYTE) {
+            if(format === gl.FLOAT) {
+                data = new Float32Array(maxNumValues);
+            } else if(format === gl.BYTE) {
                 data = new Int8Array(maxNumValues);
             } else if(format === gl.UNSIGNED_BYTE) {
                 data = new Uint8Array(maxNumValues);
@@ -1208,8 +1273,6 @@ WebGLVertexBuffer.prototype = {
                 data = new Int32Array(maxNumValues);
             } else if(format === gl.UNSIGNED_INT) {
                 data = new Uint32Array(maxNumValues);
-            } else if(format === gl.FLOAT) {
-                data = new Float32Array(maxNumValues);
             }
             writer = function vertexBufferWriterSingleFn() {
                 var numArguments = arguments.length;
@@ -1462,7 +1525,11 @@ WebGLVertexBuffer.prototype = {
         if(this.hasSingleFormat) {
             attribute = attributes[0];
             format = attribute.format;
-            if(format === gl.BYTE) {
+            if(format === gl.FLOAT) {
+                if(!(data instanceof Float32Array)) {
+                    TypedArrayConstructor = Float32Array;
+                }
+            } else if(format === gl.BYTE) {
                 if(!(data instanceof Int8Array)) {
                     TypedArrayConstructor = Int8Array;
                 }
@@ -1485,10 +1552,6 @@ WebGLVertexBuffer.prototype = {
             } else if(format === gl.UNSIGNED_INT) {
                 if(!(data instanceof Uint32Array)) {
                     TypedArrayConstructor = Uint32Array;
-                }
-            } else if(format === gl.FLOAT) {
-                if(!(data instanceof Float32Array)) {
-                    TypedArrayConstructor = Float32Array;
                 }
             }
             var numValuesPerVertex = this.stride;
@@ -2999,8 +3062,10 @@ WebGLGraphicsDevice.prototype = {
         }
     },
     setStream: function setStreamFn(vertexBuffer, semantics, offset) {
-        debug.assert(vertexBuffer instanceof WebGLVertexBuffer);
-        debug.assert(semantics instanceof WebGLSemantics);
+        if(debug) {
+            debug.assert(vertexBuffer instanceof WebGLVertexBuffer);
+            debug.assert(semantics instanceof WebGLSemantics);
+        }
         if(offset) {
             offset *= vertexBuffer.strideInBytes;
         } else {
@@ -3041,14 +3106,10 @@ WebGLGraphicsDevice.prototype = {
         var numDrawParameters = drawParametersArray.length;
         if(numDrawParameters > 1 && sortMode) {
             if(sortMode > 0) {
-                drawParametersArray.sort(function drawArraySortPositive(a, b) {
-                    return (b.sortKey - a.sortKey);
-                });
+                drawParametersArray.sort(this._drawArraySortPositive);
             } else//if (sortMode < 0)
              {
-                drawParametersArray.sort(function drawArraySortNegative(a, b) {
-                    return (a.sortKey - b.sortKey);
-                });
+                drawParametersArray.sort(this._drawArraySortNegative);
             }
         }
         var activeIndexBuffer = this.activeIndexBuffer;
@@ -3371,7 +3432,7 @@ WebGLGraphicsDevice.prototype = {
                     gl.colorMask(true, true, true, true);
                 }
             }
-            if(depth !== undefined) {
+            if(typeof depth === 'number') {
                 if(!depthMask) {
                     // This is posibly a mistake, enable it for this call
                     gl.depthMask(true);
@@ -3387,7 +3448,7 @@ WebGLGraphicsDevice.prototype = {
                     gl.colorMask(false, false, false, false);
                 }
             }
-            if(depth !== undefined) {
+            if(typeof depth === 'number') {
                 if(!depthMask) {
                     gl.depthMask(false);
                 }
@@ -3575,6 +3636,13 @@ WebGLGraphicsDevice.prototype = {
         } else if("3D_TEXTURE_SIZE" === name) {
             return 0;
         } else if("RENDERTARGET_COLOR_TEXTURES" === name) {
+            if(this.drawBuffersExtension) {
+                if(this.WEBGL_draw_buffers) {
+                    return gl.getParameter(this.drawBuffersExtension.MAX_COLOR_ATTACHMENTS_WEBGL);
+                } else {
+                    return gl.getParameter(this.drawBuffersExtension.MAX_COLOR_ATTACHMENTS_EXT);
+                }
+            }
             return 1;
         } else if("RENDERBUFFER_SIZE" === name) {
             return gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
@@ -3641,8 +3709,14 @@ WebGLGraphicsDevice.prototype = {
     finish: function finish() {
         this.gl.finish();
     },
-    checkFullScreen: // private
-    function checkFullScreenFn() {
+    _drawArraySortPositive: // private
+    function _drawArraySortPositive(a, b) {
+        return (b.sortKey - a.sortKey);
+    },
+    _drawArraySortNegative: function _drawArraySortNegative(a, b) {
+        return (a.sortKey - b.sortKey);
+    },
+    checkFullScreen: function checkFullScreenFn() {
         var fullscreen = this.fullscreen;
         if(this.oldFullscreen !== fullscreen) {
             this.oldFullscreen = fullscreen;
@@ -4054,6 +4128,12 @@ WebGLGraphicsDevice.create = function webGLGraphicsDeviceCreateFn(canvas, params
     }
     // Enable OES_element_index_uint extension
     gl.getExtension('OES_element_index_uint');
+    if(extensions.indexOf('WEBGL_draw_buffers') !== -1) {
+        gd.WEBGL_draw_buffers = true;
+        gd.drawBuffersExtension = gl.getExtension('WEBGL_draw_buffers');
+    } else if(extensions.indexOf('EXT_draw_buffers') !== -1) {
+        gd.drawBuffersExtension = gl.getExtension('EXT_draw_buffers');
+    }
     gd.PRIMITIVE_POINTS = gl.POINTS;
     gd.PRIMITIVE_LINES = gl.LINES;
     gd.PRIMITIVE_LINE_LOOP = gl.LINE_LOOP;
