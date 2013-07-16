@@ -1520,8 +1520,8 @@ Protolib.prototype =
             dst = new VMathArrayConstructor(3);
         }
 
-        debug.assert(debug.isVec4(a));
-        debug.assert(debug.isVec3(dst));
+        /* debug.assert(debug.isVec4(a)); */
+        /* debug.assert(debug.isVec3(dst)); */
 
         dst[0] = a[0];
         dst[1] = a[1];
@@ -1536,8 +1536,8 @@ Protolib.prototype =
             dst[3] = 0;
         }
 
-        debug.assert(debug.isVec3(a));
-        debug.assert(debug.isVec4(dst));
+        /* debug.assert(debug.isVec3(a)); */
+        /* debug.assert(debug.isVec4(dst)); */
 
         dst[0] = a[0];
         dst[1] = a[1];

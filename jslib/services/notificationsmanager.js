@@ -268,7 +268,7 @@ var NotificationsManager = (function () {
             };
         }
         if(!TurbulenzServices.available()) {
-            debug.log("notificationsManagerCreateFn: !! TurbulenzServices not available");
+            /* debug.log("notificationsManagerCreateFn: !! TurbulenzServices not available"); */
             // Call error callback on a timeout to get the same behaviour as the ajax call
             TurbulenzEngine.setTimeout(function () {
                 errorCallbackFn({

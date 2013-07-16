@@ -227,7 +227,7 @@ var StoreManager = (function () {
     };
     StoreManager.create = function create(requestHandler, gameSession, storeMetaReceived, errorCallbackFn) {
         if(!TurbulenzServices.available()) {
-            debug.log("storeManagerCreateFn: !! TurbulenzServices not available");
+            /* debug.log("storeManagerCreateFn: !! TurbulenzServices not available"); */
             // Call error callback on a timeout to get the same behaviour as the ajax call
             TurbulenzEngine.setTimeout(function () {
                 if(errorCallbackFn) {

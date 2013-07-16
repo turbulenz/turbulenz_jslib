@@ -1,6 +1,7 @@
 /* This file was generated from TypeScript source tslib/scenedebugging.ts */
 
 
+
 //
 // Scene debugging methods
 //
@@ -2292,7 +2293,7 @@ Scene.prototype.updateNormals = function updateNormalsFn(gd, scale, drawNormals,
                         binormalRenderable = null;
                         var offset = 0;
                         var semantic, attribute;
-                        debug.assert(numAttributes === numSemantics);
+                        /* debug.assert(numAttributes === numSemantics); */
                         for(var n = 0; n < numSemantics; n += 1) {
                             semantic = semantics[n];
                             attribute = attributes[n];
@@ -2314,7 +2315,7 @@ Scene.prototype.updateNormals = function updateNormalsFn(gd, scale, drawNormals,
                             var numComponents = this.attributeComponents(attribute);
                             offset += numComponents;
                         }
-                        debug.assert(positionOffset !== -1);
+                        /* debug.assert(positionOffset !== -1); */
                         renderable.normalsInfo = {
                             stride: stride,
                             positionOffset: positionOffset,
@@ -2400,7 +2401,7 @@ Scene.prototype.attributeComponents = function attributeComponentsFn(attribute) 
         this.vertexAttrToNumComponents = attrToComponents;
     }
     var numComponents = attrToComponents[attribute];
-    debug.assert(numComponents, "Unknown attribute type");
+    /* debug.assert(numComponents, "Unknown attribute type"); */
     return numComponents;
 };
 //
@@ -2577,18 +2578,20 @@ Scene.prototype.drawWireframe = function drawWireframeFn(gd, sm, camera, wirefra
                                 dataLength = indexBufferData.length;
                                 stepSize = 3;
                             } else if(surfacePrimitive === gd.PRIMITIVE_TRIANGLE_STRIP || surfacePrimitive === gd.PRIMITIVE_TRIANGLE_FAN) {
+                                positionOffset += (oldSurface.first - oldGeometry.vertexBufferAllocation.baseIndex) * stride;
                                 numTriangles = oldSurface.numVertices - 2;
                                 dataLength = numTriangles * 3;
                                 stepSize = 1;
                             } else//unindexed and gd.PRIMITIVE_TRIANGLES
                              {
+                                positionOffset += (oldSurface.first - oldGeometry.vertexBufferAllocation.baseIndex) * stride;
                                 dataLength = oldSurface.numVertices;
                                 stepSize = 3;
                             }
                             vertexBuffer = gd.createVertexBuffer({
                                 numVertices: dataLength,
                                 attributes: attributes,
-                                dynamic: true
+                                dynamic: oldVertexBuffer.dynamic
                             });
                             vData.length = dataLength * numAttributeComponents;
                             for(j = 0; j < dataLength; j += stepSize) {
@@ -2759,6 +2762,88 @@ Scene.prototype.drawWireframe = function drawWireframeFn(gd, sm, camera, wirefra
         }
     }
     return true;
+};
+//
+// getMetrics
+//
+Scene.prototype.getMetrics = function getMetricsFn() {
+    var numTotalNodes = 0;
+    var numTotalRenderables = 0;
+    var numTotalVertices = 0;
+    var numTotalPrimitives = 0;
+    var numTotalLights = this.globalLights.length;
+    var count = function countFn(node) {
+        numTotalNodes += 1;
+        var renderables = node.renderables;
+        var numRenderables = (renderables ? renderables.length : 0);
+        numTotalRenderables += numRenderables;
+        var lights = node.lightInstances;
+        var numLights = (lights ? lights.length : 0);
+        numTotalLights += numLights;
+        var n, numPrimitives;
+        for(n = 0; n < numRenderables; n += 1) {
+            var renderable = renderables[n];
+            var surface = renderable.surface;
+            numTotalVertices += surface.numVertices;
+            if(surface.indexBuffer) {
+                numPrimitives = surface.numIndices;
+            } else {
+                numPrimitives = surface.numVertices;
+            }
+            switch(surface.primitive) {
+                case 0:
+                    // Points
+                    numTotalPrimitives += numPrimitives;
+                    break;
+                case 1:
+                    // Lines
+                    numTotalPrimitives += (numPrimitives >> 1);
+                    break;
+                case 2:
+                    // Line loop
+                    numTotalPrimitives += numPrimitives;
+                    break;
+                case 3:
+                    // Line strip
+                    numTotalPrimitives += (numPrimitives - 1);
+                    break;
+                case 4:
+                    // Triangles
+                    numTotalPrimitives += (numPrimitives / 3) | 0;
+                    break;
+                case 5:
+                    // Triangle strip
+                    numTotalPrimitives += (numPrimitives - 2);
+                    break;
+                case 6:
+                    // Triangle fan
+                    numTotalPrimitives += (numPrimitives - 2);
+                    break;
+            }
+            
+        }
+        var children = node.children;
+        if(children) {
+            var numChildren = children.length;
+            for(n = 0; n < numChildren; n += 1) {
+                count(children[n]);
+            }
+        }
+    };
+    var rootNodes = this.rootNodes;
+    if(rootNodes) {
+        var numRoots = rootNodes.length;
+        for(var n = 0; n < numRoots; n += 1) {
+            count(rootNodes[n]);
+        }
+    }
+    return {
+        numNodes: numTotalNodes,
+        numRenderables: numTotalRenderables,
+        numLights: numTotalLights,
+        numVertices: numTotalVertices,
+        numPrimitives: numTotalPrimitives
+    };
 };
 //
 // getVisibilityMetrics

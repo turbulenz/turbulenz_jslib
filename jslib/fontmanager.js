@@ -194,16 +194,7 @@ var Font = (function () {
         var fm = this.fm;
         fm.reusableArrays[numGlyphs] = vertices;
         var numVertices = (numGlyphs * 4);
-        var numIndicies = (numGlyphs * 6);
-        var sharedIndexBuffer = fm.sharedIndexBuffer;
         var sharedVertexBuffer = fm.sharedVertexBuffer;
-        if(!sharedIndexBuffer || numIndicies > sharedIndexBuffer.numIndices) {
-            if(sharedIndexBuffer) {
-                sharedIndexBuffer.destroy();
-            }
-            sharedIndexBuffer = this.createIndexBuffer(numGlyphs);
-            fm.sharedIndexBuffer = sharedIndexBuffer;
-        }
         if(!sharedVertexBuffer || numVertices > sharedVertexBuffer.numVertices) {
             if(sharedVertexBuffer) {
                 sharedVertexBuffer.destroy();
@@ -213,12 +204,25 @@ var Font = (function () {
         }
         sharedVertexBuffer.setData(vertices, 0, numVertices);
         gd.setStream(sharedVertexBuffer, fm.semantics);
-        gd.setIndexBuffer(sharedIndexBuffer);
         // TODO: support for multiple pages
         var techniqueParameters = fm.techniqueParameters;
         techniqueParameters['texture'] = this.texture;
         gd.setTechniqueParameters(techniqueParameters);
-        gd.drawIndexed(fm.primitive, numIndicies, 0);
+        if(4 < numVertices) {
+            var numIndicies = (numGlyphs * 6);
+            var sharedIndexBuffer = fm.sharedIndexBuffer;
+            if(!sharedIndexBuffer || numIndicies > sharedIndexBuffer.numIndices) {
+                if(sharedIndexBuffer) {
+                    sharedIndexBuffer.destroy();
+                }
+                sharedIndexBuffer = this.createIndexBuffer(numGlyphs);
+                fm.sharedIndexBuffer = sharedIndexBuffer;
+            }
+            gd.setIndexBuffer(sharedIndexBuffer);
+            gd.drawIndexed(fm.primitive, numIndicies, 0);
+        } else {
+            gd.draw(fm.primitiveFan, 4, 0);
+        }
     };
     Font.prototype.createIndexBuffer = function (maxGlyphs) {
         var gd = this.gd;
@@ -267,7 +271,7 @@ var FontManager = (function () {
     function FontManager() { }
     FontManager.version = 1;
     FontManager.prototype.get = function (path) {
-        debug.abort("empty method");
+        /* debug.abort("empty method"); */
         return undefined;
     };
     FontManager.create = /**
@@ -1408,6 +1412,7 @@ var FontManager = (function () {
         };
         var fm = new FontManager();
         fm.primitive = gd.PRIMITIVE_TRIANGLES;
+        fm.primitiveFan = gd.PRIMITIVE_TRIANGLE_FAN;
         fm.semantics = gd.createSemantics([
             'POSITION', 
             'TEXCOORD0'

@@ -137,7 +137,7 @@ var IndexBufferManager = (function () {
                 indexbufferParameters.numIndices = maxIndicesPerIndexBuffer;
                 indexbuffer = this.graphicsDevice.createIndexBuffer(indexbufferParameters);
                 this.debugCreatedIndexBuffers += 1;
-                debug.assert(indexbuffer, "IndexBuffer not created.");
+                /* debug.assert(indexbuffer, "IndexBuffer not created."); */
                 if(indexbuffer) {
                     indexBufferData = {
                         indexBuffer: indexbuffer,
@@ -156,7 +156,7 @@ var IndexBufferManager = (function () {
             indexbufferParameters.numIndices = numIndices;
             indexbuffer = this.graphicsDevice.createIndexBuffer(indexbufferParameters);
             this.debugCreatedIndexBuffers += 1;
-            debug.assert(indexbuffer, "IndexBuffer not created.");
+            /* debug.assert(indexbuffer, "IndexBuffer not created."); */
             if(indexbuffer) {
                 indexBuffersPool.indexBufferData.push({
                     indexBuffer: indexbuffer,

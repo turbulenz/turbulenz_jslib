@@ -9,7 +9,7 @@ function SimpleSprite(globals)
     var md = globals.mathDevice;
 
     /* jshint bitwise: false */
-    debug.assert(this.maxSprites * 6 < 1<<16); // Must fit in 16 bit indicies.
+    /* debug.assert(this.maxSprites * 6 < 1<<16); */ // Must fit in 16 bit indicies.
     /* jshint bitwise: true */
 
     // Index buffer generation.

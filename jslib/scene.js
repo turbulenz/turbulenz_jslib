@@ -9,7 +9,21 @@
 // Scene
 //
 var Scene = (function () {
-    function Scene() { }
+    // on prototype
+    // Scene
+    function Scene(mathDevice) {
+        this.md = mathDevice;
+        this.clear();
+        var scene = this;
+        this.onGeometryDestroyed = function sceneOnGeometryDestroyedFn(geometry) {
+            geometry.reference.unsubscribeDestroyed(scene.onGeometryDestroyed);
+            delete scene.shapes[geometry.name];
+        };
+        this.onMaterialDestroyed = function sceneOnMaterialDestroyedFn(material) {
+            material.reference.unsubscribeDestroyed(scene.onMaterialDestroyed);
+            delete scene.materials[material.name];
+        };
+    }
     Scene.version = 1;
     Scene.prototype.findNode = //
     // findNode
@@ -34,36 +48,34 @@ var Scene = (function () {
     //
     function (rootNode) {
         // Add the root to the top level nodes list and update the scene hierarchys
-        debug.assert(rootNode.name, "Root nodes must be named");
-        debug.assert(!rootNode.scene, "Root node already in a scene");
-        debug.assert(!this.rootNodesMap[rootNode.name], "Root node with the same name exits in the scene");
+        var name = rootNode.name;
+        /* debug.assert(name, "Root nodes must be named"); */
+        /* debug.assert(!rootNode.scene, "Root node already in a scene"); */
+        /* debug.assert(!this.rootNodesMap[name], "Root node with the same name exits in the scene"); */
         rootNode.scene = this;
         this.rootNodes.push(rootNode);
-        if(!this.dirtyRoots) {
-            this.dirtyRoots = {
-            };
-        }
-        this.dirtyRoots[rootNode.name] = rootNode;
-        this.rootNodesMap[rootNode.name] = rootNode;
+        this.rootNodesMap[name] = rootNode;
+        this.addRootNodeToUpdate(rootNode, name);
     };
     Scene.prototype.removeRootNode = //
     // removeRootNode
     //
     function (rootNode) {
-        debug.assert(rootNode.scene === this, "Root node is not in the scene");
+        var name = rootNode.name;
+        /* debug.assert(rootNode.scene === this, "Root node is not in the scene"); */
         rootNode.removedFromScene(this);
-        var rootNodes = this.rootNodes;
-        var numRootNodes = rootNodes.length;
-        for(var n = 0; n < numRootNodes; n += 1) {
-            if(rootNode === rootNodes[n]) {
-                rootNodes.splice(n, 1);
-                break;
+        var index = this.rootNodes.indexOf(rootNode);
+        if(index !== -1) {
+            this.rootNodes.splice(index, 1);
+        }
+        delete this.rootNodesMap[name];
+        if(this.dirtyRoots[name] === rootNode) {
+            delete this.dirtyRoots[name];
+            index = this.nodesToUpdate.indexOf(rootNode);
+            if(index !== -1) {
+                this.nodesToUpdate.splice(index, 1);
             }
         }
-        if(this.dirtyRoots) {
-            delete this.dirtyRoots[rootNode.name];
-        }
-        delete this.rootNodesMap[rootNode.name];
         delete rootNode.scene;
     };
     Scene.prototype.addLight = //
@@ -427,6 +439,7 @@ var Scene = (function () {
     // findVisibleNodes
     //
     function (camera, visibleNodes) {
+        var numVisibleNodes = visibleNodes.length;
         var frustumPlanes = this.frustumPlanes;
         var useAABBTrees = true;
         var areas = this.areas;
@@ -462,7 +475,6 @@ var Scene = (function () {
                 var visiblePortals = this.visiblePortals;
                 var numVisiblePortals = visiblePortals.length;
                 var queryCounter = this.getQueryCounter();
-                var numVisibleNodes = visibleNodes.length;
                 var n, node, np, portalItem, portalPlanes;
                 area = areas[areaIndex];
                 nodes = area.nodes;
@@ -534,14 +546,15 @@ var Scene = (function () {
             
         }
         if(useAABBTrees) {
-            this.staticSpatialMap.getVisibleNodes(frustumPlanes, visibleNodes);
-            this.dynamicSpatialMap.getVisibleNodes(frustumPlanes, visibleNodes);
+            numVisibleNodes += this.staticSpatialMap.getVisibleNodes(frustumPlanes, visibleNodes, numVisibleNodes);
+            this.dynamicSpatialMap.getVisibleNodes(frustumPlanes, visibleNodes, numVisibleNodes);
         }
     };
     Scene.prototype.findVisibleNodesTree = //
     // findVisibleNodesTree
     //
     function (tree, camera, visibleNodes) {
+        var numVisibleNodes = visibleNodes.length;
         var frustumPlanes = this.frustumPlanes;
         var useAABBTree = true;
         var areas = this.areas;
@@ -581,7 +594,6 @@ var Scene = (function () {
                 var numVisiblePortals = visiblePortals.length;
                 var queryCounter = this.getQueryCounter();
                 var bspNodes = this.bspNodes;
-                var numVisibleNodes = visibleNodes.length;
                 var portalPlanes;
                 var n, node, nodeExtents, np, portalItem;
                 var cX, cY, cZ, nodeAreaIndex, overlappingAreas, numOverlappingAreas;
@@ -722,7 +734,7 @@ var Scene = (function () {
             }
         }
         if(useAABBTree) {
-            tree.getVisibleNodes(frustumPlanes, visibleNodes);
+            tree.getVisibleNodes(frustumPlanes, visibleNodes, numVisibleNodes);
         }
     };
     Scene.prototype.buildPortalPlanesNoFrustum = //
@@ -877,110 +889,8 @@ var Scene = (function () {
     //
     function (tree, origin, extents, overlappingNodes) {
         var useAABBTree = true;
-        var areas = this.areas;
-        if(areas) {
-            // Assume scene.update has been called before this function
-            var cX = origin[0];
-            var cY = origin[1];
-            var cZ = origin[2];
-            var areaIndex = this.findAreaIndex(this.bspNodes, cX, cY, cZ);
-            if(areaIndex >= 0) {
-                var externalNodesStack = this.externalNodesStack;
-                var na, area, nodes, numNodes;
-                var numAreas = areas.length;
-                for(na = 0; na < numAreas; na += 1) {
-                    area = areas[na];
-                    nodes = area.externalNodes;
-                    if(nodes) {
-                        nodes.length = 0;
-                        externalNodesStack.push(nodes);
-                        area.externalNodes = null;
-                    }
-                }
-                var minExtent0 = extents[0];
-                var minExtent1 = extents[1];
-                var minExtent2 = extents[2];
-                var maxExtent0 = extents[3];
-                var maxExtent1 = extents[4];
-                var maxExtent2 = extents[5];
-                area = areas[areaIndex];
-                var areaExtents = area.extents;
-                var testMinExtent0 = areaExtents[0];
-                var testMinExtent1 = areaExtents[1];
-                var testMinExtent2 = areaExtents[2];
-                var testMaxExtent0 = areaExtents[3];
-                var testMaxExtent1 = areaExtents[4];
-                var testMaxExtent2 = areaExtents[5];
-                var overlappingPortals = [];
-                this.findOverlappingPortals(areaIndex, cX, cY, cZ, extents, overlappingPortals);
-                var isInsidePlanesAABB = this.isInsidePlanesAABB;
-                var queryCounter = this.getQueryCounter();
-                var numOverlappingPortals = overlappingPortals.length;
-                var numOverlappingNodes = overlappingNodes.length;
-                var portalPlanes;
-                var n, node, np, portalItem;
-                if(0 < externalNodesStack.length) {
-                    nodes = externalNodesStack.pop();
-                } else {
-                    nodes = [];
-                }
-                area.externalNodes = nodes;
-                var testExtents = this.testExtents;
-                testExtents[0] = (testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0);
-                testExtents[1] = (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1);
-                testExtents[2] = (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2);
-                testExtents[3] = (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0);
-                testExtents[4] = (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1);
-                testExtents[5] = (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2);
-                tree.getOverlappingNodes(testExtents, nodes);
-                numNodes = nodes.length;
-                for(n = 0; n < numNodes; n += 1) {
-                    node = nodes[n];
-                    node.queryCounter = queryCounter;
-                    overlappingNodes[numOverlappingNodes] = node;
-                    numOverlappingNodes += 1;
-                }
-                for(np = 0; np < numOverlappingPortals; np += 1) {
-                    portalItem = overlappingPortals[np];
-                    portalPlanes = portalItem.planes;
-                    area = areas[portalItem.area];
-                    nodes = area.externalNodes;
-                    if(!nodes) {
-                        if(0 < externalNodesStack.length) {
-                            nodes = externalNodesStack.pop();
-                        } else {
-                            nodes = [];
-                        }
-                        area.externalNodes = nodes;
-                        areaExtents = area.extents;
-                        testMinExtent0 = areaExtents[0];
-                        testMinExtent1 = areaExtents[1];
-                        testMinExtent2 = areaExtents[2];
-                        testMaxExtent0 = areaExtents[3];
-                        testMaxExtent1 = areaExtents[4];
-                        testMaxExtent2 = areaExtents[5];
-                        testExtents[0] = (testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0);
-                        testExtents[1] = (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1);
-                        testExtents[2] = (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2);
-                        testExtents[3] = (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0);
-                        testExtents[4] = (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1);
-                        testExtents[5] = (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2);
-                        tree.getOverlappingNodes(testExtents, nodes);
-                    }
-                    numNodes = nodes.length;
-                    for(n = 0; n < numNodes; n += 1) {
-                        node = nodes[n];
-                        if(node.queryCounter !== queryCounter) {
-                            if(isInsidePlanesAABB(node.worldExtents, portalPlanes)) {
-                                node.queryCounter = queryCounter;
-                                overlappingNodes[numOverlappingNodes] = node;
-                                numOverlappingNodes += 1;
-                            }
-                        }
-                    }
-                }
-                useAABBTree = false;
-            }
+        if(this.areas) {
+            useAABBTree = !this._findOverlappingNodesAreas(tree, origin, extents, overlappingNodes);
         }
         if(useAABBTree) {
             tree.getOverlappingNodes(extents, overlappingNodes);
@@ -998,72 +908,93 @@ var Scene = (function () {
     function (origin, extents, overlappingNodes) {
         this.findOverlappingNodes(this.dynamicSpatialMap, origin, extents, overlappingNodes);
     };
-    Scene.prototype.findOverlappingRenderables = //
-    // findOverlappingRenderables
+    Scene.prototype._findOverlappingNodesAreas = //
+    // _findOverlappingNodesAreas
     //
-    function (tree, origin, extents, overlappingRenderables) {
-        var numOverlappingRenderables = overlappingRenderables.length;
+    function (tree, origin, extents, overlappingNodes) {
+        // Assume scene.update has been called before this function
+        var cX = origin[0];
+        var cY = origin[1];
+        var cZ = origin[2];
+        var areaIndex = this.findAreaIndex(this.bspNodes, cX, cY, cZ);
+        if(areaIndex < 0) {
+            return false;
+        }
+        var externalNodesStack = this.externalNodesStack;
+        var areas = this.areas;
+        var na, area, nodes, numNodes;
+        var numAreas = areas.length;
+        for(na = 0; na < numAreas; na += 1) {
+            area = areas[na];
+            nodes = area.externalNodes;
+            if(nodes) {
+                nodes.length = 0;
+                externalNodesStack.push(nodes);
+                area.externalNodes = null;
+            }
+        }
         var minExtent0 = extents[0];
         var minExtent1 = extents[1];
         var minExtent2 = extents[2];
         var maxExtent0 = extents[3];
         var maxExtent1 = extents[4];
         var maxExtent2 = extents[5];
-        var overlappingNodes = [];
-        var useAABBTree = true;
-        var areas = this.areas;
-        var node;
-        var numNodes;
-        var nodeIndex;
-        var renderable;
-        var renderables;
-        var numRenderables;
-        var nodeExtents;
-        var renderableIndex;
-        var renderableExtents;
-        if(areas) {
-            // Assume scene.update has been called before this function
-            var cX = origin[0];
-            var cY = origin[1];
-            var cZ = origin[2];
-            var areaIndex = this.findAreaIndex(this.bspNodes, cX, cY, cZ);
-            if(areaIndex >= 0) {
-                var externalNodesStack = this.externalNodesStack;
-                var na, area, nodes;
-                var numAreas = areas.length;
-                for(na = 0; na < numAreas; na += 1) {
-                    area = areas[na];
-                    nodes = area.externalNodes;
-                    if(nodes) {
-                        nodes.length = 0;
-                        externalNodesStack.push(nodes);
-                        area.externalNodes = null;
-                    }
-                }
-                area = areas[areaIndex];
-                var areaExtents = area.extents;
-                var testMinExtent0 = areaExtents[0];
-                var testMinExtent1 = areaExtents[1];
-                var testMinExtent2 = areaExtents[2];
-                var testMaxExtent0 = areaExtents[3];
-                var testMaxExtent1 = areaExtents[4];
-                var testMaxExtent2 = areaExtents[5];
-                var overlappingPortals = [];
-                this.findOverlappingPortals(areaIndex, cX, cY, cZ, extents, overlappingPortals);
-                var isInsidePlanesAABB = this.isInsidePlanesAABB;
-                var isFullyInsidePlanesAABB = this.isFullyInsidePlanesAABB;
-                var queryCounter = this.getQueryCounter();
-                var numOverlappingPortals = overlappingPortals.length;
-                var portalPlanes;
-                var n, np, portalItem;
-                var allVisible;
+        area = areas[areaIndex];
+        var areaExtents = area.extents;
+        var testMinExtent0 = areaExtents[0];
+        var testMinExtent1 = areaExtents[1];
+        var testMinExtent2 = areaExtents[2];
+        var testMaxExtent0 = areaExtents[3];
+        var testMaxExtent1 = areaExtents[4];
+        var testMaxExtent2 = areaExtents[5];
+        var overlappingPortals = [];
+        this.findOverlappingPortals(areaIndex, cX, cY, cZ, extents, overlappingPortals);
+        var isInsidePlanesAABB = this.isInsidePlanesAABB;
+        var queryCounter = this.getQueryCounter();
+        var numOverlappingPortals = overlappingPortals.length;
+        var numOverlappingNodes = overlappingNodes.length;
+        var portalPlanes;
+        var n, node, np, portalItem;
+        if(0 < externalNodesStack.length) {
+            nodes = externalNodesStack.pop();
+        } else {
+            nodes = [];
+        }
+        area.externalNodes = nodes;
+        var testExtents = this.testExtents;
+        testExtents[0] = (testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0);
+        testExtents[1] = (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1);
+        testExtents[2] = (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2);
+        testExtents[3] = (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0);
+        testExtents[4] = (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1);
+        testExtents[5] = (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2);
+        tree.getOverlappingNodes(testExtents, nodes);
+        numNodes = nodes.length;
+        for(n = 0; n < numNodes; n += 1) {
+            node = nodes[n];
+            node.queryCounter = queryCounter;
+            overlappingNodes[numOverlappingNodes] = node;
+            numOverlappingNodes += 1;
+        }
+        for(np = 0; np < numOverlappingPortals; np += 1) {
+            portalItem = overlappingPortals[np];
+            portalPlanes = portalItem.planes;
+            area = areas[portalItem.area];
+            nodes = area.externalNodes;
+            if(!nodes) {
                 if(0 < externalNodesStack.length) {
                     nodes = externalNodesStack.pop();
                 } else {
                     nodes = [];
                 }
                 area.externalNodes = nodes;
-                var testExtents = this.testExtents;
+                areaExtents = area.extents;
+                testMinExtent0 = areaExtents[0];
+                testMinExtent1 = areaExtents[1];
+                testMinExtent2 = areaExtents[2];
+                testMaxExtent0 = areaExtents[3];
+                testMaxExtent1 = areaExtents[4];
+                testMaxExtent2 = areaExtents[5];
                 testExtents[0] = (testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0);
                 testExtents[1] = (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1);
                 testExtents[2] = (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2);
@@ -1071,184 +1002,31 @@ var Scene = (function () {
                 testExtents[4] = (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1);
                 testExtents[5] = (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2);
                 tree.getOverlappingNodes(testExtents, nodes);
-                numNodes = nodes.length;
-                for(nodeIndex = 0; nodeIndex < numNodes; nodeIndex += 1) {
-                    node = nodes[nodeIndex];
-                    node.queryCounter = queryCounter;
-                    renderables = node.renderables;
-                    if(renderables) {
-                        numRenderables = renderables.length;
-                        if(numRenderables === 1) {
-                            overlappingRenderables[numOverlappingRenderables] = renderables[0];
-                            numOverlappingRenderables += 1;
-                        } else {
-                            // Check if node is fully inside
-                            nodeExtents = node.worldExtents;
-                            if(nodeExtents[0] >= minExtent0 && nodeExtents[1] >= minExtent1 && nodeExtents[2] >= minExtent2 && nodeExtents[3] <= maxExtent0 && nodeExtents[4] <= maxExtent1 && nodeExtents[5] <= maxExtent2) {
-                                for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
-                                    overlappingRenderables[numOverlappingRenderables] = renderables[renderableIndex];
-                                    numOverlappingRenderables += 1;
-                                }
-                            } else {
-                                for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
-                                    renderable = renderables[renderableIndex];
-                                    renderableExtents = renderable.getWorldExtents();
-                                    if(renderableExtents[3] >= minExtent0 && renderableExtents[4] >= minExtent1 && renderableExtents[5] >= minExtent2 && renderableExtents[0] <= maxExtent0 && renderableExtents[1] <= maxExtent1 && renderableExtents[2] <= maxExtent2) {
-                                        overlappingRenderables[numOverlappingRenderables] = renderable;
-                                        numOverlappingRenderables += 1;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                for(np = 0; np < numOverlappingPortals; np += 1) {
-                    portalItem = overlappingPortals[np];
-                    portalPlanes = portalItem.planes;
-                    area = areas[portalItem.area];
-                    nodes = area.externalNodes;
-                    if(!nodes) {
-                        if(0 < externalNodesStack.length) {
-                            nodes = externalNodesStack.pop();
-                        } else {
-                            nodes = [];
-                        }
-                        area.externalNodes = nodes;
-                        areaExtents = area.extents;
-                        testMinExtent0 = areaExtents[0];
-                        testMinExtent1 = areaExtents[1];
-                        testMinExtent2 = areaExtents[2];
-                        testMaxExtent0 = areaExtents[3];
-                        testMaxExtent1 = areaExtents[4];
-                        testMaxExtent2 = areaExtents[5];
-                        testExtents[0] = (testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0);
-                        testExtents[1] = (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1);
-                        testExtents[2] = (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2);
-                        testExtents[3] = (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0);
-                        testExtents[4] = (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1);
-                        testExtents[5] = (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2);
-                        tree.getOverlappingNodes(testExtents, nodes);
-                    }
-                    numNodes = nodes.length;
-                    for(n = 0; n < numNodes; n += 1) {
-                        node = nodes[n];
-                        if(node.queryCounter !== queryCounter) {
-                            allVisible = true;
-                            renderables = node.renderables;
-                            if(renderables) {
-                                nodeExtents = node.worldExtents;
-                                if(isInsidePlanesAABB(nodeExtents, portalPlanes)) {
-                                    numRenderables = renderables.length;
-                                    if(numRenderables === 1) {
-                                        renderable = renderables[0];
-                                        if(renderable.queryCounter !== queryCounter) {
-                                            renderable.queryCounter = queryCounter;
-                                            overlappingRenderables[numOverlappingRenderables] = renderable;
-                                            numOverlappingRenderables += 1;
-                                        }
-                                    } else {
-                                        // Check if node is fully inside
-                                        if(nodeExtents[0] >= minExtent0 && nodeExtents[1] >= minExtent1 && nodeExtents[2] >= minExtent2 && nodeExtents[3] <= maxExtent0 && nodeExtents[4] <= maxExtent1 && nodeExtents[5] <= maxExtent2) {
-                                            if(isFullyInsidePlanesAABB(nodeExtents, portalPlanes)) {
-                                                for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
-                                                    renderable = renderables[renderableIndex];
-                                                    if(renderable.queryCounter !== queryCounter) {
-                                                        renderable.queryCounter = queryCounter;
-                                                        overlappingRenderables[numOverlappingRenderables] = renderable;
-                                                        numOverlappingRenderables += 1;
-                                                    }
-                                                }
-                                            } else {
-                                                for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
-                                                    renderable = renderables[renderableIndex];
-                                                    if(renderable.queryCounter !== queryCounter) {
-                                                        if(isInsidePlanesAABB(renderable.getWorldExtents(), portalPlanes)) {
-                                                            renderable.queryCounter = queryCounter;
-                                                            overlappingRenderables[numOverlappingRenderables] = renderable;
-                                                            numOverlappingRenderables += 1;
-                                                        } else {
-                                                            allVisible = false;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            if(isFullyInsidePlanesAABB(nodeExtents, portalPlanes)) {
-                                                for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
-                                                    renderable = renderables[renderableIndex];
-                                                    if(renderable.queryCounter !== queryCounter) {
-                                                        renderableExtents = renderable.getWorldExtents();
-                                                        if(renderableExtents[3] >= minExtent0 && renderableExtents[4] >= minExtent1 && renderableExtents[5] >= minExtent2 && renderableExtents[0] <= maxExtent0 && renderableExtents[1] <= maxExtent1 && renderableExtents[2] <= maxExtent2) {
-                                                            renderable.queryCounter = queryCounter;
-                                                            overlappingRenderables[numOverlappingRenderables] = renderable;
-                                                            numOverlappingRenderables += 1;
-                                                        } else {
-                                                            allVisible = false;
-                                                        }
-                                                    }
-                                                }
-                                            } else {
-                                                for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
-                                                    renderable = renderables[renderableIndex];
-                                                    if(renderable.queryCounter !== queryCounter) {
-                                                        renderableExtents = renderable.getWorldExtents();
-                                                        if(renderableExtents[3] >= minExtent0 && renderableExtents[4] >= minExtent1 && renderableExtents[5] >= minExtent2 && renderableExtents[0] <= maxExtent0 && renderableExtents[1] <= maxExtent1 && renderableExtents[2] <= maxExtent2 && isInsidePlanesAABB(renderableExtents, portalPlanes)) {
-                                                            renderable.queryCounter = queryCounter;
-                                                            overlappingRenderables[numOverlappingRenderables] = renderable;
-                                                            numOverlappingRenderables += 1;
-                                                        } else {
-                                                            allVisible = false;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    allVisible = false;
-                                }
-                            }
-                            if(allVisible) {
-                                node.queryCounter = queryCounter;
-                            }
-                        }
-                    }
-                }
-                useAABBTree = false;
             }
+            numNodes = nodes.length;
+            for(n = 0; n < numNodes; n += 1) {
+                node = nodes[n];
+                if(node.queryCounter !== queryCounter) {
+                    if(isInsidePlanesAABB(node.worldExtents, portalPlanes)) {
+                        node.queryCounter = queryCounter;
+                        overlappingNodes[numOverlappingNodes] = node;
+                        numOverlappingNodes += 1;
+                    }
+                }
+            }
+        }
+        return true;
+    };
+    Scene.prototype.findOverlappingRenderables = //
+    // findOverlappingRenderables
+    //
+    function (tree, origin, extents, overlappingRenderables) {
+        var useAABBTree = true;
+        if(this.areas) {
+            useAABBTree = !this._findOverlappingRenderablesAreas(tree, origin, extents, overlappingRenderables);
         }
         if(useAABBTree) {
-            tree.getOverlappingNodes(extents, overlappingNodes);
-            numNodes = overlappingNodes.length;
-            for(nodeIndex = 0; nodeIndex < numNodes; nodeIndex += 1) {
-                node = overlappingNodes[nodeIndex];
-                renderables = node.renderables;
-                if(renderables) {
-                    numRenderables = renderables.length;
-                    if(numRenderables === 1) {
-                        overlappingRenderables[numOverlappingRenderables] = renderables[0];
-                        numOverlappingRenderables += 1;
-                    } else {
-                        // Check if node is fully inside
-                        nodeExtents = node.worldExtents;
-                        if(nodeExtents[0] >= minExtent0 && nodeExtents[1] >= minExtent1 && nodeExtents[2] >= minExtent2 && nodeExtents[3] <= maxExtent0 && nodeExtents[4] <= maxExtent1 && nodeExtents[5] <= maxExtent2) {
-                            for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
-                                overlappingRenderables[numOverlappingRenderables] = renderables[renderableIndex];
-                                numOverlappingRenderables += 1;
-                            }
-                        } else {
-                            for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
-                                renderable = renderables[renderableIndex];
-                                renderableExtents = renderable.getWorldExtents();
-                                if(renderableExtents[3] >= minExtent0 && renderableExtents[4] >= minExtent1 && renderableExtents[5] >= minExtent2 && renderableExtents[0] <= maxExtent0 && renderableExtents[1] <= maxExtent1 && renderableExtents[2] <= maxExtent2) {
-                                    overlappingRenderables[numOverlappingRenderables] = renderable;
-                                    numOverlappingRenderables += 1;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            this._findOverlappingRenderablesNoAreas(tree, extents, overlappingRenderables);
         }
     };
     Scene.prototype.findStaticOverlappingRenderables = //
@@ -1263,6 +1041,276 @@ var Scene = (function () {
     function (origin, extents, overlappingRenderables) {
         this.findOverlappingRenderables(this.dynamicSpatialMap, origin, extents, overlappingRenderables);
     };
+    Scene.prototype._findOverlappingRenderablesAreas = //
+    // _findOverlappingRenderablesAreas
+    //
+    function (tree, origin, extents, overlappingRenderables) {
+        // Assume scene.update has been called before this function
+        var cX = origin[0];
+        var cY = origin[1];
+        var cZ = origin[2];
+        var areaIndex = this.findAreaIndex(this.bspNodes, cX, cY, cZ);
+        if(areaIndex < 0) {
+            return false;
+        }
+        var numOverlappingRenderables = overlappingRenderables.length;
+        var minExtent0 = extents[0];
+        var minExtent1 = extents[1];
+        var minExtent2 = extents[2];
+        var maxExtent0 = extents[3];
+        var maxExtent1 = extents[4];
+        var maxExtent2 = extents[5];
+        var node;
+        var numNodes;
+        var nodeIndex;
+        var renderable;
+        var renderables;
+        var numRenderables;
+        var nodeExtents;
+        var renderableIndex;
+        var renderableExtents;
+        var externalNodesStack = this.externalNodesStack;
+        var areas = this.areas;
+        var na, area, nodes;
+        var numAreas = areas.length;
+        for(na = 0; na < numAreas; na += 1) {
+            area = areas[na];
+            nodes = area.externalNodes;
+            if(nodes) {
+                nodes.length = 0;
+                externalNodesStack.push(nodes);
+                area.externalNodes = null;
+            }
+        }
+        area = areas[areaIndex];
+        var areaExtents = area.extents;
+        var testMinExtent0 = areaExtents[0];
+        var testMinExtent1 = areaExtents[1];
+        var testMinExtent2 = areaExtents[2];
+        var testMaxExtent0 = areaExtents[3];
+        var testMaxExtent1 = areaExtents[4];
+        var testMaxExtent2 = areaExtents[5];
+        var overlappingPortals = [];
+        this.findOverlappingPortals(areaIndex, cX, cY, cZ, extents, overlappingPortals);
+        var isInsidePlanesAABB = this.isInsidePlanesAABB;
+        var isFullyInsidePlanesAABB = this.isFullyInsidePlanesAABB;
+        var queryCounter = this.getQueryCounter();
+        var numOverlappingPortals = overlappingPortals.length;
+        var portalPlanes;
+        var n, np, portalItem;
+        var allVisible;
+        if(0 < externalNodesStack.length) {
+            nodes = externalNodesStack.pop();
+        } else {
+            nodes = [];
+        }
+        area.externalNodes = nodes;
+        var testExtents = this.testExtents;
+        testExtents[0] = (testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0);
+        testExtents[1] = (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1);
+        testExtents[2] = (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2);
+        testExtents[3] = (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0);
+        testExtents[4] = (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1);
+        testExtents[5] = (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2);
+        tree.getOverlappingNodes(testExtents, nodes);
+        numNodes = nodes.length;
+        for(nodeIndex = 0; nodeIndex < numNodes; nodeIndex += 1) {
+            node = nodes[nodeIndex];
+            node.queryCounter = queryCounter;
+            renderables = node.renderables;
+            if(renderables) {
+                numRenderables = renderables.length;
+                if(numRenderables === 1) {
+                    overlappingRenderables[numOverlappingRenderables] = renderables[0];
+                    numOverlappingRenderables += 1;
+                } else {
+                    // Check if node is fully inside
+                    nodeExtents = node.worldExtents;
+                    if(nodeExtents[0] >= minExtent0 && nodeExtents[1] >= minExtent1 && nodeExtents[2] >= minExtent2 && nodeExtents[3] <= maxExtent0 && nodeExtents[4] <= maxExtent1 && nodeExtents[5] <= maxExtent2) {
+                        for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
+                            overlappingRenderables[numOverlappingRenderables] = renderables[renderableIndex];
+                            numOverlappingRenderables += 1;
+                        }
+                    } else {
+                        for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
+                            renderable = renderables[renderableIndex];
+                            renderableExtents = renderable.getWorldExtents();
+                            if(renderableExtents[3] >= minExtent0 && renderableExtents[4] >= minExtent1 && renderableExtents[5] >= minExtent2 && renderableExtents[0] <= maxExtent0 && renderableExtents[1] <= maxExtent1 && renderableExtents[2] <= maxExtent2) {
+                                overlappingRenderables[numOverlappingRenderables] = renderable;
+                                numOverlappingRenderables += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for(np = 0; np < numOverlappingPortals; np += 1) {
+            portalItem = overlappingPortals[np];
+            portalPlanes = portalItem.planes;
+            area = areas[portalItem.area];
+            nodes = area.externalNodes;
+            if(!nodes) {
+                if(0 < externalNodesStack.length) {
+                    nodes = externalNodesStack.pop();
+                } else {
+                    nodes = [];
+                }
+                area.externalNodes = nodes;
+                areaExtents = area.extents;
+                testMinExtent0 = areaExtents[0];
+                testMinExtent1 = areaExtents[1];
+                testMinExtent2 = areaExtents[2];
+                testMaxExtent0 = areaExtents[3];
+                testMaxExtent1 = areaExtents[4];
+                testMaxExtent2 = areaExtents[5];
+                testExtents[0] = (testMinExtent0 > minExtent0 ? testMinExtent0 : minExtent0);
+                testExtents[1] = (testMinExtent1 > minExtent1 ? testMinExtent1 : minExtent1);
+                testExtents[2] = (testMinExtent2 > minExtent2 ? testMinExtent2 : minExtent2);
+                testExtents[3] = (testMaxExtent0 < maxExtent0 ? testMaxExtent0 : maxExtent0);
+                testExtents[4] = (testMaxExtent1 < maxExtent1 ? testMaxExtent1 : maxExtent1);
+                testExtents[5] = (testMaxExtent2 < maxExtent2 ? testMaxExtent2 : maxExtent2);
+                tree.getOverlappingNodes(testExtents, nodes);
+            }
+            numNodes = nodes.length;
+            for(n = 0; n < numNodes; n += 1) {
+                node = nodes[n];
+                if(node.queryCounter !== queryCounter) {
+                    allVisible = true;
+                    renderables = node.renderables;
+                    if(renderables) {
+                        nodeExtents = node.worldExtents;
+                        if(isInsidePlanesAABB(nodeExtents, portalPlanes)) {
+                            numRenderables = renderables.length;
+                            if(numRenderables === 1) {
+                                renderable = renderables[0];
+                                if(renderable.queryCounter !== queryCounter) {
+                                    renderable.queryCounter = queryCounter;
+                                    overlappingRenderables[numOverlappingRenderables] = renderable;
+                                    numOverlappingRenderables += 1;
+                                }
+                            } else {
+                                // Check if node is fully inside
+                                if(nodeExtents[0] >= minExtent0 && nodeExtents[1] >= minExtent1 && nodeExtents[2] >= minExtent2 && nodeExtents[3] <= maxExtent0 && nodeExtents[4] <= maxExtent1 && nodeExtents[5] <= maxExtent2) {
+                                    if(isFullyInsidePlanesAABB(nodeExtents, portalPlanes)) {
+                                        for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
+                                            renderable = renderables[renderableIndex];
+                                            if(renderable.queryCounter !== queryCounter) {
+                                                renderable.queryCounter = queryCounter;
+                                                overlappingRenderables[numOverlappingRenderables] = renderable;
+                                                numOverlappingRenderables += 1;
+                                            }
+                                        }
+                                    } else {
+                                        for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
+                                            renderable = renderables[renderableIndex];
+                                            if(renderable.queryCounter !== queryCounter) {
+                                                if(isInsidePlanesAABB(renderable.getWorldExtents(), portalPlanes)) {
+                                                    renderable.queryCounter = queryCounter;
+                                                    overlappingRenderables[numOverlappingRenderables] = renderable;
+                                                    numOverlappingRenderables += 1;
+                                                } else {
+                                                    allVisible = false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    if(isFullyInsidePlanesAABB(nodeExtents, portalPlanes)) {
+                                        for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
+                                            renderable = renderables[renderableIndex];
+                                            if(renderable.queryCounter !== queryCounter) {
+                                                renderableExtents = renderable.getWorldExtents();
+                                                if(renderableExtents[3] >= minExtent0 && renderableExtents[4] >= minExtent1 && renderableExtents[5] >= minExtent2 && renderableExtents[0] <= maxExtent0 && renderableExtents[1] <= maxExtent1 && renderableExtents[2] <= maxExtent2) {
+                                                    renderable.queryCounter = queryCounter;
+                                                    overlappingRenderables[numOverlappingRenderables] = renderable;
+                                                    numOverlappingRenderables += 1;
+                                                } else {
+                                                    allVisible = false;
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
+                                            renderable = renderables[renderableIndex];
+                                            if(renderable.queryCounter !== queryCounter) {
+                                                renderableExtents = renderable.getWorldExtents();
+                                                if(renderableExtents[3] >= minExtent0 && renderableExtents[4] >= minExtent1 && renderableExtents[5] >= minExtent2 && renderableExtents[0] <= maxExtent0 && renderableExtents[1] <= maxExtent1 && renderableExtents[2] <= maxExtent2 && isInsidePlanesAABB(renderableExtents, portalPlanes)) {
+                                                    renderable.queryCounter = queryCounter;
+                                                    overlappingRenderables[numOverlappingRenderables] = renderable;
+                                                    numOverlappingRenderables += 1;
+                                                } else {
+                                                    allVisible = false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            allVisible = false;
+                        }
+                    }
+                    if(allVisible) {
+                        node.queryCounter = queryCounter;
+                    }
+                }
+            }
+        }
+        return true;
+    };
+    Scene.prototype._findOverlappingRenderablesNoAreas = //
+    // _findOverlappingRenderablesNoAreas
+    //
+    function (tree, extents, overlappingRenderables) {
+        var numOverlappingRenderables = overlappingRenderables.length;
+        var minExtent0 = extents[0];
+        var minExtent1 = extents[1];
+        var minExtent2 = extents[2];
+        var maxExtent0 = extents[3];
+        var maxExtent1 = extents[4];
+        var maxExtent2 = extents[5];
+        var overlappingNodes = [];
+        var node;
+        var numNodes;
+        var nodeIndex;
+        var renderable;
+        var renderables;
+        var numRenderables;
+        var nodeExtents;
+        var renderableIndex;
+        var renderableExtents;
+        tree.getOverlappingNodes(extents, overlappingNodes);
+        numNodes = overlappingNodes.length;
+        for(nodeIndex = 0; nodeIndex < numNodes; nodeIndex += 1) {
+            node = overlappingNodes[nodeIndex];
+            renderables = node.renderables;
+            if(renderables) {
+                numRenderables = renderables.length;
+                if(numRenderables === 1) {
+                    overlappingRenderables[numOverlappingRenderables] = renderables[0];
+                    numOverlappingRenderables += 1;
+                } else {
+                    // Check if node is fully inside
+                    nodeExtents = node.worldExtents;
+                    if(nodeExtents[0] >= minExtent0 && nodeExtents[1] >= minExtent1 && nodeExtents[2] >= minExtent2 && nodeExtents[3] <= maxExtent0 && nodeExtents[4] <= maxExtent1 && nodeExtents[5] <= maxExtent2) {
+                        for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
+                            overlappingRenderables[numOverlappingRenderables] = renderables[renderableIndex];
+                            numOverlappingRenderables += 1;
+                        }
+                    } else {
+                        for(renderableIndex = 0; renderableIndex < numRenderables; renderableIndex += 1) {
+                            renderable = renderables[renderableIndex];
+                            renderableExtents = renderable.getWorldExtents();
+                            if(renderableExtents[3] >= minExtent0 && renderableExtents[4] >= minExtent1 && renderableExtents[5] >= minExtent2 && renderableExtents[0] <= maxExtent0 && renderableExtents[1] <= maxExtent1 && renderableExtents[2] <= maxExtent2) {
+                                overlappingRenderables[numOverlappingRenderables] = renderable;
+                                numOverlappingRenderables += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
     Scene.prototype.cloneRootNode = //
     // cloneRootNode
     //
@@ -1275,6 +1323,19 @@ var Scene = (function () {
     // updateVisibleNodes
     //
     function (camera) {
+        var useAABBTree = true;
+        if(this.areas) {
+            useAABBTree = !this._updateVisibleNodesAreas(camera);
+        }
+        if(useAABBTree) {
+            this._updateVisibleNodesNoAreas(camera);
+        }
+        this.frameIndex += 1;
+    };
+    Scene.prototype._updateVisibleNodesNoAreas = //
+    // _updateVisibleNodesNoAreas
+    //
+    function (camera) {
         var visibleNodes = this.visibleNodes;
         var numVisibleNodes = 0;
         var visibleRenderables = this.visibleRenderables;
@@ -1282,22 +1343,160 @@ var Scene = (function () {
         var visibleLights = this.visibleLights;
         var numVisibleLights = 0;
         this.extractFrustumPlanes(camera);
+        var frustumPlanes = this.frustumPlanes;
         var frameIndex = this.frameIndex;
-        var maxDistance = 0;
         var nearPlane = this.nearPlane;
         var d0 = nearPlane[0];
         var d1 = nearPlane[1];
         var d2 = nearPlane[2];
         var offset = nearPlane[3];
+        var maxDistance = 0;
+        var n, node;
+        var isFullyInsidePlanesAABB = this.isFullyInsidePlanesAABB;
+        var isInsidePlanesAABB = this.isInsidePlanesAABB;
+        var queryVisibleNodes = this.queryVisibleNodes;
+        if(!queryVisibleNodes) {
+            this.queryVisibleNodes = queryVisibleNodes = [];
+        }
+        var numQueryVisibleNodes = this.staticSpatialMap.getVisibleNodes(frustumPlanes, queryVisibleNodes, 0);
+        numQueryVisibleNodes += this.dynamicSpatialMap.getVisibleNodes(frustumPlanes, queryVisibleNodes, numQueryVisibleNodes);
+        for(n = 0; n < numQueryVisibleNodes; n += 1) {
+            node = queryVisibleNodes[n];
+            if(!node.disabled) {
+                var extents = node.worldExtents;
+                var distance, renderable, i, lightInstance, l;
+                /* debug.assert(node.frameVisible !== frameIndex); */
+                node.frameVisible = frameIndex;
+                distance = ((d0 * (d0 > 0 ? extents[3] : extents[0])) + (d1 * (d1 > 0 ? extents[4] : extents[1])) + (d2 * (d2 > 0 ? extents[5] : extents[2])) - offset);
+                node.distance = distance;
+                if(0 < distance) {
+                    //This signifies any part of the node is visible, but not necessarily all.
+                    visibleNodes[numVisibleNodes] = node;
+                    numVisibleNodes += 1;
+                    var renderables = node.renderables;
+                    var numRenderables = (renderables ? renderables.length : 0);
+                    var lights = node.lightInstances;
+                    var numLights = (lights ? lights.length : 0);
+                    var fullyVisible = (1 < (numLights + numRenderables) ? isFullyInsidePlanesAABB(extents, frustumPlanes) : false);
+                    if(renderables) {
+                        if(numRenderables === 1 && !lights) {
+                            renderable = renderables[0];
+                            if(!renderable.disabled) {
+                                if(maxDistance < distance) {
+                                    maxDistance = distance;
+                                }
+                                renderable.distance = distance;
+                                renderable.frameVisible = frameIndex;
+                                visibleRenderables[numVisibleRenderables] = renderable;
+                                numVisibleRenderables += 1;
+                            }
+                        } else {
+                            for(i = 0; i < numRenderables; i += 1) {
+                                renderable = renderables[i];
+                                if(!renderable.disabled) {
+                                    extents = renderable.getWorldExtents();
+                                    if(fullyVisible || isInsidePlanesAABB(extents, frustumPlanes)) {
+                                        distance = ((d0 * (d0 > 0 ? extents[3] : extents[0])) + (d1 * (d1 > 0 ? extents[4] : extents[1])) + (d2 * (d2 > 0 ? extents[5] : extents[2])) - offset);
+                                        if(0 < distance) {
+                                            if(maxDistance < distance) {
+                                                maxDistance = distance;
+                                            }
+                                            renderable.distance = distance;
+                                            renderable.frameVisible = frameIndex;
+                                            visibleRenderables[numVisibleRenderables] = renderable;
+                                            numVisibleRenderables += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if(lights) {
+                        if(numLights === 1 && !renderables) {
+                            lightInstance = lights[0];
+                            if(!lightInstance.disabled && !lightInstance.light.isGlobal()) {
+                                lightInstance.distance = distance;
+                                lightInstance.frameVisible = frameIndex;
+                                visibleLights[numVisibleLights] = lightInstance;
+                                numVisibleLights += 1;
+                            }
+                        } else {
+                            for(l = 0; l < numLights; l += 1) {
+                                lightInstance = lights[l];
+                                if(!lightInstance.disabled && !lightInstance.light.isGlobal()) {
+                                    extents = lightInstance.getWorldExtents();
+                                    if(fullyVisible || isInsidePlanesAABB(extents, frustumPlanes)) {
+                                        distance = ((d0 * (d0 > 0 ? extents[3] : extents[0])) + (d1 * (d1 > 0 ? extents[4] : extents[1])) + (d2 * (d2 > 0 ? extents[5] : extents[2])) - offset);
+                                        if(0 < distance) {
+                                            lightInstance.distance = distance;
+                                            lightInstance.frameVisible = frameIndex;
+                                            visibleLights[numVisibleLights] = lightInstance;
+                                            numVisibleLights += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        this.maxDistance = (maxDistance + camera.nearPlane);
+        if(this.maxDistance < camera.farPlane) {
+            this._filterVisibleNodesForCameraBox(camera, numVisibleNodes, numVisibleRenderables, numVisibleLights);
+        } else {
+            visibleRenderables.length = numVisibleRenderables;
+            visibleLights.length = numVisibleLights;
+            visibleNodes.length = numVisibleNodes;
+        }
+    };
+    Scene.prototype._updateVisibleNodesAreas = //
+    // _updateVisibleNodesAreas
+    //
+    function (camera) {
+        var cameraMatrix = camera.matrix;
+        var cX = cameraMatrix[9];
+        var cY = cameraMatrix[10];
+        var cZ = cameraMatrix[11];
+        var areaIndex = this.findAreaIndex(this.bspNodes, cX, cY, cZ);
+        this.cameraAreaIndex = areaIndex;
+        if(areaIndex < 0) {
+            return false;
+        }
+        var visibleNodes = this.visibleNodes;
+        var numVisibleNodes = 0;
+        var visibleRenderables = this.visibleRenderables;
+        var numVisibleRenderables = 0;
+        var visibleLights = this.visibleLights;
+        var numVisibleLights = 0;
+        this.extractFrustumPlanes(camera);
+        var frustumPlanes = this.frustumPlanes;
+        var frameIndex = this.frameIndex;
+        var nearPlane = this.nearPlane;
+        var d0 = nearPlane[0];
+        var d1 = nearPlane[1];
+        var d2 = nearPlane[2];
+        var offset = nearPlane[3];
+        var maxDistance = 0;
         var n = 0;
         var node;
-        var queryCounter = this.getQueryCounter();
-        var isInsidePlanesAABB = this.isInsidePlanesAABB;
         var isFullyInsidePlanesAABB = this.isFullyInsidePlanesAABB;
+        var isInsidePlanesAABB = this.isInsidePlanesAABB;
+        // findVisibleNodes
+        var cameraExtents = this.cameraExtents;
+        camera.getFrustumExtents(cameraExtents);
+        var cameraMinExtent0 = cameraExtents[0];
+        var cameraMinExtent1 = cameraExtents[1];
+        var cameraMinExtent2 = cameraExtents[2];
+        var cameraMaxExtent0 = cameraExtents[3];
+        var cameraMaxExtent1 = cameraExtents[4];
+        var cameraMaxExtent2 = cameraExtents[5];
+        var areas = this.areas;
+        var queryCounter = this.getQueryCounter();
         //
         // sceneProcessVisibleNodeFn helper
         //
-        var sceneProcessVisibleNode = function sceneProcessVisibleNodeFn(node, planes) {
+        function sceneProcessVisibleNode(node, planes) {
             var extents = node.worldExtents;
             var allVisible = true;
             var distance;
@@ -1396,196 +1595,168 @@ var Scene = (function () {
             if(allVisible) {
                 node.queryCounter = queryCounter;
             }
-        };
-        // findVisibleNodes
-        var cameraExtents = this.cameraExtents;
-        var cameraMinExtent0, cameraMinExtent1, cameraMinExtent2;
-        var cameraMaxExtent0, cameraMaxExtent1, cameraMaxExtent2;
-        camera.getFrustumExtents(cameraExtents);
-        var frustumPlanes = this.frustumPlanes;
-        var useAABBTrees = true;
-        var areas = this.areas;
-        if(areas) {
-            var cameraMatrix = camera.matrix;
-            var cX = cameraMatrix[9];
-            var cY = cameraMatrix[10];
-            var cZ = cameraMatrix[11];
-            var areaIndex = this.findAreaIndex(this.bspNodes, cX, cY, cZ);
-            this.cameraAreaIndex = areaIndex;
-            if(areaIndex >= 0) {
-                cameraMinExtent0 = cameraExtents[0];
-                cameraMinExtent1 = cameraExtents[1];
-                cameraMinExtent2 = cameraExtents[2];
-                cameraMaxExtent0 = cameraExtents[3];
-                cameraMaxExtent1 = cameraExtents[4];
-                cameraMaxExtent2 = cameraExtents[5];
-                this.findVisiblePortals(areaIndex, cX, cY, cZ);
-                var area, na, nodes, numNodes;
-                var numAreas = areas.length;
-                for(na = 0; na < numAreas; na += 1) {
-                    area = areas[na];
-                    nodes = area.nodes;
-                    numNodes = area.numStaticNodes;
-                    if(nodes.length > numNodes) {
-                        nodes.length = numNodes;
-                    }
-                    area.addedDynamicNodes = false;
+        }
+        this.findVisiblePortals(areaIndex, cX, cY, cZ);
+        var area, na, nodes, numNodes;
+        var numAreas = areas.length;
+        for(na = 0; na < numAreas; na += 1) {
+            area = areas[na];
+            nodes = area.nodes;
+            numNodes = area.numStaticNodes;
+            if(nodes.length > numNodes) {
+                nodes.length = numNodes;
+            }
+            area.addedDynamicNodes = false;
+        }
+        var dynamicSpatialMap = this.dynamicSpatialMap;
+        var visiblePortals = this.visiblePortals;
+        var numVisiblePortals = visiblePortals.length;
+        var np, portalItem, portalPlanes;
+        area = areas[areaIndex];
+        nodes = area.nodes;
+        area.addedDynamicNodes = true;
+        var areaExtent = area.extents;
+        var areaMinExtent0 = areaExtent[0];
+        var areaMinExtent1 = areaExtent[1];
+        var areaMinExtent2 = areaExtent[2];
+        var areaMaxExtent0 = areaExtent[3];
+        var areaMaxExtent1 = areaExtent[4];
+        var areaMaxExtent2 = areaExtent[5];
+        var combinedExtents = (this.float32ArrayConstructor ? new this.float32ArrayConstructor(6) : new Array(6));
+        combinedExtents[0] = (areaMinExtent0 < cameraMinExtent0 ? cameraMinExtent0 : areaMinExtent0);
+        combinedExtents[1] = (areaMinExtent1 < cameraMinExtent1 ? cameraMinExtent1 : areaMinExtent1);
+        combinedExtents[2] = (areaMinExtent2 < cameraMinExtent2 ? cameraMinExtent2 : areaMinExtent2);
+        combinedExtents[3] = (areaMaxExtent0 > cameraMaxExtent0 ? cameraMaxExtent0 : areaMaxExtent0);
+        combinedExtents[4] = (areaMaxExtent1 > cameraMaxExtent1 ? cameraMaxExtent1 : areaMaxExtent1);
+        combinedExtents[5] = (areaMaxExtent2 > cameraMaxExtent2 ? cameraMaxExtent2 : areaMaxExtent2);
+        dynamicSpatialMap.getOverlappingNodes(combinedExtents, nodes);
+        numNodes = nodes.length;
+        for(n = 0; n < numNodes; n += 1) {
+            node = nodes[n];
+            node.queryCounter = queryCounter;
+            if(!node.disabled && isInsidePlanesAABB(node.worldExtents, frustumPlanes)) {
+                sceneProcessVisibleNode(node, frustumPlanes);
+            }
+        }
+        for(np = 0; np < numVisiblePortals; np += 1) {
+            portalItem = visiblePortals[np];
+            portalPlanes = portalItem.planes;
+            area = areas[portalItem.area];
+            nodes = area.nodes;
+            // Frustum tests do return some false positives, check bounding boxes
+            areaExtent = area.extents;
+            areaMinExtent0 = areaExtent[0];
+            areaMinExtent1 = areaExtent[1];
+            areaMinExtent2 = areaExtent[2];
+            areaMaxExtent0 = areaExtent[3];
+            areaMaxExtent1 = areaExtent[4];
+            areaMaxExtent2 = areaExtent[5];
+            if(cameraMaxExtent0 > areaMinExtent0 && cameraMaxExtent1 > areaMinExtent1 && cameraMaxExtent2 > areaMinExtent2 && areaMaxExtent0 > cameraMinExtent0 && areaMaxExtent1 > cameraMinExtent1 && areaMaxExtent2 > cameraMinExtent2) {
+                if(!area.addedDynamicNodes) {
+                    area.addedDynamicNodes = true;
+                    combinedExtents[0] = (areaMinExtent0 < cameraMinExtent0 ? cameraMinExtent0 : areaMinExtent0);
+                    combinedExtents[1] = (areaMinExtent1 < cameraMinExtent1 ? cameraMinExtent1 : areaMinExtent1);
+                    combinedExtents[2] = (areaMinExtent2 < cameraMinExtent2 ? cameraMinExtent2 : areaMinExtent2);
+                    combinedExtents[3] = (areaMaxExtent0 > cameraMaxExtent0 ? cameraMaxExtent0 : areaMaxExtent0);
+                    combinedExtents[4] = (areaMaxExtent1 > cameraMaxExtent1 ? cameraMaxExtent1 : areaMaxExtent1);
+                    combinedExtents[5] = (areaMaxExtent2 > cameraMaxExtent2 ? cameraMaxExtent2 : areaMaxExtent2);
+                    dynamicSpatialMap.getOverlappingNodes(combinedExtents, nodes);
                 }
-                var dynamicSpatialMap = this.dynamicSpatialMap;
-                var visiblePortals = this.visiblePortals;
-                var numVisiblePortals = visiblePortals.length;
-                var np, portalItem, portalPlanes;
-                area = areas[areaIndex];
-                nodes = area.nodes;
-                area.addedDynamicNodes = true;
-                var areaExtent = area.extents;
-                var areaMinExtent0 = areaExtent[0];
-                var areaMinExtent1 = areaExtent[1];
-                var areaMinExtent2 = areaExtent[2];
-                var areaMaxExtent0 = areaExtent[3];
-                var areaMaxExtent1 = areaExtent[4];
-                var areaMaxExtent2 = areaExtent[5];
-                var combinedExtents = (this.float32ArrayConstructor ? new this.float32ArrayConstructor(6) : new Array(6));
-                combinedExtents[0] = (areaMinExtent0 < cameraMinExtent0 ? cameraMinExtent0 : areaMinExtent0);
-                combinedExtents[1] = (areaMinExtent1 < cameraMinExtent1 ? cameraMinExtent1 : areaMinExtent1);
-                combinedExtents[2] = (areaMinExtent2 < cameraMinExtent2 ? cameraMinExtent2 : areaMinExtent2);
-                combinedExtents[3] = (areaMaxExtent0 > cameraMaxExtent0 ? cameraMaxExtent0 : areaMaxExtent0);
-                combinedExtents[4] = (areaMaxExtent1 > cameraMaxExtent1 ? cameraMaxExtent1 : areaMaxExtent1);
-                combinedExtents[5] = (areaMaxExtent2 > cameraMaxExtent2 ? cameraMaxExtent2 : areaMaxExtent2);
-                dynamicSpatialMap.getOverlappingNodes(combinedExtents, nodes);
                 numNodes = nodes.length;
                 for(n = 0; n < numNodes; n += 1) {
                     node = nodes[n];
-                    node.queryCounter = queryCounter;
-                    if(!node.disabled && isInsidePlanesAABB(node.worldExtents, frustumPlanes)) {
-                        sceneProcessVisibleNode(node, frustumPlanes);
-                    }
-                }
-                for(np = 0; np < numVisiblePortals; np += 1) {
-                    portalItem = visiblePortals[np];
-                    portalPlanes = portalItem.planes;
-                    area = areas[portalItem.area];
-                    nodes = area.nodes;
-                    // Frustum tests do return some false positives, check bounding boxes
-                    areaExtent = area.extents;
-                    areaMinExtent0 = areaExtent[0];
-                    areaMinExtent1 = areaExtent[1];
-                    areaMinExtent2 = areaExtent[2];
-                    areaMaxExtent0 = areaExtent[3];
-                    areaMaxExtent1 = areaExtent[4];
-                    areaMaxExtent2 = areaExtent[5];
-                    if(cameraMaxExtent0 > areaMinExtent0 && cameraMaxExtent1 > areaMinExtent1 && cameraMaxExtent2 > areaMinExtent2 && areaMaxExtent0 > cameraMinExtent0 && areaMaxExtent1 > cameraMinExtent1 && areaMaxExtent2 > cameraMinExtent2) {
-                        if(!area.addedDynamicNodes) {
-                            area.addedDynamicNodes = true;
-                            combinedExtents[0] = (areaMinExtent0 < cameraMinExtent0 ? cameraMinExtent0 : areaMinExtent0);
-                            combinedExtents[1] = (areaMinExtent1 < cameraMinExtent1 ? cameraMinExtent1 : areaMinExtent1);
-                            combinedExtents[2] = (areaMinExtent2 < cameraMinExtent2 ? cameraMinExtent2 : areaMinExtent2);
-                            combinedExtents[3] = (areaMaxExtent0 > cameraMaxExtent0 ? cameraMaxExtent0 : areaMaxExtent0);
-                            combinedExtents[4] = (areaMaxExtent1 > cameraMaxExtent1 ? cameraMaxExtent1 : areaMaxExtent1);
-                            combinedExtents[5] = (areaMaxExtent2 > cameraMaxExtent2 ? cameraMaxExtent2 : areaMaxExtent2);
-                            dynamicSpatialMap.getOverlappingNodes(combinedExtents, nodes);
-                        }
-                        numNodes = nodes.length;
-                        for(n = 0; n < numNodes; n += 1) {
-                            node = nodes[n];
-                            if(node.queryCounter !== queryCounter) {
-                                if(node.disabled) {
-                                    node.queryCounter = queryCounter;
-                                } else if(isInsidePlanesAABB(node.worldExtents, portalPlanes)) {
-                                    sceneProcessVisibleNode(node, portalPlanes);
-                                }
-                            }
+                    if(node.queryCounter !== queryCounter) {
+                        if(node.disabled) {
+                            node.queryCounter = queryCounter;
+                        } else if(isInsidePlanesAABB(node.worldExtents, portalPlanes)) {
+                            sceneProcessVisibleNode(node, portalPlanes);
                         }
                     }
-                }
-                useAABBTrees = false;
-            }
-        }
-        if(useAABBTrees) {
-            var queryVisibleNodes = this.queryVisibleNodes;
-            if(queryVisibleNodes) {
-                queryVisibleNodes.length = 0;
-            } else {
-                this.queryVisibleNodes = queryVisibleNodes = [];
-            }
-            this.staticSpatialMap.getVisibleNodes(frustumPlanes, queryVisibleNodes);
-            this.dynamicSpatialMap.getVisibleNodes(frustumPlanes, queryVisibleNodes);
-            var numQueryVisibleNodes = queryVisibleNodes.length;
-            for(n = 0; n < numQueryVisibleNodes; n += 1) {
-                node = queryVisibleNodes[n];
-                if(!node.disabled) {
-                    sceneProcessVisibleNode(node, frustumPlanes);
                 }
             }
         }
         this.maxDistance = (maxDistance + camera.nearPlane);
         if(this.maxDistance < camera.farPlane) {
-            var oldNumVisibleRenderables = numVisibleRenderables;
-            var oldNumVisibleLights = numVisibleLights;
-            var renderable, lightInstance, extents;
-            // The camera extents may be different and some objects could be discarded
-            camera.getFrustumExtents(cameraExtents, this.maxDistance);
-            cameraMinExtent0 = cameraExtents[0];
-            cameraMinExtent1 = cameraExtents[1];
-            cameraMinExtent2 = cameraExtents[2];
-            cameraMaxExtent0 = cameraExtents[3];
-            cameraMaxExtent1 = cameraExtents[4];
-            cameraMaxExtent2 = cameraExtents[5];
+            this._filterVisibleNodesForCameraBox(camera, numVisibleNodes, numVisibleRenderables, numVisibleLights);
+        } else {
+            visibleRenderables.length = numVisibleRenderables;
+            visibleLights.length = numVisibleLights;
+            visibleNodes.length = numVisibleNodes;
+        }
+        return true;
+    };
+    Scene.prototype._filterVisibleNodesForCameraBox = //
+    // _filterVisibleNodesForCameraBox
+    //
+    function (camera, numVisibleNodes, numVisibleRenderables, numVisibleLights) {
+        var visibleNodes = this.visibleNodes;
+        var visibleRenderables = this.visibleRenderables;
+        var visibleLights = this.visibleLights;
+        var oldNumVisibleRenderables = numVisibleRenderables;
+        var oldNumVisibleLights = numVisibleLights;
+        // The camera extents may be different and some objects could be discarded
+        var cameraExtents = this.cameraExtents;
+        camera.getFrustumExtents(cameraExtents, this.maxDistance);
+        var cameraMinExtent0 = cameraExtents[0];
+        var cameraMinExtent1 = cameraExtents[1];
+        var cameraMinExtent2 = cameraExtents[2];
+        var cameraMaxExtent0 = cameraExtents[3];
+        var cameraMaxExtent1 = cameraExtents[4];
+        var cameraMaxExtent2 = cameraExtents[5];
+        var node, renderable, lightInstance, extents;
+        var n = 0;
+        while(n < numVisibleRenderables) {
+            renderable = visibleRenderables[n];
+            extents = renderable.getWorldExtents();
+            if(extents[0] > cameraMaxExtent0 || extents[1] > cameraMaxExtent1 || extents[2] > cameraMaxExtent2 || extents[3] < cameraMinExtent0 || extents[4] < cameraMinExtent1 || extents[5] < cameraMinExtent2) {
+                renderable.frameVisible -= 1;
+                numVisibleRenderables -= 1;
+                if(n < numVisibleRenderables) {
+                    visibleRenderables[n] = visibleRenderables[numVisibleRenderables];
+                } else {
+                    break;
+                }
+            } else {
+                n += 1;
+            }
+        }
+        n = 0;
+        while(n < numVisibleLights) {
+            lightInstance = visibleLights[n];
+            extents = lightInstance.getWorldExtents();
+            if(extents[0] > cameraMaxExtent0 || extents[1] > cameraMaxExtent1 || extents[2] > cameraMaxExtent2 || extents[3] < cameraMinExtent0 || extents[4] < cameraMinExtent1 || extents[5] < cameraMinExtent2) {
+                lightInstance.frameVisible -= 1;
+                numVisibleLights -= 1;
+                if(n < numVisibleLights) {
+                    visibleLights[n] = visibleLights[numVisibleLights];
+                } else {
+                    break;
+                }
+            } else {
+                n += 1;
+            }
+        }
+        if(oldNumVisibleRenderables !== numVisibleRenderables || oldNumVisibleLights !== numVisibleLights) {
             n = 0;
-            while(n < numVisibleRenderables) {
-                renderable = visibleRenderables[n];
-                extents = renderable.getWorldExtents();
+            while(n < numVisibleNodes) {
+                node = visibleNodes[n];
+                extents = node.worldExtents;
                 if(extents[0] > cameraMaxExtent0 || extents[1] > cameraMaxExtent1 || extents[2] > cameraMaxExtent2 || extents[3] < cameraMinExtent0 || extents[4] < cameraMinExtent1 || extents[5] < cameraMinExtent2) {
-                    renderable.frameVisible -= 1;
-                    numVisibleRenderables -= 1;
-                    if(n < numVisibleRenderables) {
-                        visibleRenderables[n] = visibleRenderables[numVisibleRenderables];
+                    node.frameVisible -= 1;
+                    numVisibleNodes -= 1;
+                    if(n < numVisibleNodes) {
+                        visibleNodes[n] = visibleNodes[numVisibleNodes];
                     } else {
                         break;
                     }
                 } else {
                     n += 1;
-                }
-            }
-            n = 0;
-            while(n < numVisibleLights) {
-                lightInstance = visibleLights[n];
-                extents = lightInstance.getWorldExtents();
-                if(extents[0] > cameraMaxExtent0 || extents[1] > cameraMaxExtent1 || extents[2] > cameraMaxExtent2 || extents[3] < cameraMinExtent0 || extents[4] < cameraMinExtent1 || extents[5] < cameraMinExtent2) {
-                    lightInstance.frameVisible -= 1;
-                    numVisibleLights -= 1;
-                    if(n < numVisibleLights) {
-                        visibleLights[n] = visibleLights[numVisibleLights];
-                    } else {
-                        break;
-                    }
-                } else {
-                    n += 1;
-                }
-            }
-            if(oldNumVisibleRenderables !== numVisibleRenderables || oldNumVisibleLights !== numVisibleLights) {
-                n = 0;
-                while(n < numVisibleNodes) {
-                    node = visibleNodes[n];
-                    extents = node.worldExtents;
-                    if(extents[0] > cameraMaxExtent0 || extents[1] > cameraMaxExtent1 || extents[2] > cameraMaxExtent2 || extents[3] < cameraMinExtent0 || extents[4] < cameraMinExtent1 || extents[5] < cameraMinExtent2) {
-                        node.frameVisible -= 1;
-                        numVisibleNodes -= 1;
-                        if(n < numVisibleNodes) {
-                            visibleNodes[n] = visibleNodes[numVisibleNodes];
-                        } else {
-                            break;
-                        }
-                    } else {
-                        n += 1;
-                    }
                 }
             }
         }
         visibleRenderables.length = numVisibleRenderables;
         visibleLights.length = numVisibleLights;
         visibleNodes.length = numVisibleNodes;
-        this.frameIndex += 1;
     };
     Scene.prototype.getCurrentVisibleNodes = //
     // getCurrentVisibleNodes
@@ -1605,29 +1776,30 @@ var Scene = (function () {
     function () {
         return this.visibleLights;
     };
+    Scene.prototype.addRootNodeToUpdate = //
+    // addRootNodeToUpdate
+    //
+    function (rootNode, name) {
+        var dirtyRoots = this.dirtyRoots;
+        if(dirtyRoots[name] !== rootNode) {
+            dirtyRoots[name] = rootNode;
+            this.nodesToUpdate.push(rootNode);
+        }
+    };
     Scene.prototype.updateNodes = //
     // updateNodes
     //
     function () {
-        var dirtyRoots = this.dirtyRoots;
-        if(dirtyRoots) {
-            var nodesToUpdate = this.nodesToUpdate;
-            if(!nodesToUpdate) {
-                this.nodesToUpdate = nodesToUpdate = [];
+        var nodesToUpdate = this.nodesToUpdate;
+        var numNodesToUpdate = nodesToUpdate.length;
+        if(0 < numNodesToUpdate) {
+            var dirtyRoots = this.dirtyRoots;
+            var n;
+            for(n = 0; n < numNodesToUpdate; n += 1) {
+                dirtyRoots[nodesToUpdate[n].name] = null;
             }
-            var numNodesToUpdate = 0;
-            for(var root in dirtyRoots) {
-                if(dirtyRoots.hasOwnProperty(root)) {
-                    nodesToUpdate[numNodesToUpdate] = dirtyRoots[root];
-                    numNodesToUpdate += 1;
-                }
-            }
-            this.dirtyRoots = null;
-            dirtyRoots = null;
-            if(0 < numNodesToUpdate) {
-                nodesToUpdate.length = numNodesToUpdate;
-                SceneNode.prototype.updateHelper(this.md, this, nodesToUpdate);
-            }
+            SceneNode.prototype.updateHelper(this.md, this, nodesToUpdate);
+            nodesToUpdate.length = 0;
         }
     };
     Scene.prototype.update = //
@@ -1706,7 +1878,7 @@ var Scene = (function () {
     //  getExtents
     //
     function () {
-        if(this.dirtyRoots) {
+        if(0 < this.nodesToUpdate.length) {
             this.updateNodes();
             this.staticSpatialMap.finalize();
             this.dynamicSpatialMap.finalize();
@@ -1883,9 +2055,11 @@ var Scene = (function () {
             }
         }
         this.rootNodes = [];
-        this.dirtyRoots = null;
         this.rootNodesMap = {
         };
+        this.dirtyRoots = {
+        };
+        this.nodesToUpdate = [];
     };
     Scene.prototype.clear = //
     // clear
@@ -2408,7 +2582,7 @@ var Scene = (function () {
                     if(inputs.hasOwnProperty(input)) {
                         // skip unknown semantics
                         if(gd['SEMANTIC_' + input] === undefined) {
-                            debug.log("Unknown semantic: " + input);
+                            /* debug.log("Unknown semantic: " + input); */
                             continue;
                         }
                         var fileInput = inputs[input];
@@ -2649,7 +2823,7 @@ var Scene = (function () {
                     verticesAsIndexLists = null;
                     indicesPerVertex = 1;
                 }
-                debug.assert(indicesPerVertex === 1);
+                /* debug.assert(indicesPerVertex === 1); */
                 totalNumVertices = vertexSources[0].data.length / vertexSources[0].stride;
                 var vertexBufferManager = (loadParams.vertexBufferManager || this.vertexBufferManager);
                 if(!vertexBufferManager) {
@@ -2761,6 +2935,7 @@ var Scene = (function () {
                                 destSurface.indexBuffer = indexBuffer;
                                 destSurface.numIndices = numIndices;
                                 destSurface.first = (indexBufferBaseIndex + indexBufferOffset);
+                                destSurface.numVertices = totalNumVertices;
                                 if(baseIndex) {
                                     for(t = 0; t < numIndices; t += 1) {
                                         indexBufferData[indexBufferOffset] = (baseIndex + faces[t]);
@@ -2814,14 +2989,13 @@ var Scene = (function () {
                             shape.vertexData = surface.vertexData;
                         }
                         shape.first = surface.first;
+                        shape.numVertices = surface.numVertices;
                         if(surface.indexBuffer) {
                             shape.indexBuffer = surface.indexBuffer;
                             shape.numIndices = surface.numIndices;
                             if(keepVertexData) {
                                 shape.indexData = surface.indexData;
                             }
-                        } else {
-                            shape.numVertices = surface.numVertices;
                         }
                     }
                     delete shape.surfaces;
@@ -3435,27 +3609,28 @@ var Scene = (function () {
             sceneCompleteLoadStage();
         }
     };
-    Scene.prototype.planeNormalize = function (a, b, c, d, output) {
-        if(!output) {
+    Scene.prototype.planeNormalize = function (a, b, c, d, dst) {
+        var res = dst;
+        if(!res) {
             /*jshint newcap: false*/
             var float32ArrayConstructor = Scene.prototype.float32ArrayConstructor;
-            output = (float32ArrayConstructor ? new float32ArrayConstructor(4) : new Array(4));
+            res = (float32ArrayConstructor ? new float32ArrayConstructor(4) : new Array(4));
             /*jshint newcap: true*/
                     }
         var lsq = ((a * a) + (b * b) + (c * c));
         if(lsq > 0.0) {
             var lr = 1.0 / Math.sqrt(lsq);
-            output[0] = (a * lr);
-            output[1] = (b * lr);
-            output[2] = (c * lr);
-            output[3] = (d * lr);
+            res[0] = (a * lr);
+            res[1] = (b * lr);
+            res[2] = (c * lr);
+            res[3] = (d * lr);
         } else {
-            output[0] = 0;
-            output[1] = 0;
-            output[2] = 0;
-            output[3] = 0;
+            res[0] = 0;
+            res[1] = 0;
+            res[2] = 0;
+            res[3] = 0;
         }
-        return output;
+        return res;
     };
     Scene.prototype.isInsidePlanesAABB = function (extents, planes) {
         var n0 = extents[0];
@@ -3834,20 +4009,7 @@ var Scene = (function () {
     };
     Scene.create = // Constructor function
     function create(mathDevice) {
-        var newScene = new Scene();
-        newScene.md = mathDevice;
-        newScene.clear();
-        newScene.onGeometryDestroyed = function sceneOnGeometryDestroyedFn(geometry) {
-            var scene = newScene;
-            geometry.reference.unsubscribeDestroyed(scene.onGeometryDestroyed);
-            delete scene.shapes[geometry.name];
-        };
-        newScene.onMaterialDestroyed = function sceneOnMaterialDestroyedFn(material) {
-            var scene = newScene;
-            material.reference.unsubscribeDestroyed(scene.onMaterialDestroyed);
-            delete scene.materials[material.name];
-        };
-        return newScene;
+        return new Scene(mathDevice);
     };
     return Scene;
 })();
