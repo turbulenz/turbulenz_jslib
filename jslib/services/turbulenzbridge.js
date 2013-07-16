@@ -38,7 +38,7 @@ var TurbulenzBridge = (function () {
             this.addListener = bridge.gameListenerOn || bridge.addListener || bridge.setListener;
             this.setListener = bridge.gameListenerOn || bridge.setListener;
         } else {
-            debug.log("No turbulenz services");
+            /* debug.log("No turbulenz services"); */
         }
         if(typeof TurbulenzServices !== 'undefined') {
             TurbulenzServices.addBridgeEvents();

@@ -261,34 +261,34 @@ var Physics2DConstraint = (function () {
     function Physics2DConstraint() { }
     Physics2DConstraint.prototype._inWorld = // Abstract methods to be overridden by subclasses
     function () {
-        debug.abort("abstact method");
+        /* debug.abort("abstact method"); */
     };
     Physics2DConstraint.prototype._outWorld = function () {
-        debug.abort("abstact method");
+        /* debug.abort("abstact method"); */
     };
     Physics2DConstraint.prototype._pairExists = function (b1, b2) {
-        debug.abort("abstact method");
+        /* debug.abort("abstact method"); */
         return false;
     };
     Physics2DConstraint.prototype._wakeConnected = function () {
-        debug.abort("abstact method");
+        /* debug.abort("abstact method"); */
     };
     Physics2DConstraint.prototype._sleepComputation = function (union) {
-        debug.abort("abstact method");
+        /* debug.abort("abstact method"); */
     };
     Physics2DConstraint.prototype._preStep = function (deltaTime) {
-        debug.abort("abstact method");
+        /* debug.abort("abstact method"); */
         return false;
     };
     Physics2DConstraint.prototype._warmStart = function () {
-        debug.abort("abstact method");
+        /* debug.abort("abstact method"); */
     };
     Physics2DConstraint.prototype._iterateVel = function () {
-        debug.abort("abstact method");
+        /* debug.abort("abstact method"); */
         return false;
     };
     Physics2DConstraint.prototype._iteratePos = function () {
-        debug.abort("abstact method");
+        /* debug.abort("abstact method"); */
         return false;
     };
     Physics2DConstraint.prototype.init = function (con, params) {
@@ -3765,11 +3765,11 @@ var Physics2DShape = (function () {
     // };
     // Abstract methods (have to have a body unfortunately)
     function () {
-        debug.abort("abstract method");
+        /* debug.abort("abstract method"); */
         return 0;
     };
     Physics2DShape.prototype.computeMasslessInertia = function () {
-        debug.abort("abstract method");
+        /* debug.abort("abstract method"); */
         return 0;
     };
     Physics2DShape.prototype.translate = // floatArray
@@ -3777,13 +3777,13 @@ var Physics2DShape = (function () {
     //     debug.abort("abstract method"); return 0;
     // };
     function (translation, skip) {
-        debug.abort("abstract method");
+        /* debug.abort("abstract method"); */
     };
     Physics2DShape.prototype._update = function (posX, posY, cos, sin, skipAABB) {
-        debug.abort("abstract method");
+        /* debug.abort("abstract method"); */
     };
     Physics2DShape.prototype.clone = function () {
-        debug.abort("abstract method");
+        /* debug.abort("abstract method"); */
         return undefined;
     };
     Physics2DShape.prototype.getGroup = // Methods

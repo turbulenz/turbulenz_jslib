@@ -313,7 +313,7 @@ var DataShare = (function () {
     };
     DataShare.create = function create(requestHandler, gameSession, params, errorCallbackFn) {
         if(!TurbulenzServices.available()) {
-            debug.log("dataShareCreateFn: !! TurbulenzServices not available");
+            /* debug.log("dataShareCreateFn: !! TurbulenzServices not available"); */
             // Call error callback on a timeout to get the same behaviour as the ajax call
             TurbulenzEngine.setTimeout(function () {
                 if(errorCallbackFn) {
@@ -413,7 +413,7 @@ var DataShareManager = (function () {
     };
     DataShareManager.create = function create(requestHandler, gameSession, errorCallbackFn) {
         if(!TurbulenzServices.available()) {
-            debug.log("dataShareManagerCreateFn: !! TurbulenzServices not available");
+            /* debug.log("dataShareManagerCreateFn: !! TurbulenzServices not available"); */
             // Call error callback on a timeout to get the same behaviour as the ajax call
             if(errorCallbackFn) {
                 TurbulenzEngine.setTimeout(function () {

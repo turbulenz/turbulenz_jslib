@@ -356,32 +356,27 @@ var TurbulenzServices = (function () {
         if(!errorCallbackFn) {
             errorCallbackFn = TurbulenzServices.defaultErrorCallback;
         }
+        // defaultErrorCallback should never be null, so this should
+        // hold.
+        /* debug.assert(errorCallbackFn, "no error callback"); */
         if(!TurbulenzServices.available()) {
-            if(errorCallbackFn) {
-                errorCallbackFn("TurbulenzServices.sendCustomMetricEvent failed: Service not available", 0);
-            }
+            errorCallbackFn("TurbulenzServices.sendCustomMetricEvent " + "failed: Service not available", 0);
             return;
         }
         // Validation
         if(('string' !== typeof eventKey) || (0 === eventKey.length)) {
-            if(errorCallbackFn) {
-                errorCallbackFn("TurbulenzServices.sendCustomMetricEvent failed: Event key must be a non-empty string", 0);
-            }
+            errorCallbackFn("TurbulenzServices.sendCustomMetricEvent " + "failed: Event key must be a non-empty string", 0);
             return;
         }
         if('number' !== typeof eventValue || isNaN(eventValue) || !isFinite(eventValue)) {
             if('[object Array]' !== Object.prototype.toString.call(eventValue)) {
-                if(errorCallbackFn) {
-                    errorCallbackFn("TurbulenzServices.sendCustomMetricEvent failed: Event value must be a number or" + " an array of numbers", 0);
-                }
+                errorCallbackFn("TurbulenzServices.sendCustomMetricEvent " + "failed: Event value must be a number or " + "an array of numbers", 0);
                 return;
             }
             var i, valuesLength = eventValue.length;
             for(i = 0; i < valuesLength; i += 1) {
                 if('number' !== typeof eventValue[i] || isNaN(eventValue[i]) || !isFinite(eventValue[i])) {
-                    if(errorCallbackFn) {
-                        errorCallbackFn("TurbulenzServices.sendCustomMetricEvent failed: Event value array elements" + " must be numbers", 0);
-                    }
+                    errorCallbackFn("TurbulenzServices.sendCustomMetricEvent " + "failed: Event value array elements must " + "be numbers", 0);
                     return;
                 }
             }
@@ -395,8 +390,8 @@ var TurbulenzServices = (function () {
                 'gameSessionId': gameSession.gameSessionId
             },
             callback: function sendCustomMetricEventAjaxErrorCheck(jsonResponse, status) {
-                if(status !== 200 && errorCallbackFn) {
-                    errorCallbackFn("TurbulenzServices.sendCustomMetricEvent error with HTTP status " + status + ": " + jsonResponse.msg, status);
+                if(status !== 200) {
+                    errorCallbackFn("TurbulenzServices.sendCustomMetricEvent " + "error with HTTP status " + status + ": " + jsonResponse.msg, status);
                 }
             },
             requestHandler: requestHandler,
@@ -583,5 +578,5 @@ var TurbulenzServices = (function () {
 if(typeof TurbulenzBridge !== 'undefined') {
     TurbulenzServices.addBridgeEvents();
 } else {
-    debug.log("No TurbulenzBridge object");
+    /* debug.log("No TurbulenzBridge object"); */
 }

@@ -26,7 +26,7 @@ var PhysicsManager = (function () {
                         continue;
                     }
                     if(target.parent) {
-                        debug.abort("Rigid bodies with parent nodes are unsupported");
+                        /* debug.abort("Rigid bodies with parent nodes are unsupported"); */
                         //Not really possible, since the child can become inactive (frozen) and therefore it will
                         /*var parentWorld = target.parent.getWorldTransform();
                         var inverseParent = mathsDevice.m43Inverse(parentWorld);

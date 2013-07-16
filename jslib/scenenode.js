@@ -5,10 +5,30 @@
 // SceneNode
 //
 var SceneNode = (function () {
-    function SceneNode() { }
-    SceneNode.version = 1;
-    SceneNode.makePath = // on prototype
     //
+    // SceneNode
+    //
+    function SceneNode(params) {
+        this.name = params.name;
+        var md = TurbulenzEngine.getMathDevice();
+        this.mathDevice = md;
+        this.dynamic = params.dynamic || false;
+        this.disabled = params.disabled || false;
+        this.dirtyWorldExtents = true;
+        this.dirtyLocalExtents = true;
+        this.worldUpdate = 0//Counter of number of times modified.
+        ;
+        var local = params.local;
+        if(local) {
+            this.local = md.m43Copy(local);
+        } else {
+            this.local = md.m43BuildIdentity();
+        }
+        local = this.local;
+        this.world = md.m43Copy(local);
+    }
+    SceneNode.version = 1;
+    SceneNode.makePath = //
     //SceneNode.makePath
     //
     function makePath(parentPath, childName) {
@@ -18,7 +38,7 @@ var SceneNode = (function () {
     //SceneNode.invalidSetLocalTransform
     //
     function invalidSetLocalTransform() {
-        debug.abort("setLocalTransform can not be called on static nodes.");
+        /* debug.abort("setLocalTransform can not be called on static nodes."); */
     };
     SceneNode.prototype.getName = //
     //getName
@@ -49,7 +69,7 @@ var SceneNode = (function () {
         this.parent = parent;
         this.notifiedParent = false;
         this.dirtyWorld = false;
-        this.setDirtyWorldTransform();
+        this._setDirtyWorldTransform();
     };
     SceneNode.prototype.addChild = //
     //addChild
@@ -96,7 +116,7 @@ var SceneNode = (function () {
                 }
             }
         }
-        debug.abort("Invalid child");
+        /* debug.abort("Invalid child"); */
     };
     SceneNode.prototype.findChild = //
     //findChild
@@ -203,70 +223,8 @@ var SceneNode = (function () {
         if(matrix !== this.local) {
             this.local = this.mathDevice.m43Copy(matrix, this.local);
         }
-        //inlined non-recursive setDirtyWorldTransform()
-        var setDirtyWorldTransformHelper = function setDirtyWorldTransformHelperFn(nodes) {
-            var numRemainingNodes = nodes.length;
-            var node, index, child;
-            do {
-                numRemainingNodes -= 1;
-                node = nodes[numRemainingNodes];
-                node.dirtyWorld = true;
-                if(!node.customWorldExtents && node.localExtents) {
-                    node.dirtyWorldExtents = true;
-                }
-                var children = node.children;
-                if(children) {
-                    var numChildren = children.length;
-                    if(!node.childNeedsUpdateCount) {
-                        // Common case of propagating down to clean children
-                        node.childNeedsUpdateCount = numChildren;
-                        for(index = 0; index < numChildren; index += 1) {
-                            child = children[index];
-                            child.notifiedParent = true;
-                            nodes[numRemainingNodes] = child;
-                            numRemainingNodes += 1;
-                        }
-                    } else {
-                        // One or more children dirty
-                        for(index = 0; index < numChildren; index += 1) {
-                            child = children[index];
-                            if(!child.dirtyWorld) {
-                                if(!child.notifiedParent) {
-                                    child.notifiedParent = true;
-                                    node.childNeedsUpdateCount += 1;
-                                }
-                                nodes[numRemainingNodes] = child;
-                                numRemainingNodes += 1;
-                            }
-                        }
-                    }
-                }
-            }while(0 < numRemainingNodes);
-        };
         if(!this.dirtyWorld) {
-            //inlined updateRequired()
-            var parent = this.parent;
-            if(parent) {
-                if(!this.notifiedParent) {
-                    this.notifiedParent = true;
-                    parent.childNeedsUpdate();
-                }
-            } else {
-                //Root nodes
-                var scene = this.scene;
-                if(scene) {
-                    var dirtyRoots = scene.dirtyRoots;
-                    if(!dirtyRoots) {
-                        dirtyRoots = {
-                        };
-                        scene.dirtyRoots = dirtyRoots;
-                    }
-                    dirtyRoots[this.name] = this;
-                }
-            }
-            setDirtyWorldTransformHelper([
-                this
-            ]);
+            this._setDirtyWorldTransform();
         }
     };
     SceneNode.prototype.getLocalTransform = //
@@ -275,31 +233,50 @@ var SceneNode = (function () {
     function () {
         return this.local;
     };
-    SceneNode.prototype.setDirtyWorldTransform = //
-    //setDirtyWorldTransform
+    SceneNode.prototype._setDirtyWorldTransform = //
+    //_setDirtyWorldTransform
     //
     function () {
-        //private function
-        if(this.dirtyWorld) {
-            return;
-        }
-        var setDirtyWorldTransformHelper = function setDirtyWorldTransformHelperFn() {
-            this.dirtyWorld = true;
-            if(!this.customWorldExtents && this.localExtents) {
-                this.dirtyWorldExtents = true;
+        //Private function
+        //Notify parents
+        //inlined updateRequired()
+        var parent = this.parent;
+        if(parent) {
+            if(!this.notifiedParent) {
+                this.notifiedParent = true;
+                parent.childNeedsUpdate();
             }
-            var children = this.children;
+        } else {
+            //Root nodes
+            var scene = this.scene;
+            if(scene) {
+                scene.addRootNodeToUpdate(this, this.name);
+            }
+        }
+        //Notify children
+        var nodes = [
+            this
+        ];
+        var numRemainingNodes = nodes.length;
+        var node, index, child;
+        do {
+            numRemainingNodes -= 1;
+            node = nodes[numRemainingNodes];
+            node.dirtyWorld = true;
+            if(!node.customWorldExtents && node.localExtents) {
+                node.dirtyWorldExtents = true;
+            }
+            var children = node.children;
             if(children) {
                 var numChildren = children.length;
-                var index;
-                var child;
-                if(!this.childNeedsUpdateCount) {
+                if(!node.childNeedsUpdateCount) {
                     // Common case of propagating down to clean children
-                    this.childNeedsUpdateCount = numChildren;
+                    node.childNeedsUpdateCount = numChildren;
                     for(index = 0; index < numChildren; index += 1) {
                         child = children[index];
                         child.notifiedParent = true;
-                        setDirtyWorldTransformHelper.call(child);
+                        nodes[numRemainingNodes] = child;
+                        numRemainingNodes += 1;
                     }
                 } else {
                     // One or more children dirty
@@ -308,32 +285,15 @@ var SceneNode = (function () {
                         if(!child.dirtyWorld) {
                             if(!child.notifiedParent) {
                                 child.notifiedParent = true;
-                                this.childNeedsUpdateCount += 1;
+                                node.childNeedsUpdateCount += 1;
                             }
-                            setDirtyWorldTransformHelper.call(child);
+                            nodes[numRemainingNodes] = child;
+                            numRemainingNodes += 1;
                         }
                     }
                 }
             }
-        };
-        //inlined updateRequired()
-        if(this.parent) {
-            if(!this.notifiedParent) {
-                this.parent.childNeedsUpdate();
-                this.notifiedParent = true;
-            }
-        } else {
-            //Root nodes
-            var scene = this.scene;
-            if(scene) {
-                if(!scene.dirtyRoots) {
-                    scene.dirtyRoots = {
-                    };
-                }
-                scene.dirtyRoots[this.name] = this;
-            }
-        }
-        setDirtyWorldTransformHelper.call(this);
+        }while(0 < numRemainingNodes);
     };
     SceneNode.prototype.getWorldTransform = //
     //getWorldTransform
@@ -426,14 +386,14 @@ var SceneNode = (function () {
         if(disabled) {
             this.disabled = true;
         } else {
-            delete this.disabled;
+            this.disabled = false;
         }
     };
     SceneNode.prototype.getDisabled = //
     //getDisabled
     //
     function () {
-        return this.disabled ? true : false;
+        return this.disabled;
     };
     SceneNode.prototype.enableHierarchy = //
     //enableHierarchy
@@ -487,13 +447,7 @@ var SceneNode = (function () {
             //Root nodes
             var scene = this.scene;
             if(scene) {
-                var dirtyRoots = scene.dirtyRoots;
-                if(!dirtyRoots) {
-                    dirtyRoots = {
-                    };
-                    scene.dirtyRoots = dirtyRoots;
-                }
-                dirtyRoots[this.name] = this;
+                scene.addRootNodeToUpdate(this, this.name);
             }
         }
     };
@@ -548,107 +502,9 @@ var SceneNode = (function () {
                         node.updateLocalExtents();
                     }
                     if(node.numCustomRenderableWorldExtents) {
-                        var renderable, extents, minX, minY, minZ, maxX, maxY, maxZ;
-                        var renderables = node.renderables;
-                        var numRenderables = renderables.length;
-                        var empty = true;
-                        for(index = 0; index < numRenderables; index += 1) {
-                            renderable = renderables[index];
-                            extents = renderable.getCustomWorldExtents();
-                            if(extents) {
-                                minX = extents[0];
-                                minY = extents[1];
-                                minZ = extents[2];
-                                maxX = extents[3];
-                                maxY = extents[4];
-                                maxZ = extents[5];
-                                index += 1;
-                                empty = false;
-                                break;
-                            }
-                        }
-                        for(; index < numRenderables; index += 1) {
-                            renderable = renderables[index];
-                            extents = renderable.getCustomWorldExtents();
-                            if(extents) {
-                                if(minX > extents[0]) {
-                                    minX = extents[0];
-                                }
-                                if(minY > extents[1]) {
-                                    minY = extents[1];
-                                }
-                                if(minZ > extents[2]) {
-                                    minZ = extents[2];
-                                }
-                                if(maxX < extents[3]) {
-                                    maxX = extents[3];
-                                }
-                                if(maxY < extents[4]) {
-                                    maxY = extents[4];
-                                }
-                                if(maxZ < extents[5]) {
-                                    maxZ = extents[5];
-                                }
-                            }
-                        }
-                        if(empty) {
-                            // This should not happen...
-                            delete node.worldExtents;
-                        } else {
-                            worldExtents = node.worldExtents;
-                            if(!worldExtents) {
-                                worldExtents = new node.arrayConstructor(6);
-                                node.worldExtents = worldExtents;
-                            }
-                            worldExtents[0] = minX;
-                            worldExtents[1] = minY;
-                            worldExtents[2] = minZ;
-                            worldExtents[3] = maxX;
-                            worldExtents[4] = maxY;
-                            worldExtents[5] = maxZ;
-                        }
+                        node.updateCustomRenderableWorldExtents();
                     } else if(node.localExtents) {
-                        //get center and half extents
-                        var localExtentsCenter = node.localExtentsCenter;
-                        var localHalfExtents = node.localHalfExtents;
-                        var c0 = localExtentsCenter[0];
-                        var c1 = localExtentsCenter[1];
-                        var c2 = localExtentsCenter[2];
-                        var h0 = localHalfExtents[0];
-                        var h1 = localHalfExtents[1];
-                        var h2 = localHalfExtents[2];
-                        var world = node.world;
-                        var m0 = world[0];
-                        var m1 = world[1];
-                        var m2 = world[2];
-                        var m3 = world[3];
-                        var m4 = world[4];
-                        var m5 = world[5];
-                        var m6 = world[6];
-                        var m7 = world[7];
-                        var m8 = world[8];
-                        var ct0 = world[9];
-                        var ct1 = world[10];
-                        var ct2 = world[11];
-                        if(c0 !== 0 || c1 !== 0 || c2 !== 0) {
-                            ct0 += (m0 * c0 + m3 * c1 + m6 * c2);
-                            ct1 += (m1 * c0 + m4 * c1 + m7 * c2);
-                            ct2 += (m2 * c0 + m5 * c1 + m8 * c2);
-                        }
-                        var ht0 = ((m0 < 0 ? -m0 : m0) * h0 + (m3 < 0 ? -m3 : m3) * h1 + (m6 < 0 ? -m6 : m6) * h2);
-                        var ht1 = ((m1 < 0 ? -m1 : m1) * h0 + (m4 < 0 ? -m4 : m4) * h1 + (m7 < 0 ? -m7 : m7) * h2);
-                        var ht2 = ((m2 < 0 ? -m2 : m2) * h0 + (m5 < 0 ? -m5 : m5) * h1 + (m8 < 0 ? -m8 : m8) * h2);
-                        worldExtents = node.worldExtents;
-                        if(!worldExtents) {
-                            worldExtents = new node.arrayConstructor(6);
-                            node.worldExtents = worldExtents;
-                        }
-                        worldExtents[0] = (ct0 - ht0);
-                        worldExtents[1] = (ct1 - ht1);
-                        worldExtents[2] = (ct2 - ht2);
-                        worldExtents[3] = (ct0 + ht0);
-                        worldExtents[4] = (ct1 + ht1);
-                        worldExtents[5] = (ct2 + ht2);
+                        node.recalculateWorldExtents();
                     } else {
                         //no object with size so no extents.
                         delete node.worldExtents;
@@ -839,109 +695,10 @@ var SceneNode = (function () {
                 if(this.dirtyLocalExtents) {
                     this.updateLocalExtents();
                 }
-                var worldExtents;
                 if(this.numCustomRenderableWorldExtents) {
-                    var index, renderable, extents, minX, minY, minZ, maxX, maxY, maxZ;
-                    var renderables = this.renderables;
-                    var numRenderables = renderables.length;
-                    var empty = true;
-                    for(index = 0; index < numRenderables; index += 1) {
-                        renderable = renderables[index];
-                        extents = renderable.getCustomWorldExtents();
-                        if(extents) {
-                            minX = extents[0];
-                            minY = extents[1];
-                            minZ = extents[2];
-                            maxX = extents[3];
-                            maxY = extents[4];
-                            maxZ = extents[5];
-                            index += 1;
-                            empty = false;
-                            break;
-                        }
-                    }
-                    for(; index < numRenderables; index += 1) {
-                        renderable = renderables[index];
-                        extents = renderable.getCustomWorldExtents();
-                        if(extents) {
-                            if(minX > extents[0]) {
-                                minX = extents[0];
-                            }
-                            if(minY > extents[1]) {
-                                minY = extents[1];
-                            }
-                            if(minZ > extents[2]) {
-                                minZ = extents[2];
-                            }
-                            if(maxX < extents[3]) {
-                                maxX = extents[3];
-                            }
-                            if(maxY < extents[4]) {
-                                maxY = extents[4];
-                            }
-                            if(maxZ < extents[5]) {
-                                maxZ = extents[5];
-                            }
-                        }
-                    }
-                    if(empty) {
-                        // This should not happen...
-                        delete this.worldExtents;
-                    } else {
-                        worldExtents = this.worldExtents;
-                        if(!worldExtents) {
-                            worldExtents = new this.arrayConstructor(6);
-                            this.worldExtents = worldExtents;
-                        }
-                        worldExtents[0] = minX;
-                        worldExtents[1] = minY;
-                        worldExtents[2] = minZ;
-                        worldExtents[3] = maxX;
-                        worldExtents[4] = maxY;
-                        worldExtents[5] = maxZ;
-                    }
+                    this.updateCustomRenderableWorldExtents();
                 } else if(this.localExtents) {
-                    //get center and half extents
-                    var localExtentsCenter = this.localExtentsCenter;
-                    var localHalfExtents = this.localHalfExtents;
-                    var c0 = localExtentsCenter[0];
-                    var c1 = localExtentsCenter[1];
-                    var c2 = localExtentsCenter[2];
-                    var h0 = localHalfExtents[0];
-                    var h1 = localHalfExtents[1];
-                    var h2 = localHalfExtents[2];
-                    var world = this.world;
-                    var m0 = world[0];
-                    var m1 = world[1];
-                    var m2 = world[2];
-                    var m3 = world[3];
-                    var m4 = world[4];
-                    var m5 = world[5];
-                    var m6 = world[6];
-                    var m7 = world[7];
-                    var m8 = world[8];
-                    var ct0 = world[9];
-                    var ct1 = world[10];
-                    var ct2 = world[11];
-                    if(c0 !== 0 || c1 !== 0 || c2 !== 0) {
-                        ct0 += (m0 * c0 + m3 * c1 + m6 * c2);
-                        ct1 += (m1 * c0 + m4 * c1 + m7 * c2);
-                        ct2 += (m2 * c0 + m5 * c1 + m8 * c2);
-                    }
-                    var ht0 = ((m0 < 0 ? -m0 : m0) * h0 + (m3 < 0 ? -m3 : m3) * h1 + (m6 < 0 ? -m6 : m6) * h2);
-                    var ht1 = ((m1 < 0 ? -m1 : m1) * h0 + (m4 < 0 ? -m4 : m4) * h1 + (m7 < 0 ? -m7 : m7) * h2);
-                    var ht2 = ((m2 < 0 ? -m2 : m2) * h0 + (m5 < 0 ? -m5 : m5) * h1 + (m8 < 0 ? -m8 : m8) * h2);
-                    worldExtents = this.worldExtents;
-                    if(!worldExtents) {
-                        worldExtents = new this.arrayConstructor(6);
-                        this.worldExtents = worldExtents;
-                    }
-                    worldExtents[0] = (ct0 - ht0);
-                    worldExtents[1] = (ct1 - ht1);
-                    worldExtents[2] = (ct2 - ht2);
-                    worldExtents[3] = (ct0 + ht0);
-                    worldExtents[4] = (ct1 + ht1);
-                    worldExtents[5] = (ct2 + ht2);
+                    this.recalculateWorldExtents();
                 } else {
                     //no object with size so no extents.
                     delete this.worldExtents;
@@ -951,6 +708,115 @@ var SceneNode = (function () {
             this.worldExtentsUpdate = true;
             this.checkUpdateRequired();
         }
+    };
+    SceneNode.prototype.updateCustomRenderableWorldExtents = //
+    //updateCustomRenderableWorldExtents
+    //
+    function () {
+        var index, renderable, extents, minX, minY, minZ, maxX, maxY, maxZ;
+        var renderables = this.renderables;
+        var numRenderables = renderables.length;
+        var empty = true;
+        for(index = 0; index < numRenderables; index += 1) {
+            renderable = renderables[index];
+            extents = renderable.getCustomWorldExtents();
+            if(extents) {
+                minX = extents[0];
+                minY = extents[1];
+                minZ = extents[2];
+                maxX = extents[3];
+                maxY = extents[4];
+                maxZ = extents[5];
+                index += 1;
+                empty = false;
+                break;
+            }
+        }
+        for(; index < numRenderables; index += 1) {
+            renderable = renderables[index];
+            extents = renderable.getCustomWorldExtents();
+            if(extents) {
+                if(minX > extents[0]) {
+                    minX = extents[0];
+                }
+                if(minY > extents[1]) {
+                    minY = extents[1];
+                }
+                if(minZ > extents[2]) {
+                    minZ = extents[2];
+                }
+                if(maxX < extents[3]) {
+                    maxX = extents[3];
+                }
+                if(maxY < extents[4]) {
+                    maxY = extents[4];
+                }
+                if(maxZ < extents[5]) {
+                    maxZ = extents[5];
+                }
+            }
+        }
+        if(empty) {
+            // This should not happen...
+            delete this.worldExtents;
+        } else {
+            var worldExtents = this.worldExtents;
+            if(!worldExtents) {
+                worldExtents = new this.arrayConstructor(6);
+                this.worldExtents = worldExtents;
+            }
+            worldExtents[0] = minX;
+            worldExtents[1] = minY;
+            worldExtents[2] = minZ;
+            worldExtents[3] = maxX;
+            worldExtents[4] = maxY;
+            worldExtents[5] = maxZ;
+        }
+    };
+    SceneNode.prototype.recalculateWorldExtents = //
+    //recalculateWorldExtents
+    //
+    function () {
+        var localExtentsCenter = this.localExtentsCenter;
+        var localHalfExtents = this.localHalfExtents;
+        var c0 = localExtentsCenter[0];
+        var c1 = localExtentsCenter[1];
+        var c2 = localExtentsCenter[2];
+        var h0 = localHalfExtents[0];
+        var h1 = localHalfExtents[1];
+        var h2 = localHalfExtents[2];
+        var world = this.world;
+        var m0 = world[0];
+        var m1 = world[1];
+        var m2 = world[2];
+        var m3 = world[3];
+        var m4 = world[4];
+        var m5 = world[5];
+        var m6 = world[6];
+        var m7 = world[7];
+        var m8 = world[8];
+        var ct0 = world[9];
+        var ct1 = world[10];
+        var ct2 = world[11];
+        if(c0 !== 0 || c1 !== 0 || c2 !== 0) {
+            ct0 += (m0 * c0 + m3 * c1 + m6 * c2);
+            ct1 += (m1 * c0 + m4 * c1 + m7 * c2);
+            ct2 += (m2 * c0 + m5 * c1 + m8 * c2);
+        }
+        var ht0 = ((m0 < 0 ? -m0 : m0) * h0 + (m3 < 0 ? -m3 : m3) * h1 + (m6 < 0 ? -m6 : m6) * h2);
+        var ht1 = ((m1 < 0 ? -m1 : m1) * h0 + (m4 < 0 ? -m4 : m4) * h1 + (m7 < 0 ? -m7 : m7) * h2);
+        var ht2 = ((m2 < 0 ? -m2 : m2) * h0 + (m5 < 0 ? -m5 : m5) * h1 + (m8 < 0 ? -m8 : m8) * h2);
+        var worldExtents = this.worldExtents;
+        if(!worldExtents) {
+            worldExtents = new this.arrayConstructor(6);
+            this.worldExtents = worldExtents;
+        }
+        worldExtents[0] = (ct0 - ht0);
+        worldExtents[1] = (ct1 - ht1);
+        worldExtents[2] = (ct2 - ht2);
+        worldExtents[3] = (ct0 + ht0);
+        worldExtents[4] = (ct1 + ht1);
+        worldExtents[5] = (ct2 + ht2);
     };
     SceneNode.prototype.getWorldExtents = //
     //getWorldExtents
@@ -1137,7 +1003,7 @@ var SceneNode = (function () {
                 return;
             }
         }
-        debug.abort("Invalid renderable");
+        /* debug.abort("Invalid renderable"); */
     };
     SceneNode.prototype.hasRenderables = //
     //hasRenderables
@@ -1191,7 +1057,7 @@ var SceneNode = (function () {
                 return;
             }
         }
-        debug.abort("Invalid light");
+        /* debug.abort("Invalid light"); */
     };
     SceneNode.prototype.hasLightInstances = //
     //hasLightInstances
@@ -1204,7 +1070,7 @@ var SceneNode = (function () {
     //
     function () {
         //Should only be called when parent is null
-        debug.assert(!this.parent, "SceneNode should be remove from parent before destroy is called");
+        /* debug.assert(!this.parent, "SceneNode should be remove from parent before destroy is called"); */
         if(this.destroyedObserver) {
             this.destroyedObserver.notify({
                 node: this
@@ -1269,29 +1135,7 @@ var SceneNode = (function () {
     //SceneNode.create
     //
     function create(params) {
-        var sceneNode = new SceneNode();
-        sceneNode.name = params.name;
-        var md = TurbulenzEngine.getMathDevice();
-        sceneNode.mathDevice = md;
-        if(params.dynamic) {
-            sceneNode.dynamic = params.dynamic;
-        }
-        if(params.disabled) {
-            sceneNode.disabled = params.disabled;
-        }
-        sceneNode.dirtyWorldExtents = true;
-        sceneNode.dirtyLocalExtents = true;
-        sceneNode.worldUpdate = 0//Counter of number of times modified.
-        ;
-        var local = params.local;
-        if(local) {
-            sceneNode.local = md.m43Copy(local);
-        } else {
-            sceneNode.local = md.m43BuildIdentity();
-        }
-        local = sceneNode.local;
-        sceneNode.world = md.m43Copy(local);
-        return sceneNode;
+        return new SceneNode(params);
     };
     return SceneNode;
 })();

@@ -67,7 +67,7 @@ var Effect = (function () {
         if(prepareObject) {
             prepareObject.prepare(renderable);
         } else {
-            debug.abort("Unsupported or missing geometryType");
+            /* debug.abort("Unsupported or missing geometryType"); */
         }
     };
     return Effect;
@@ -87,7 +87,7 @@ var EffectManager = (function () {
         return effectManager;
     };
     EffectManager.prototype.add = function (effect) {
-        debug.assert(this.effects[effect.name] === undefined);
+        /* debug.assert(this.effects[effect.name] === undefined); */
         this.effects[effect.name] = effect;
     };
     EffectManager.prototype.remove = function (name) {

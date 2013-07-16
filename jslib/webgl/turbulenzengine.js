@@ -524,9 +524,9 @@ var WebGLTurbulenzEngine = (function () {
             }
             if(looksLikeNetbook()) {
                 systemInfo.platformProfile = "tablet";
-                if(debug) {
+                /* if(debug) {
                     debug.log("Setting platformProfile to 'tablet'");
-                }
+                } */
             }
         } else {
             osIndex = userAgent.indexOf('Mac OS X');
@@ -550,9 +550,9 @@ var WebGLTurbulenzEngine = (function () {
                     }
                     if(looksLikeNetbook()) {
                         systemInfo.platformProfile = "tablet";
-                        if(debug) {
+                        /* if(debug) {
                             debug.log("Setting platformProfile to 'tablet'");
-                        }
+                        } */
                     }
                 } else {
                     osIndex = userAgent.indexOf('Android');

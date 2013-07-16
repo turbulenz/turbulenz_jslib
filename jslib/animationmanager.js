@@ -6,28 +6,28 @@ var AnimationManager = (function () {
     AnimationManager.version = 1;
     AnimationManager.prototype.loadFile = // Methods
     function (path, callback) {
-        debug.abort("abstract method");
+        /* debug.abort("abstract method"); */
     };
     AnimationManager.prototype.loadData = function (data, prefix) {
-        debug.abort("abstract method");
+        /* debug.abort("abstract method"); */
     };
     AnimationManager.prototype.get = function (name) {
-        debug.abort("abstract method");
+        /* debug.abort("abstract method"); */
         return null;
     };
     AnimationManager.prototype.remove = function (name) {
-        debug.abort("abstract method");
+        /* debug.abort("abstract method"); */
     };
     AnimationManager.prototype.nodeHasSkeleton = function (node) {
-        debug.abort("abstract method");
+        /* debug.abort("abstract method"); */
         return null;
     };
     AnimationManager.prototype.getAll = function () {
-        debug.abort("abstract method");
+        /* debug.abort("abstract method"); */
         return null;
     };
     AnimationManager.prototype.setPathRemapping = function (prm, assetUrl) {
-        debug.abort("abstract method");
+        /* debug.abort("abstract method"); */
     };
     AnimationManager.create = function create(errorCallback, log) {
         if(!errorCallback) {

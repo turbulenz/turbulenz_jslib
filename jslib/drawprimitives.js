@@ -54,7 +54,7 @@ var DrawPrimitives = (function () {
         this.rectTexPrimitive = gd.PRIMITIVE_TRIANGLE_STRIP;
         this.rectTexPositions = gd.createVertexBuffer(this.rectTexPositionsParameters);
         this.rectTexSemantics = gd.createSemantics(this.rectTexSemanticsParameters);
-        debug.assert((this.boxPositions && this.rectPositions && this.rectTexPositions), "Buffers not created.");
+        /* debug.assert((this.boxPositions && this.rectPositions && this.rectTexPositions), "Buffers not created."); */
         if(this.boxPositions && this.rectPositions && this.rectTexPositions) {
             var that = this;
             var fileName = shaderPath + this.shaderName;

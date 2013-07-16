@@ -51,7 +51,7 @@ var debug = {
         throw msg;
     },
     abort: function debugAbortFn(msg) {
-        debug.reportAssert(msg);
+        /* debug.reportAssert(msg); */
     },
     assert: // Basic assertion that a condition is true.
     function debugAssertFn(condition, msg) {
@@ -60,7 +60,7 @@ var debug = {
                 msg = "Unlabelled assert";
             }
             // TODO : Grab information about the caller?
-            debug.reportAssert(msg);
+            /* debug.reportAssert(msg); */
         }
     },
     log: function debugAssertLogFn(msg) {

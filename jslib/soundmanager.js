@@ -20,7 +20,7 @@ var SoundManager = (function () {
     function SoundManager() { }
     SoundManager.version = 1;
     SoundManager.prototype.get = function (path) {
-        debug.abort("this method should be overridden");
+        /* debug.abort("this method should be overridden"); */
         return {
         };
     };
