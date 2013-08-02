@@ -7240,6 +7240,7 @@ var Physics2DWorld = (function () {
         rect[2] = (x1 < x2 ? x2 : x1);
         rect[3] = (y1 < y2 ? y2 : y1);
         var callback = this._rayCast;
+        callback.minShape = null;
         callback.ray = ray;
         callback.noInner = (noInnerSurfaces || false);
         callback.minFactor = ray.maxFactor;
