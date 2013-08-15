@@ -1,5 +1,5 @@
 #!/usr/bin/env make
-engine=../engine.turbulenz
+engine?=../engine.turbulenz
 
 jslib=$(patsubst $(engine)/%,%,$(wildcard $(engine)/jslib/*.js))
 webgl=$(patsubst $(engine)/%,%,$(wildcard $(engine)/jslib/webgl/*.js))
