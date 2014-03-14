@@ -1,16 +1,13 @@
-/* This file was generated from TypeScript source tslib/posteffects.ts */
-
-
-
+// Copyright (c) 2009-2011 Turbulenz Limited
 //
 // PostEffects
 //
 var PostEffects = (function () {
-    function PostEffects() { }
-    PostEffects.version = 1;
+    function PostEffects() {
+    }
     PostEffects.prototype.updateShader = function (sm) {
         var shader = sm.get("shaders/posteffects.cgfx");
-        if(shader !== this.shader) {
+        if (shader !== this.shader) {
             this.shader = shader;
             this.bicolor.technique = shader.getTechnique("bicolor");
             this.copy.technique = shader.getTechnique("copy");
@@ -20,10 +17,11 @@ var PostEffects = (function () {
             this.blend.technique = shader.getTechnique("blend");
         }
     };
+
     PostEffects.prototype.getEffectSetupCB = function (name) {
         var effect = this[name];
-        if(effect) {
-            if(!effect.callback) {
+        if (effect) {
+            if (!effect.callback) {
                 effect.callback = function postFXSetupFn(gd, colorTexture) {
                     gd.setTechnique(effect.technique);
                     effect.techniqueParameters[effect.textureName] = colorTexture;
@@ -35,35 +33,32 @@ var PostEffects = (function () {
             return undefined;
         }
     };
+
     PostEffects.prototype.destroy = function () {
-        for(var p in this) {
-            if(this.hasOwnProperty(p)) {
+        for (var p in this) {
+            if (this.hasOwnProperty(p)) {
                 delete this[p];
             }
         }
     };
+
     PostEffects.create = // Constructor function
-    function create(gd, sm) {
+    function (gd, sm) {
         var pe = new PostEffects();
+
         sm.load("shaders/posteffects.cgfx");
+
         pe.bicolor = {
             technique: null,
             techniqueParameters: gd.createTechniqueParameters({
-                color0: [
-                    0, 
-                    0, 
-                    0
-                ],
-                color1: [
-                    1, 
-                    1, 
-                    1
-                ],
+                color0: [0, 0, 0],
+                color1: [1, 1, 1],
                 colorTexture: null
             }),
             callback: null,
             textureName: 'colorTexture'
         };
+
         pe.copy = {
             technique: null,
             techniqueParameters: gd.createTechniqueParameters({
@@ -72,6 +67,7 @@ var PostEffects = (function () {
             callback: null,
             textureName: 'colorTexture'
         };
+
         pe.copyFiltered = {
             technique: null,
             techniqueParameters: gd.createTechniqueParameters({
@@ -80,34 +76,27 @@ var PostEffects = (function () {
             callback: null,
             textureName: 'colorTextureFiltered'
         };
+
         pe.fadein = {
             technique: null,
             techniqueParameters: gd.createTechniqueParameters({
-                fadeColor: [
-                    0, 
-                    0, 
-                    0, 
-                    0
-                ],
+                fadeColor: [0, 0, 0, 0],
                 colorTexture: null
             }),
             callback: null,
             textureName: 'colorTexture'
         };
+
         pe.modulate = {
             technique: null,
             techniqueParameters: gd.createTechniqueParameters({
-                modulateColor: [
-                    1, 
-                    1, 
-                    1, 
-                    1
-                ],
+                modulateColor: [1, 1, 1, 1],
                 colorTexture: null
             }),
             callback: null,
             textureName: 'colorTexture'
         };
+
         pe.blend = {
             technique: null,
             techniqueParameters: gd.createTechniqueParameters({
@@ -117,8 +106,9 @@ var PostEffects = (function () {
             callback: null,
             textureName: 'colorTexture'
         };
+
         return pe;
     };
+    PostEffects.version = 1;
     return PostEffects;
 })();
-

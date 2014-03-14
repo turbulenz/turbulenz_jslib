@@ -1,36 +1,33 @@
-/* This file was generated from TypeScript source tslib/utilities.ts */
-
-
+// Copyright (c) 2010-2013 Turbulenz Limited
+;
 var Utilities = {
-    skipAsserts: //
+    //
     // assert
     //
-    false,
+    skipAsserts: false,
     assert: function assertFn(test, message) {
-        if(!test) {
-            if(!this.skipAsserts) {
-                this.breakInDebugger.doesNotExist()//Use a function that does not exist. This is caught in the debuggers.
-                ;
+        if (!test) {
+            if (!this.skipAsserts) {
+                this.breakInDebugger.doesNotExist();
             }
         }
     },
-    beget: //
+    //
     // beget
     //
-    function begetFn(o) {
+    beget: function begetFn(o) {
         var F = function () {
         };
         F.prototype = o;
         return new F();
     },
-    log: //
+    //
     // log
     //
-    function logFn(a, b) {
+    log: function logFn(a, b) {
         var console = window.console;
-        if(console) {
-            // "console.log.apply" will crash when using the plugin on Chrome...
-            switch(arguments.length) {
+        if (console) {
+            switch (arguments.length) {
                 case 1:
                     console.log(arguments[0]);
                     break;
@@ -69,37 +66,42 @@ var Utilities = {
         num = num | (num >>> 16);
         return (num + 1);
     },
-    ajax: //
+    //
     // ajax
     //
-    function utilitiesAjaxFn(params) {
+    ajax: function utilitiesAjaxFn(params) {
         // parameters
         var requestText = "";
         var method = params.method;
-        var data = params.data || {
-        };
+        var data = params.data || {};
         var encrypted = params.encrypt;
         var signature = null;
         var url = params.url;
         var requestHandler = params.requestHandler;
         var callbackFn = params.callback;
-        if(encrypted) {
+
+        if (encrypted) {
             data.requestUrl = url;
+
             var str = JSON.stringify(data);
-            if(method === "POST") {
+
+            if (method === "POST") {
                 str = TurbulenzEngine.encrypt(str);
             }
+
             requestText += "data=" + encodeURIComponent(str) + "&";
+
             requestText += "gameSessionId=" + encodeURIComponent(data.gameSessionId);
+
             signature = TurbulenzEngine.generateSignature(str);
-        } else if(data) {
+        } else if (data) {
             var key;
-            for(key in data) {
-                if(data.hasOwnProperty(key)) {
-                    if(requestText.length !== 0) {
+            for (key in data) {
+                if (data.hasOwnProperty(key)) {
+                    if (requestText.length !== 0) {
                         requestText += "&";
                     }
-                    if(method === "POST") {
+                    if (method === "POST") {
                         requestText += key + "=" + data[key];
                     } else {
                         requestText += encodeURIComponent(key) + "=" + encodeURIComponent(data[key]);
@@ -107,94 +109,100 @@ var Utilities = {
                 }
             }
         }
+
         var httpResponseCallback = function httpResponseCallbackFn(xhrResponseText, xhrStatus) {
             // break circular reference
             var xhr = this.xhr;
             this.xhr.onreadystatechange = null;
             this.xhr = null;
+
             var response;
+
             response = JSON.parse(xhrResponseText);
-            if(encrypted) {
+            if (encrypted) {
                 var sig = xhr.getResponseHeader("X-TZ-Signature");
                 var validSignature = TurbulenzEngine.verifySignature(xhrResponseText, sig);
                 xhrResponseText = null;
+
                 TurbulenzEngine.setTimeout(function () {
                     var receivedUrl = response.requestUrl;
-                    if(validSignature) {
-                        if(!TurbulenzEngine.encryptionEnabled || receivedUrl === url) {
+
+                    if (validSignature) {
+                        if (!TurbulenzEngine.encryptionEnabled || receivedUrl === url) {
                             callbackFn(response, xhrStatus);
                             callbackFn = null;
                             return;
                         }
                     }
-                    // If it was a server-side verification fail then pass through the actual message
-                    if(xhrStatus === 400) {
+
+                    if (xhrStatus === 400) {
                         callbackFn(response, xhrStatus, "Verification Failed");
                     } else {
                         // Else drop reply
-                        callbackFn({
-                            msg: "Verification failed",
-                            ok: false
-                        }, 400, "Verification Failed");
+                        callbackFn({ msg: "Verification failed", ok: false }, 400, "Verification Failed");
                     }
                     callbackFn = null;
                 }, 0);
             } else {
                 xhrResponseText = null;
+
                 TurbulenzEngine.setTimeout(function () {
                     callbackFn(response, xhrStatus);
                     callbackFn = null;
                 }, 0);
             }
         };
+
         var httpRequest = function httpRequestFn(url, onload, callContext) {
             var xhr;
-            if(window.XMLHttpRequest) {
+            if (window.XMLHttpRequest) {
                 xhr = new window.XMLHttpRequest();
-            } else if(window.ActiveXObject) {
+            } else if (window.ActiveXObject) {
                 xhr = new window.ActiveXObject("Microsoft.XMLHTTP");
             } else {
-                if(params.error) {
+                if (params.error) {
                     params.error("No XMLHTTPRequest object could be created");
                 }
                 return;
             }
             callContext.xhr = xhr;
+
             var httpCallback = function httpCallbackFn() {
-                if(xhr.readyState === 4 && TurbulenzEngine && !TurbulenzEngine.isUnloading())/* 4 == complete */
-                 {
+                if (xhr.readyState === 4 && TurbulenzEngine && !TurbulenzEngine.isUnloading()) {
                     var xhrResponseText = xhr.responseText;
                     var xhrStatus = xhr.status;
+
                     // Checking xhrStatusText when xhrStatus is 0 causes a silent error!
                     var xhrStatusText = (xhrStatus !== 0 && xhr.statusText) || "No connection or cross domain request";
-                    // Sometimes the browser sets status to 200 OK when the connection is closed
-                    // before the message is sent (weird!).
-                    // In order to address this we fail any completely empty responses.
-                    // Hopefully, nobody will get a valid response with no headers and no body!
-                    if(xhr.getAllResponseHeaders() === "" && xhrResponseText === "" && xhrStatus === 200 && xhrStatusText === 'OK') {
+
+                    if (xhr.getAllResponseHeaders() === "" && xhrResponseText === "" && xhrStatus === 200 && xhrStatusText === 'OK') {
                         onload('', 0);
                         return;
                     }
+
                     onload.call(callContext, xhrResponseText, xhrStatus);
                 }
             };
+
             // Send request
             xhr.open(method, ((requestText && (method !== "POST")) ? url + "?" + requestText : url), true);
-            if(callbackFn) {
+            if (callbackFn) {
                 xhr.onreadystatechange = httpCallback;
             }
-            if(signature) {
+
+            if (signature) {
                 xhr.setRequestHeader("X-TZ-Signature", signature);
             }
-            if(method === "POST") {
+
+            if (method === "POST") {
                 xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
                 xhr.send(requestText);
-            } else// method === 'GET'
-             {
+            } else {
                 xhr.send();
             }
         };
-        if(requestHandler) {
+
+        if (requestHandler) {
             requestHandler.request({
                 src: url,
                 requestFn: httpRequest,
@@ -208,11 +216,11 @@ var Utilities = {
             httpRequest(url, httpResponseCallback, callContext);
         }
     },
-    ajaxStatusCodes: //
+    //
     // ajaxStatusCodes
     //
     // http://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html#sec6.1
-    {
+    ajaxStatusCodes: {
         0: "No Connection, Timeout Or Cross Domain Request",
         100: "Continue",
         101: "Switching Protocols",
@@ -258,55 +266,39 @@ var Utilities = {
         505: "HTTP Version not supported"
     }
 };
+
 var MathDeviceConvert = {
     v2ToArray: function v2ToJavaScriptArrayFn(v2) {
-        return [
-            v2[0], 
-            v2[1]
-        ];
+        return [v2[0], v2[1]];
     },
     arrayToV2: function arrayToV2Fn(mathDevice, v2Array, v2Dest) {
         return mathDevice.v2Build(v2Array[0], v2Array[1], v2Dest);
     },
     v3ToArray: function v3ToJavaScriptArrayFn(v3) {
-        return [
-            v3[0], 
-            v3[1], 
-            v3[2]
-        ];
+        return [v3[0], v3[1], v3[2]];
     },
     arrayToV3: function arrayToV3Fn(mathDevice, v3Array, v3Dest) {
         return mathDevice.v3Build(v3Array[0], v3Array[1], v3Array[2], v3Dest);
     },
     v4ToArray: function v4ToJavaScriptArrayFn(v4) {
-        return [
-            v4[0], 
-            v4[1], 
-            v4[2], 
-            v4[3]
-        ];
+        return [v4[0], v4[1], v4[2], v4[3]];
     },
     arrayToV4: function arrayToV4Fn(mathDevice, v4Array, v4Dest) {
         return mathDevice.v4Build(v4Array[0], v4Array[1], v4Array[2], v4Array[3], v4Dest);
     },
     quatToArray: function quatToJavaScriptArrayFn(quat) {
-        return [
-            quat[0], 
-            quat[1], 
-            quat[2], 
-            quat[3]
-        ];
+        return [quat[0], quat[1], quat[2], quat[3]];
     },
     arrayToQuat: function arrayToQuatFn(mathDevice, quatArray, quatDest) {
         return mathDevice.quatBuild(quatArray[0], quatArray[1], quatArray[2], quatArray[3], quatDest);
     },
     aabbToArray: function aabbToJavaScriptArrayFn(aabb) {
         return [
-            aabb[0], 
-            aabb[1], 
-            aabb[2], 
-            aabb[3], 
-            aabb[4], 
+            aabb[0],
+            aabb[1],
+            aabb[2],
+            aabb[3],
+            aabb[4],
             aabb[5]
         ];
     },
@@ -315,12 +307,12 @@ var MathDeviceConvert = {
     },
     quatPosToArray: function quatPosToJavaScriptArrayFn(quatPos) {
         return [
-            quatPos[0], 
-            quatPos[1], 
-            quatPos[2], 
-            quatPos[3], 
-            quatPos[4], 
-            quatPos[5], 
+            quatPos[0],
+            quatPos[1],
+            quatPos[2],
+            quatPos[3],
+            quatPos[4],
+            quatPos[5],
             quatPos[6]
         ];
     },
@@ -329,14 +321,14 @@ var MathDeviceConvert = {
     },
     m33ToArray: function m33ToJavaScriptArrayFn(m33) {
         return [
-            m33[0], 
-            m33[1], 
-            m33[2], 
-            m33[3], 
-            m33[4], 
-            m33[5], 
-            m33[6], 
-            m33[7], 
+            m33[0],
+            m33[1],
+            m33[2],
+            m33[3],
+            m33[4],
+            m33[5],
+            m33[6],
+            m33[7],
             m33[8]
         ];
     },
@@ -345,17 +337,17 @@ var MathDeviceConvert = {
     },
     m43ToArray: function m43ToJavaScriptArrayFn(m43) {
         return [
-            m43[0], 
-            m43[1], 
-            m43[2], 
-            m43[3], 
-            m43[4], 
-            m43[5], 
-            m43[6], 
-            m43[7], 
-            m43[8], 
-            m43[9], 
-            m43[10], 
+            m43[0],
+            m43[1],
+            m43[2],
+            m43[3],
+            m43[4],
+            m43[5],
+            m43[6],
+            m43[7],
+            m43[8],
+            m43[9],
+            m43[10],
             m43[11]
         ];
     },
@@ -364,37 +356,37 @@ var MathDeviceConvert = {
     },
     m34ToArray: function m34ToJavaScriptArrayFn(m34) {
         return [
-            m34[0], 
-            m34[1], 
-            m34[2], 
-            m34[3], 
-            m34[4], 
-            m34[5], 
-            m34[6], 
-            m34[7], 
-            m34[8], 
-            m34[9], 
-            m34[10], 
+            m34[0],
+            m34[1],
+            m34[2],
+            m34[3],
+            m34[4],
+            m34[5],
+            m34[6],
+            m34[7],
+            m34[8],
+            m34[9],
+            m34[10],
             m34[11]
         ];
     },
     m44ToArray: function m44ToJavaScriptArrayFn(m44) {
         return [
-            m44[0], 
-            m44[1], 
-            m44[2], 
-            m44[3], 
-            m44[4], 
-            m44[5], 
-            m44[6], 
-            m44[7], 
-            m44[8], 
-            m44[9], 
-            m44[10], 
-            m44[11], 
-            m44[12], 
-            m44[13], 
-            m44[14], 
+            m44[0],
+            m44[1],
+            m44[2],
+            m44[3],
+            m44[4],
+            m44[5],
+            m44[6],
+            m44[7],
+            m44[8],
+            m44[9],
+            m44[10],
+            m44[11],
+            m44[12],
+            m44[13],
+            m44[14],
             m44[15]
         ];
     },
@@ -402,56 +394,62 @@ var MathDeviceConvert = {
         return mathDevice.m44Build(m44Array[0], m44Array[1], m44Array[2], m44Array[3], m44Array[4], m44Array[5], m44Array[6], m44Array[7], m44Array[8], m44Array[9], m44Array[10], m44Array[11], m44Array[12], m44Array[13], m44Array[14], m44Array[15], m44Dest);
     }
 };
+
 //
 //Reference
 //
 // Proxy reference class allowing weak reference to the object
 var Reference = (function () {
-    function Reference() { }
-    Reference.version = 1;
-    Reference.prototype.add = //
+    function Reference() {
+    }
+    //
     // add
     //
-    function () {
+    Reference.prototype.add = function () {
         this.referenceCount += 1;
     };
-    Reference.prototype.remove = //
+
+    //
     // remove
     //
-    function () {
+    Reference.prototype.remove = function () {
         this.referenceCount -= 1;
-        if(this.referenceCount === 0) {
-            if(this.destroyedObserver) {
+        if (this.referenceCount === 0) {
+            if (this.destroyedObserver) {
                 this.destroyedObserver.notify(this.object);
             }
             this.object.destroy();
             this.object = null;
         }
     };
-    Reference.prototype.subscribeDestroyed = //
+
+    //
     //subscribeDestroyed
     //
-    function (observerFunction) {
-        if(!this.destroyedObserver) {
+    Reference.prototype.subscribeDestroyed = function (observerFunction) {
+        if (!this.destroyedObserver) {
             this.destroyedObserver = Observer.create();
         }
         this.destroyedObserver.subscribe(observerFunction);
     };
-    Reference.prototype.unsubscribeDestroyed = //
+
+    //
     //unsubscribeDestroyed
     //
-    function (observerFunction) {
+    Reference.prototype.unsubscribeDestroyed = function (observerFunction) {
         this.destroyedObserver.unsubscribe(observerFunction);
     };
+
     Reference.create = //
     // create
     //
-    function create(object) {
+    function (object) {
         var result = new Reference();
         result.object = object;
         result.referenceCount = 0;
         return result;
     };
+    Reference.version = 1;
     return Reference;
 })();
 
@@ -459,100 +457,90 @@ var Reference = (function () {
 // Profile
 //
 var Profile = {
-    profiles: {
-    },
-    sortMode: {
-        alphabetical: 0,
-        duration: 1,
-        max: 2,
-        min: 3,
-        calls: 4
-    },
-    start: //
+    profiles: {},
+    sortMode: { alphabetical: 0, duration: 1, max: 2, min: 3, calls: 4 },
+    //
     // start
     //
-    function profileStartFn(name) {
+    start: function profileStartFn(name) {
         var data = this.profiles[name];
-        if(!data) {
-            data = {
-                name: name,
-                calls: 0,
-                duration: 0.0,
-                min: Number.MAX_VALUE,
-                max: 0.0,
-                sumOfSquares: 0.0
-            };
+        if (!data) {
+            data = { name: name, calls: 0, duration: 0.0, min: Number.MAX_VALUE, max: 0.0, sumOfSquares: 0.0 };
             this.profiles[name] = data;
         }
         data.start = TurbulenzEngine.time;
     },
-    stop: //
+    //
     // stop
     //
-    function profileStopFn(name) {
+    stop: function profileStopFn(name) {
         var end = TurbulenzEngine.time;
         var data = this.profiles[name];
-        if(data) {
+        if (data) {
             var duration = end - data.start;
             data.duration += duration;
             data.calls += 1;
             data.sumOfSquares += duration * duration;
-            if(duration > data.max) {
+
+            if (duration > data.max) {
                 data.max = duration;
             }
-            if(duration < data.min) {
+
+            if (duration < data.min) {
                 data.min = duration;
             }
         }
     },
-    reset: //
+    //
     // reset
     //
-    function profileResetFn() {
-        this.profiles = {
-        };
+    reset: function profileResetFn() {
+        this.profiles = {};
     },
-    getReport: //
+    //
     // getReport
     //
-    function profileGetReportFn(sortMode, format) {
+    getReport: function profileGetReportFn(sortMode, format) {
         var dataArray = [];
         var data;
         var maxDuration = 0.0;
         var name;
-        for(name in this.profiles) {
-            if(this.profiles.hasOwnProperty(name)) {
+        for (name in this.profiles) {
+            if (this.profiles.hasOwnProperty(name)) {
                 data = this.profiles[name];
-                if(maxDuration < data.duration) {
+                if (maxDuration < data.duration) {
                     maxDuration = data.duration;
                 }
                 dataArray.push(data);
             }
         }
+
         var compareFunction;
-        if(sortMode === Profile.sortMode.alphabetical) {
+
+        if (sortMode === Profile.sortMode.alphabetical) {
             compareFunction = function compareName(left, right) {
                 return (left.name < right.name) ? -1 : (left.name > right.name) ? 1 : 0;
             };
-        } else if(sortMode === Profile.sortMode.max) {
+        } else if (sortMode === Profile.sortMode.max) {
             compareFunction = function compareMax(left, right) {
                 return right.max - left.max;
             };
-        } else if(sortMode === Profile.sortMode.min) {
+        } else if (sortMode === Profile.sortMode.min) {
             compareFunction = function compareMin(left, right) {
                 return right.min - left.min;
             };
-        } else if(sortMode === Profile.sortMode.calls) {
+        } else if (sortMode === Profile.sortMode.calls) {
             compareFunction = function compareCalls(left, right) {
                 return right.calls - left.calls;
             };
-        } else// Profile.sortMode.duration or undefined
-         {
+        } else {
             compareFunction = function compareDuration(left, right) {
                 return right.duration - left.duration;
             };
         }
+
         dataArray.sort(compareFunction);
+
         var line;
         var text = "";
         var precision = format ? format.precision : 8;
@@ -562,7 +550,7 @@ var Profile = {
         var standardDeviation;
         var mean;
         var index;
-        for(index = 0; index < length; index += 1) {
+        for (index = 0; index < length; index += 1) {
             data = dataArray[index];
             line = data.name;
             line += seperator + data.calls;
@@ -579,35 +567,39 @@ var Profile = {
         return text;
     }
 };
-var JSProfiling = {
-};
+
+;
+
+var JSProfiling = {};
+
 //
 // createArray
 //      Creates an array of nodes by merging all duplicate function references in the call profile tree together.
 JSProfiling.createArray = function JSProfilingCreateArrayFn(rootNode) {
-    var map = {
-    };
+    var map = {};
     var array = [];
-    if(rootNode.head) {
-        rootNode = rootNode.head// Chrome native profiler.
-        ;
+
+    if (rootNode.head) {
+        rootNode = rootNode.head;
     }
+
     var processNode = function processNodeFn(node) {
         var urlObject = map[node.url];
-        if(!urlObject) {
-            urlObject = {
-            };
+        if (!urlObject) {
+            urlObject = {};
             map[node.url] = urlObject;
         }
+
         var functionName = node.functionName === "" ? "(anonymous)" : node.functionName;
+
         var functionObject = urlObject[functionName];
-        if(!functionObject) {
-            functionObject = {
-            };
+        if (!functionObject) {
+            functionObject = {};
             urlObject[functionName] = functionObject;
         }
+
         var existingNode = functionObject[node.lineNumber];
-        if(!existingNode) {
+        if (!existingNode) {
             var newNode = {
                 functionName: functionName,
                 numberOfCalls: node.numberOfCalls,
@@ -616,6 +608,7 @@ JSProfiling.createArray = function JSProfilingCreateArrayFn(rootNode) {
                 url: node.url,
                 lineNumber: node.lineNumber
             };
+
             array[array.length] = newNode;
             functionObject[node.lineNumber] = newNode;
         } else {
@@ -623,32 +616,39 @@ JSProfiling.createArray = function JSProfilingCreateArrayFn(rootNode) {
             existingNode.selfTime += node.selfTime;
             existingNode.numberOfCalls += node.numberOfCalls;
         }
+
         var children = typeof node.children === 'function' ? node.children() : node.children;
-        if(children) {
+        if (children) {
             var numberOfChildren = children.length;
             var childIndex;
-            for(childIndex = 0; childIndex < numberOfChildren; childIndex += 1) {
+            for (childIndex = 0; childIndex < numberOfChildren; childIndex += 1) {
                 processNode(children[childIndex]);
             }
         }
     };
+
     processNode(rootNode);
+
     return array;
 };
+
 //
 // sort
 //
 JSProfiling.sort = function JSProfilingSortFn(array, propertyName, descending) {
-    if(!propertyName) {
+    if (!propertyName) {
         propertyName = "totalTime";
     }
+
     var sorterAscending = function (left, right) {
         return left[propertyName] - right[propertyName];
     };
+
     var sorterDescending = function (left, right) {
         return right[propertyName] - left[propertyName];
     };
-    if(descending === false) {
+
+    if (descending === false) {
         array.sort(sorterAscending);
     } else {
         array.sort(sorterDescending);

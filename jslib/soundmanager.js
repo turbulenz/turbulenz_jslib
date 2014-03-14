@@ -1,14 +1,9 @@
-/* This file was generated from TypeScript source tslib/soundmanager.ts */
-
 // Copyright (c) 2009-2012 Turbulenz Limited
 /*global Observer: false*/
 /*global TurbulenzEngine: false*/
-/// <reference path="turbulenz.d.ts" />
-/// <reference path="debug.ts" />
-/// <reference path="requesthandler.ts" />
-/// <reference path="observer.ts" />
 "use strict";
-
+;
+;
 
 /**
 @class  Sound manager
@@ -17,52 +12,60 @@
 @since TurbulenzEngine 0.1.0
 */
 var SoundManager = (function () {
-    function SoundManager() { }
-    SoundManager.version = 1;
+    function SoundManager() {
+    }
     SoundManager.prototype.get = function (path) {
         /* debug.abort("this method should be overridden"); */
-        return {
-        };
+        return {};
     };
+
     SoundManager.beep = /**
     Generates beep sound data
     @return {array} returns an Array of numbers with the sample data
     */
-    function beep(amplitude, frequency, wavefrequency, length) {
+    function (amplitude, frequency, wavefrequency, length) {
         var sin = Math.sin;
         var twoPI = (2.0 * Math.PI);
         var dphi = (twoPI * wavefrequency / frequency);
         var numSamples = (frequency * length);
         var data, phase, value;
-        if(typeof Float32Array !== "undefined") {
+
+        if (typeof Float32Array !== "undefined") {
             data = new Float32Array(numSamples);
         } else {
             data = new Array(numSamples);
         }
+
         phase = 0;
-        for(var k = 0; k < numSamples; k += 1) {
+        for (var k = 0; k < numSamples; k += 1) {
             value = (sin(phase) * amplitude);
+
             phase += dphi;
-            if(phase >= twoPI) {
+            if (phase >= twoPI) {
                 phase -= twoPI;
             }
+
             data[k] = value;
         }
+
         return data;
     };
+
     SoundManager.create = /**
     @constructs Constructs a SoundManager object.
     
     @return {SoundManager} object, null if failed
     */
-    function create(sd, rh, ds, errorCallback, log) {
-        if(!errorCallback) {
-            errorCallback = function () {
-                /* e */             };
+    function (sd, rh, ds, errorCallback, log) {
+        if (!errorCallback) {
+            errorCallback = function (/* e */ ) {
+            };
         }
+
         var defaultSoundName = "default";
+
         var defaultSound;
-        if(ds) {
+        if (ds) {
             defaultSound = ds;
         } else {
             var soundParams = {
@@ -74,20 +77,21 @@ var SoundManager = (function () {
                     defaultSound = s;
                 }
             };
-            if(!sd.createSound(soundParams)) {
+
+            if (!sd.createSound(soundParams)) {
                 errorCallback("Default sound not created.");
             }
         }
-        var sounds = {
-        };
-        var loadingSound = {
-        };
-        var loadedObservers = {
-        };
+
+        var sounds = {};
+        var loadingSound = {};
+        var loadedObservers = {};
         var numLoadingSounds = 0;
         var pathRemapping = null;
         var pathPrefix = "";
+
         sounds[defaultSoundName] = defaultSound;
+
         /**
         Loads a sound
         
@@ -97,24 +101,26 @@ var SoundManager = (function () {
         @name load
         
         @param {string} path Path to the sound file
-        @param {bool} uncompress Uncompress the sound for faster playback
+        @param {boolean} uncompress Uncompress the sound for faster playback
         @param {function()} onSoundLoaded function called once the sound has loaded
         
         @return {Sound} object, returns the default sound if the file at given path is not yet loaded
         */
         var loadSound = function loadSoundFn(path, uncompress, onSoundLoaded) {
             var sound = sounds[path];
-            if(!sound) {
-                if(!loadingSound[path]) {
+            if (!sound) {
+                if (!loadingSound[path]) {
                     loadingSound[path] = true;
                     numLoadingSounds += 1;
+
                     var observer = Observer.create();
                     loadedObservers[path] = observer;
-                    if(onSoundLoaded) {
+                    if (onSoundLoaded) {
                         observer.subscribe(onSoundLoaded);
                     }
+
                     var soundLoaded = function soundLoadedFn(sound/*, status */ ) {
-                        if(sound) {
+                        if (sound) {
                             sounds[path] = sound;
                             observer.notify(sound);
                             delete loadedObservers[path];
@@ -124,26 +130,29 @@ var SoundManager = (function () {
                         delete loadingSound[path];
                         numLoadingSounds -= 1;
                     };
+
                     var requestSound = function requestSoundFn(url, onload/*, callContext */ ) {
                         var sound = sd.createSound({
                             src: url,
                             uncompress: uncompress,
                             onload: onload
                         });
-                        if(!sound) {
+                        if (!sound) {
                             errorCallback("Sound '" + path + "' not created.");
                         }
                     };
+
                     rh.request({
                         src: ((pathRemapping && pathRemapping[path]) || (pathPrefix + path)),
                         requestFn: requestSound,
                         onload: soundLoaded
                     });
-                } else if(onSoundLoaded) {
+                } else if (onSoundLoaded) {
                     loadedObservers[path].subscribe(onSoundLoaded);
                 }
+
                 return defaultSound;
-            } else if(onSoundLoaded) {
+            } else if (onSoundLoaded) {
                 // the callback should always be called asynchronously
                 TurbulenzEngine.setTimeout(function soundAlreadyLoadedFn() {
                     onSoundLoaded(sound);
@@ -151,6 +160,7 @@ var SoundManager = (function () {
             }
             return sound;
         };
+
         /**
         Alias one sound to another name
         
@@ -165,6 +175,7 @@ var SoundManager = (function () {
         var mapSound = function mapSoundFn(dst, src) {
             sounds[dst] = sounds[src];
         };
+
         /**
         Get sound created from a given sound file or with the given name
         
@@ -179,11 +190,12 @@ var SoundManager = (function () {
         */
         var getSound = function getSoundFn(path) {
             var sound = sounds[path];
-            if(!sound) {
+            if (!sound) {
                 return defaultSound;
             }
             return sound;
         };
+
         /**
         Removes a sound from the manager
         
@@ -195,10 +207,11 @@ var SoundManager = (function () {
         @param {string} path Path or name of the sound
         */
         var removeSound = function removeSoundFn(path) {
-            if(typeof sounds[path] !== 'undefined') {
+            if (typeof sounds[path] !== 'undefined') {
                 delete sounds[path];
             }
         };
+
         /**
         Reloads a sound
         
@@ -213,24 +226,30 @@ var SoundManager = (function () {
             removeSound(path);
             loadSound(path);
         };
+
         var sm = new SoundManager();
-        if(log) {
+
+        if (log) {
             sm.load = function loadSoundLogFn(path, uncompress) {
                 log.innerHTML += "SoundManager.load:&nbsp;'" + path + "'";
                 return loadSound(path, uncompress);
             };
+
             sm.map = function mapSoundLogFn(dst, src) {
                 log.innerHTML += "SoundManager.map:&nbsp;'" + src + "' -> '" + dst + "'";
                 mapSound(dst, src);
             };
+
             sm.get = function getSoundLogFn(path) {
                 log.innerHTML += "SoundManager.get:&nbsp;'" + path + "'";
                 return getSound(path);
             };
+
             sm.remove = function removeSoundLogFn(path) {
                 log.innerHTML += "SoundManager.remove:&nbsp;'" + path + "'";
                 removeSound(path);
             };
+
             sm.reload = function reloadSoundLogFn(path) {
                 log.innerHTML += "SoundManager. reload:&nbsp;'" + path + "'";
                 reloadSound(path);
@@ -242,6 +261,7 @@ var SoundManager = (function () {
             sm.remove = removeSound;
             sm.reload = reloadSound;
         }
+
         /**
         Reloads all sounds
         
@@ -251,12 +271,13 @@ var SoundManager = (function () {
         @name reloadAll
         */
         sm.reloadAll = function reloadAllSoundsFn() {
-            for(var t in sounds) {
-                if(sounds.hasOwnProperty(t) && t !== defaultSoundName) {
+            for (var t in sounds) {
+                if (sounds.hasOwnProperty(t) && t !== defaultSoundName) {
                     reloadSound(t);
                 }
             }
         };
+
         /**
         Get object containing all loaded sounds
         
@@ -270,6 +291,7 @@ var SoundManager = (function () {
         sm.getAll = function getAllSoundsFn() {
             return sounds;
         };
+
         /**
         Get number of sounds pending
         
@@ -283,6 +305,7 @@ var SoundManager = (function () {
         sm.getNumPendingSounds = function getNumPendingSoundsFn() {
             return numLoadingSounds;
         };
+
         /**
         Check if a sound is not pending
         
@@ -298,6 +321,7 @@ var SoundManager = (function () {
         sm.isSoundLoaded = function isSoundLoadedFn(path) {
             return !loadingSound[path];
         };
+
         /**
         Check if a sound is missing
         
@@ -313,6 +337,7 @@ var SoundManager = (function () {
         sm.isSoundMissing = function isSoundMissingFn(path) {
             return !sounds[path];
         };
+
         /**
         Set path remapping dictionary
         
@@ -328,19 +353,21 @@ var SoundManager = (function () {
             pathRemapping = prm;
             pathPrefix = assetUrl;
         };
+
         sm.destroy = function shaderManagerDestroyFn() {
-            if(sounds) {
+            if (sounds) {
                 var p;
-                for(p in sounds) {
-                    if(sounds.hasOwnProperty(p)) {
+                for (p in sounds) {
+                    if (sounds.hasOwnProperty(p)) {
                         var sound = sounds[p];
-                        if(sound) {
+                        if (sound) {
                             sound.destroy();
                         }
                     }
                 }
                 sounds = null;
             }
+
             defaultSound = null;
             loadingSound = null;
             loadedObservers = null;
@@ -350,8 +377,9 @@ var SoundManager = (function () {
             rh = null;
             sd = null;
         };
+
         return sm;
     };
+    SoundManager.version = 1;
     return SoundManager;
 })();
-
