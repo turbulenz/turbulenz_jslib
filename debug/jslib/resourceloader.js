@@ -1,69 +1,71 @@
-/* This file was generated from TypeScript source tslib/resourceloader.ts */
+// Copyright (c) 2010-2014 Turbulenz Limited
+/*global TurbulenzEngine:false*/
+/*global VMath:false*/
+;
 
-// TODO: SceneData?
+;
 
-// TODO:
-
+;
 
 //
 // ResourceLoader
 //
 var ResourceLoader = (function () {
-    function ResourceLoader() { }
-    ResourceLoader.version = 1;
-    ResourceLoader.prototype.clear = //
+    function ResourceLoader() {
+    }
+    //
     // clear
     //
-    function () {
-        this.nodesMap = {
-        };
-        this.referencesPending = {
-        };
+    ResourceLoader.prototype.clear = function () {
+        this.nodesMap = {};
+        this.referencesPending = {};
         this.numReferencesPending = 0;
-        this.animationsPending = {
-        };
+        this.animationsPending = {};
     };
-    ResourceLoader.prototype.endLoading = //
+
+    //
     // endLoading
     //
-    function (onload) {
-        this.referencesPending = {
-        };
-        this.animationsPending = {
-        };
-        if(onload) {
+    ResourceLoader.prototype.endLoading = function (onload) {
+        this.referencesPending = {};
+        this.animationsPending = {};
+
+        if (onload) {
             onload(this.data);
         }
     };
+
     ResourceLoader.prototype.resolveShapes = function (loadParams) {
         var copyObject = function copyObjectFn(o) {
-            var newObj = {
-            };
-            for(var p in o) {
-                if(o.hasOwnProperty(p)) {
+            var newObj = {};
+            for (var p in o) {
+                if (o.hasOwnProperty(p)) {
                     newObj[p] = o[p];
                 }
             }
             return newObj;
         };
+
         var shapesNamePrefix = loadParams.shapesNamePrefix;
+
         // we reuse shapesNamePrefix to save adding prefixes for everything
         var skeletonNamePrefix = loadParams.shapesNamePrefix;
         var sceneData = loadParams.data;
         var fileShapes = sceneData.geometries;
         var targetShapes = this.data.geometries;
-        if(!targetShapes) {
-            targetShapes = {
-            };
+        if (!targetShapes) {
+            targetShapes = {};
             this.data.geometries = targetShapes;
         }
-        for(var fileShapeName in fileShapes) {
-            if(fileShapes.hasOwnProperty(fileShapeName)) {
+
+        for (var fileShapeName in fileShapes) {
+            if (fileShapes.hasOwnProperty(fileShapeName)) {
                 var fileShape = fileShapes[fileShapeName];
                 var targetShapeName = (shapesNamePrefix ? (shapesNamePrefix + "-" + fileShapeName) : fileShapeName);
+
                 // Update the skeleton reference
                 var fileSkeletonName = fileShape.skeleton;
-                if(fileSkeletonName) {
+                if (fileSkeletonName) {
                     // the shape has to be copied if it has a skeleton as the same shape
                     // can be used with multiple skeletons
                     targetShapes[targetShapeName] = copyObject(fileShape);
@@ -74,68 +76,76 @@ var ResourceLoader = (function () {
             }
         }
     };
+
     ResourceLoader.prototype.resolveSkeletons = function (loadParams) {
         // we reuse shapesNamePrefix to save adding prefixes for everything
         var skeletonNamePrefix = loadParams.shapesNamePrefix;
         var sceneData = loadParams.data;
         var fileSkeletons = sceneData.skeletons;
         var targetSkeletons = this.data.skeletons;
-        if(!targetSkeletons) {
-            targetSkeletons = {
-            };
+        if (!targetSkeletons) {
+            targetSkeletons = {};
             this.data.skeletons = targetSkeletons;
         }
-        for(var fileSkeletonName in fileSkeletons) {
-            if(fileSkeletons.hasOwnProperty(fileSkeletonName)) {
+
+        for (var fileSkeletonName in fileSkeletons) {
+            if (fileSkeletons.hasOwnProperty(fileSkeletonName)) {
                 var fileSkeleton = fileSkeletons[fileSkeletonName];
                 var targetSkeletonName = (skeletonNamePrefix ? (skeletonNamePrefix + "-" + fileSkeletonName) : fileSkeletonName);
                 targetSkeletons[targetSkeletonName] = fileSkeleton;
             }
         }
     };
-    ResourceLoader.prototype.resolveAnimations = //
+
+    //
     // Resolve animations
     //
-    function (loadParams) {
+    ResourceLoader.prototype.resolveAnimations = function (loadParams) {
         var sceneData = loadParams.data;
+
         var fileAnims = sceneData.animations;
-        if(!fileAnims) {
+        if (!fileAnims) {
             return;
         }
+
         var currentLoader = this;
         var anims = currentLoader.data.animations;
-        if(!anims) {
-            anims = {
-            };
+        if (!anims) {
+            anims = {};
             currentLoader.data.animations = anims;
         }
+
         var postLoadReference = function postLoadReferenceFn(sceneText) {
-            if(sceneText) {
+            if (sceneText) {
                 var sceneData = JSON.parse(sceneText);
                 var animations = sceneData.animations;
-                for(var anim in animations) {
-                    if(animations.hasOwnProperty(anim)) {
+                for (var anim in animations) {
+                    if (animations.hasOwnProperty(anim)) {
                         anims[anim] = animations[anim];
                     }
                 }
             }
+
             //Utilities.log("resolved ref for " + anim + " count now " + (currentLoader.numReferencesPending-1));
             currentLoader.numReferencesPending -= 1;
-            if(currentLoader.numReferencesPending <= 0) {
+            if (currentLoader.numReferencesPending <= 0) {
                 currentLoader.endLoading(loadParams.onload);
             }
         };
+
         // Import animations
         var requestOwner = (loadParams.request ? loadParams : TurbulenzEngine);
-        for(var a in fileAnims) {
-            if(fileAnims.hasOwnProperty(a)) {
+        for (var a in fileAnims) {
+            if (fileAnims.hasOwnProperty(a)) {
                 var reference = fileAnims[a].reference;
-                if(reference) {
-                    if(!this.animationsPending[a]) {
+                if (reference) {
+                    if (!this.animationsPending[a]) {
                         this.animationsPending[a] = true;
                         this.numReferencesPending += 1;
+
                         //Utilities.log("adding ref for " + a + " count now " + this.numReferencesPending);
                         delete fileAnims[a].reference;
+
                         loadParams.requestHandler.request({
                             src: reference,
                             requestOwner: requestOwner,
@@ -148,45 +158,53 @@ var ResourceLoader = (function () {
             }
         }
     };
-    ResourceLoader.prototype.resolveNodes = //
+
+    //
     // resolveNodes
     //
-    function (loadParams) {
+    ResourceLoader.prototype.resolveNodes = function (loadParams) {
         var sceneData = loadParams.data;
+
         var references = this.referencesPending;
         var numReferences = 0;
         var nodesMap = this.nodesMap;
+
         var currentLoader = this;
+
         var nodesNamePrefix = loadParams.nodesNamePrefix;
         var shapesNamePrefix = loadParams.shapesNamePrefix;
+
         var requestOwner = (loadParams.request ? loadParams : TurbulenzEngine);
+
         var copyObject = function copyObjectFn(o) {
-            var newObj = {
-            };
-            for(var p in o) {
-                if(o.hasOwnProperty(p)) {
+            var newObj = {};
+            for (var p in o) {
+                if (o.hasOwnProperty(p)) {
                     newObj[p] = o[p];
                 }
             }
             return newObj;
         };
+
         var resolveNode = function resolveNodeFn(fileNode, nodeName, parentNodePath) {
             // We're changing a node which may be referenced multiple
             // times so take a copy
             var node = (copyObject(fileNode));
             var nodePath = parentNodePath ? (parentNodePath + "/" + nodeName) : nodeName;
+
             var reference = node.reference;
-            if(reference) {
+            if (reference) {
                 //Utilities.log("Reference resolve for " + nodePath);
                 var internalReferenceIndex = reference.indexOf("#");
-                if(internalReferenceIndex === -1) {
+                if (internalReferenceIndex === -1) {
                     var referenceParameters = references[reference];
-                    if(!referenceParameters || referenceParameters.length === 0 || !node.inplace) {
+                    if (!referenceParameters || referenceParameters.length === 0 || !node.inplace) {
                         numReferences += 1;
+
                         //Utilities.log("adding ref for " + nodePath + " numrefs now " + numReferences);
                         var sceneParameters = copyObject(loadParams);
                         sceneParameters.append = true;
-                        if(node.inplace) {
+                        if (node.inplace) {
                             sceneParameters.nodesNamePrefix = parentNodePath;
                             sceneParameters.shapesNamePrefix = null;
                             sceneParameters.parentNode = null;
@@ -195,29 +213,28 @@ var ResourceLoader = (function () {
                             sceneParameters.shapesNamePrefix = reference;
                             sceneParameters.parentNode = node;
                         }
-                        if(node.skin) {
+                        if (node.skin) {
                             sceneParameters.skin = node.skin;
                         }
-                        if(!referenceParameters || referenceParameters.length === 0) {
-                            referenceParameters = [
-                                sceneParameters
-                            ];
+
+                        if (!referenceParameters || referenceParameters.length === 0) {
+                            referenceParameters = [sceneParameters];
                             references[reference] = referenceParameters;
+
                             var loadReference = function (sceneText) {
                                 var numInstances = referenceParameters.length;
                                 var sceneData;
-                                if(sceneText) {
+                                if (sceneText) {
                                     sceneData = JSON.parse(sceneText);
                                 } else {
                                     // Make sure we can call scene
                                     // load to correctly deal with
                                     // reference counts when a
                                     // reference is missing
-                                    sceneData = {
-                                    };
+                                    sceneData = {};
                                 }
                                 var params;
-                                for(var n = 0; n < numInstances; n += 1) {
+                                for (var n = 0; n < numInstances; n += 1) {
                                     params = referenceParameters[n];
                                     params.data = sceneData;
                                     params.isReference = true;
@@ -225,6 +242,7 @@ var ResourceLoader = (function () {
                                 }
                                 referenceParameters.length = 0;
                             };
+
                             loadParams.requestHandler.request({
                                 src: reference,
                                 requestOwner: requestOwner,
@@ -238,114 +256,126 @@ var ResourceLoader = (function () {
                 delete node.reference;
                 delete node.inplace;
             }
+
             var geometryinstances = node.geometryinstances;
-            if(shapesNamePrefix && geometryinstances) {
+            if (shapesNamePrefix && geometryinstances) {
                 // Need to deep copy the geometry instances dictionary because we're prefixing the names
-                node.geometryinstances = {
-                };
-                for(var gi in geometryinstances) {
-                    if(geometryinstances.hasOwnProperty(gi)) {
+                node.geometryinstances = {};
+                for (var gi in geometryinstances) {
+                    if (geometryinstances.hasOwnProperty(gi)) {
                         node.geometryinstances[gi] = copyObject(geometryinstances[gi]);
                         var geometryInstance = node.geometryinstances[gi];
+
                         //Utilities.log("prefixing " + geometryInstance.geometry + " with " + shapesNamePrefix);
                         geometryInstance.geometry = shapesNamePrefix + "-" + geometryInstance.geometry;
                     }
                 }
             }
+
             var fileChildren = fileNode.nodes;
-            if(fileChildren) {
-                node.nodes = {
-                };
-                for(var c in fileChildren) {
-                    if(fileChildren.hasOwnProperty(c)) {
+            if (fileChildren) {
+                node.nodes = {};
+                for (var c in fileChildren) {
+                    if (fileChildren.hasOwnProperty(c)) {
                         var childPath = nodePath + "/" + c;
-                        if(!nodesMap[childPath]) {
+                        if (!nodesMap[childPath]) {
                             node.nodes[c] = resolveNode(fileChildren[c], c, nodePath);
                             nodesMap[childPath] = node.nodes[c];
                         }
                     }
                 }
             }
+
             return node;
         };
+
         var fileNodes = sceneData.nodes;
         var parentNode = loadParams.parentNode;
-        for(var fn in fileNodes) {
-            if(fileNodes.hasOwnProperty(fn) && fileNodes[fn]) {
+        for (var fn in fileNodes) {
+            if (fileNodes.hasOwnProperty(fn) && fileNodes[fn]) {
                 var nodeName = fn;
                 var fileNode = resolveNode(fileNodes[fn], nodeName, nodesNamePrefix);
                 var nodePath = (nodesNamePrefix ? (nodesNamePrefix + "/" + fn) : fn);
                 var overloadedNode = nodesMap[nodePath];
-                if(overloadedNode) {
+
+                if (overloadedNode) {
                     //Utilities.log("Overloaded node '" + nodePath + "'");
                     var overloadedMatrix = overloadedNode.matrix;
-                    if(overloadedMatrix && fileNode.matrix) {
+                    if (overloadedMatrix && fileNode.matrix) {
                         overloadedNode.matrix = VMath.m43Mul(fileNode.matrix, overloadedMatrix);
                         overloadedMatrix = null;
                     }
+
                     var overloadedChildren = overloadedNode.nodes;
-                    if(overloadedChildren && fileNode.nodes) {
-                        //Utilities.log("Concat children of node '" + nodePath + "'");
-                        for(var c in fileNode.nodes) {
-                            if(fileNode.nodes.hasOwnProperty(c)) {
+                    if (overloadedChildren && fileNode.nodes) {
+                        for (var c in fileNode.nodes) {
+                            if (fileNode.nodes.hasOwnProperty(c)) {
                                 overloadedChildren[c] = fileNode.nodes[c];
                             }
                         }
-                    } else if(fileNode.nodes) {
+                    } else if (fileNode.nodes) {
                         overloadedNode.nodes = fileNode.nodes;
                     }
-                    for(var on in fileNode) {
-                        if(fileNode.hasOwnProperty(on)) {
+
+                    for (var on in fileNode) {
+                        if (fileNode.hasOwnProperty(on)) {
                             overloadedNode[on] = fileNode[on];
                         }
                     }
                     fileNode = overloadedNode;
                 } else {
-                    if(loadParams.isReference && parentNode) {
-                        if(!parentNode.nodes) {
-                            parentNode.nodes = {
-                            };
+                    if (loadParams.isReference && parentNode) {
+                        if (!parentNode.nodes) {
+                            parentNode.nodes = {};
                         }
                         parentNode.nodes[fn] = fileNode;
                     } else {
                         this.data.nodes[fn] = fileNode;
                     }
+
                     nodesMap[nodePath] = fileNode;
                 }
             }
         }
+
         this.numReferencesPending += numReferences;
         //Utilities.log("total refs now " + this.numReferencesPending);
-            };
-    ResourceLoader.prototype.resolvePhysicsNodes = //
+    };
+
+    //
     // loadPhysicsNodes
     //
-    function (loadParams) {
+    ResourceLoader.prototype.resolvePhysicsNodes = function (loadParams) {
         var sceneData = loadParams.data;
         var nodesNamePrefix = loadParams.nodesNamePrefix;
         var shapesNamePrefix = loadParams.shapesNamePrefix;
+
         function begetFn(o) {
             var F = function () {
             };
             F.prototype = o;
             return new F();
         }
+
         var fileModels = sceneData.physicsmodels;
         var targetFileModels = this.data.physicsmodels;
-        if(!targetFileModels) {
-            targetFileModels = {
-            };
+        if (!targetFileModels) {
+            targetFileModels = {};
             this.data.physicsmodels = targetFileModels;
         }
-        for(var fm in fileModels) {
-            if(fileModels.hasOwnProperty(fm)) {
+
+        for (var fm in fileModels) {
+            if (fileModels.hasOwnProperty(fm)) {
                 var fileModel = fileModels[fm];
-                if(shapesNamePrefix) {
+
+                if (shapesNamePrefix) {
                     var newModelName = shapesNamePrefix ? shapesNamePrefix + "-" + fm : fm;
+
                     var model = begetFn(fileModel);
                     targetFileModels[newModelName] = model;
+
                     var geometry = model.geometry;
-                    if(geometry) {
+                    if (geometry) {
                         model.geometry = shapesNamePrefix ? shapesNamePrefix + "-" + geometry : geometry;
                     }
                 } else {
@@ -353,22 +383,27 @@ var ResourceLoader = (function () {
                 }
             }
         }
+
         var fileNodes = sceneData.physicsnodes;
         var targetFileNodes = this.data.physicsnodes;
-        if(!targetFileNodes) {
-            targetFileNodes = {
-            };
+        if (!targetFileNodes) {
+            targetFileNodes = {};
             this.data.physicsnodes = targetFileNodes;
         }
-        for(var fn in fileNodes) {
-            if(fileNodes.hasOwnProperty(fn)) {
+
+        for (var fn in fileNodes) {
+            if (fileNodes.hasOwnProperty(fn)) {
                 var fileNode = fileNodes[fn];
-                if(nodesNamePrefix || shapesNamePrefix) {
+
+                if (nodesNamePrefix || shapesNamePrefix) {
                     var targetName = fileNode.target;
                     targetName = nodesNamePrefix ? (nodesNamePrefix + "/" + targetName) : targetName;
+
                     var node = begetFn(fileNode);
                     node.target = targetName;
+
                     node.body = shapesNamePrefix ? shapesNamePrefix + "-" + fileNode.body : fileNode.body;
+
                     var newNodeName = nodesNamePrefix ? (nodesNamePrefix + "/" + fn) : fn;
                     targetFileNodes[newNodeName] = node;
                 } else {
@@ -377,56 +412,62 @@ var ResourceLoader = (function () {
             }
         }
     };
-    ResourceLoader.prototype.resolveAreas = //
+
+    //
     // loadAreas
     //
-    function (loadParams) {
+    ResourceLoader.prototype.resolveAreas = function (loadParams) {
         var sceneData = loadParams.data;
+
         var fileAreas = sceneData.areas;
-        if(!fileAreas) {
+        if (!fileAreas) {
             return;
         }
+
         var numFileAreas = fileAreas.length;
-        if(numFileAreas <= 0) {
+        if (numFileAreas <= 0) {
             return;
         }
+
         var targetAreas = this.data.areas;
-        if(!targetAreas) {
+        if (!targetAreas) {
             targetAreas = [];
             this.data.areas = targetAreas;
         }
+
         var nodesNamePrefix = loadParams.nodesNamePrefix;
-        for(var fa = 0; fa < numFileAreas; fa += 1) {
+
+        for (var fa = 0; fa < numFileAreas; fa += 1) {
             var fileArea = fileAreas[fa];
-            if(nodesNamePrefix) {
+
+            if (nodesNamePrefix) {
                 var targetName = fileArea.target;
                 fileArea.target = (nodesNamePrefix + "/" + targetName);
             }
             targetAreas.push(fileArea);
         }
     };
-    ResourceLoader.prototype.resolve = //
+
+    //
     // resolve
     //
-    function (loadParams) {
-        if(!loadParams.append) {
-            this.data = {
-                nodes: {
-                }
-            };
+    ResourceLoader.prototype.resolve = function (loadParams) {
+        if (!loadParams.append) {
+            this.data = { nodes: {} };
         }
+
         // Start by simply copying any dictionaries which we don't special case
         var appendData = loadParams.data;
-        for(var d in appendData) {
-            if(d !== "nodes" && d !== "skeletons" && d !== "geometries" && d !== "animations" && d !== "areas" && d !== "physicsnodes" && d !== "physicsmodels") {
-                if(appendData.hasOwnProperty(d)) {
+        for (var d in appendData) {
+            if (d !== "nodes" && d !== "skeletons" && d !== "geometries" && d !== "animations" && d !== "areas" && d !== "physicsnodes" && d !== "physicsmodels") {
+                if (appendData.hasOwnProperty(d)) {
                     var dict = appendData[d];
                     var targetDict = this.data[d];
-                    if(!targetDict) {
+                    if (!targetDict) {
                         this.data[d] = dict;
                     } else {
-                        for(var e in dict) {
-                            if(dict.hasOwnProperty(e) && !targetDict[e]) {
+                        for (var e in dict) {
+                            if (dict.hasOwnProperty(e) && !targetDict[e]) {
                                 targetDict[e] = dict[e];
                             }
                         }
@@ -434,49 +475,61 @@ var ResourceLoader = (function () {
                 }
             }
         }
+
         this.resolveShapes(loadParams);
+
         this.resolveSkeletons(loadParams);
+
         this.resolveAnimations(loadParams);
+
         this.resolveNodes(loadParams);
+
         this.resolvePhysicsNodes(loadParams);
+
         this.resolveAreas(loadParams);
-        if(loadParams.isReference) {
+
+        if (loadParams.isReference) {
             this.numReferencesPending -= 1;
             //Utilities.log("loaded ref now " + this.numReferencesPending);
-                    }
-        if(this.numReferencesPending <= 0) {
+        }
+
+        if (this.numReferencesPending <= 0) {
             this.endLoading(loadParams.onload);
         }
     };
-    ResourceLoader.prototype.load = //
+
+    //
     // load
     //
-    function (assetPath, loadParams) {
+    ResourceLoader.prototype.load = function (assetPath, loadParams) {
         var loader = this;
         var dataReceived = function dataReceivedFn(text) {
-            var sceneData = {
-            };
-            if(text) {
+            var sceneData = {};
+            if (text) {
                 sceneData = JSON.parse(text);
             }
+
             loadParams.data = sceneData;
             loadParams.append = false;
             loader.resolve(loadParams);
         };
+
         loadParams.requestHandler.request({
             src: assetPath,
             requestOwner: loadParams.request ? loadParams : TurbulenzEngine,
             onload: dataReceived
         });
     };
+
     ResourceLoader.create = // Constructor function
-    function create() {
+    function () {
         var rl = new ResourceLoader();
         rl.clear();
-        rl.skeletonNames = {
-        };
+
+        rl.skeletonNames = {};
+
         return rl;
     };
+    ResourceLoader.version = 1;
     return ResourceLoader;
 })();
-

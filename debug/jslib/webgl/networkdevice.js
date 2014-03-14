@@ -1,25 +1,21 @@
-/* This file was generated from TypeScript source tslib/webgl/networkdevice.ts */
-
 // Copyright (c) 2011-2012 Turbulenz Limited
-/*global window*/
 "use strict";
-
-function WebGLNetworkDevice() {
-    return this;
-}
-WebGLNetworkDevice.prototype = {
-    version: 1,
-    WebSocketConstructor: (window.WebSocket ? window.WebSocket : window.MozWebSocket),
-    createWebSocket: function createWebSocketdFn(url, protocol) {
+//
+// WebGLNetworkDevice
+//
+var WebGLNetworkDevice = (function () {
+    function WebGLNetworkDevice() {
+    }
+    WebGLNetworkDevice.prototype.createWebSocket = function (url, protocol) {
         var WebSocketConstructor = this.WebSocketConstructor;
-        if(WebSocketConstructor) {
+        if (WebSocketConstructor) {
             var ws;
-            if(protocol) {
+            if (protocol) {
                 ws = new WebSocketConstructor(url, protocol);
             } else {
                 ws = new WebSocketConstructor(url);
             }
-            if(typeof ws.destroy === "undefined") {
+            if (typeof ws.destroy === "undefined") {
                 ws.destroy = function websocketDestroyFn() {
                     this.onopen = null;
                     this.onerror = null;
@@ -32,11 +28,17 @@ WebGLNetworkDevice.prototype = {
         } else {
             return null;
         }
-    },
-    update: function networkDeviceUpdateFn() {
-    }
-};
-WebGLNetworkDevice.create = function networkDeviceCreateFn() {
-    /* params */ var nd = new WebGLNetworkDevice();
-    return nd;
-};
+    };
+
+    WebGLNetworkDevice.prototype.update = function () {
+    };
+
+    WebGLNetworkDevice.create = function (params) {
+        var nd = new WebGLNetworkDevice();
+        return nd;
+    };
+    WebGLNetworkDevice.version = 1;
+    return WebGLNetworkDevice;
+})();
+
+WebGLNetworkDevice.prototype.WebSocketConstructor = (window.WebSocket ? window.WebSocket : window.MozWebSocket);

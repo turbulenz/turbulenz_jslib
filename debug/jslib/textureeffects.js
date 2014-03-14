@@ -1,12 +1,12 @@
-/* This file was generated from TypeScript source tslib/textureeffects.ts */
-
+// Copyright (c) 2013 Turbulenz Limited
+;
 
 var TextureEffects = (function () {
-    function TextureEffects() { }
-    TextureEffects.version = 1;
-    TextureEffects.prototype.grayScaleMatrix = // Methods
-    function (dst) {
-        if(dst === undefined) {
+    function TextureEffects() {
+    }
+    // Methods
+    TextureEffects.prototype.grayScaleMatrix = function (dst) {
+        if (dst === undefined) {
             dst = this.mathDevice.m43BuildIdentity();
         }
         dst[0] = 0.2126;
@@ -21,8 +21,9 @@ var TextureEffects = (function () {
         dst[9] = dst[10] = dst[11] = 0;
         return dst;
     };
+
     TextureEffects.prototype.sepiaMatrix = function (dst) {
-        if(dst === undefined) {
+        if (dst === undefined) {
             dst = this.mathDevice.m43BuildIdentity();
         }
         dst[0] = 0.393;
@@ -37,8 +38,9 @@ var TextureEffects = (function () {
         dst[9] = dst[10] = dst[11] = 0;
         return dst;
     };
+
     TextureEffects.prototype.negativeMatrix = function (dst) {
-        if(dst === undefined) {
+        if (dst === undefined) {
             dst = this.mathDevice.m43BuildIdentity();
         }
         dst[0] = dst[4] = dst[8] = -1;
@@ -46,8 +48,9 @@ var TextureEffects = (function () {
         dst[9] = dst[10] = dst[11] = 1;
         return dst;
     };
+
     TextureEffects.prototype.saturationMatrix = function (saturationScale, dst) {
-        if(dst === undefined) {
+        if (dst === undefined) {
             dst = this.mathDevice.m43BuildIdentity();
         }
         var is = (1 - saturationScale);
@@ -63,10 +66,12 @@ var TextureEffects = (function () {
         dst[9] = dst[10] = dst[11] = 0;
         return dst;
     };
+
     TextureEffects.prototype.hueMatrix = function (angle, dst) {
-        if(dst === undefined) {
+        if (dst === undefined) {
             dst = this.mathDevice.m43BuildIdentity();
         }
+
         ////
         //// Uncomment to calculate new coeffecients should luminance
         //// values 0.2126 0.7152 0.0722 change.
@@ -120,64 +125,94 @@ var TextureEffects = (function () {
         dst[7] = (-0.0722 * c) + (-0.28717402389491986 * s) + 0.0722;
         dst[8] = (0.9278 * c) + (0.290176245294706 * s) + 0.0722;
         dst[9] = dst[10] = dst[11] = 0;
+
         return dst;
     };
+
     TextureEffects.prototype.brightnessMatrix = function (brightnessOffset, dst) {
-        if(dst === undefined) {
+        if (dst === undefined) {
             dst = this.mathDevice.m43BuildIdentity();
         }
+
         dst[0] = dst[4] = dst[8] = 1;
         dst[1] = dst[2] = dst[3] = dst[5] = dst[6] = dst[7] = 0;
         dst[9] = dst[10] = dst[11] = brightnessOffset;
+
         return dst;
     };
-    TextureEffects.prototype.contrastMatrix = function (contrastScale, dst) {
-        if(dst === undefined) {
+
+    TextureEffects.prototype.additiveMatrix = function (additiveRGB, dst) {
+        if (dst === undefined) {
             dst = this.mathDevice.m43BuildIdentity();
         }
+
+        dst[0] = dst[4] = dst[8] = 1;
+        dst[1] = dst[2] = dst[3] = dst[5] = dst[6] = dst[7] = 0;
+        dst[9] = additiveRGB[0];
+        dst[10] = additiveRGB[1];
+        dst[11] = additiveRGB[2];
+
+        return dst;
+    };
+
+    TextureEffects.prototype.contrastMatrix = function (contrastScale, dst) {
+        if (dst === undefined) {
+            dst = this.mathDevice.m43BuildIdentity();
+        }
+
         dst[0] = dst[4] = dst[8] = contrastScale;
         dst[1] = dst[2] = dst[3] = dst[5] = dst[6] = dst[7] = 0;
         dst[9] = dst[10] = dst[11] = 0.5 * (1 - contrastScale);
+
         return dst;
     };
+
     TextureEffects.prototype.applyBloom = function (params) {
         var source = params.source;
         var blur1 = params.blurTarget1;
         var blur2 = params.blurTarget2;
         var dest = params.destination;
-        if(!source || !dest || !blur1 || !blur2 || !blur1.colorTexture0 || !blur2.colorTexture0 || blur1 === blur2 || blur1 === dest || source === blur1.colorTexture0 || source === dest.colorTexture0) {
+        if (!source || !dest || !blur1 || !blur2 || !blur1.colorTexture0 || !blur2.colorTexture0 || blur1 === blur2 || blur1 === dest || source === blur1.colorTexture0 || source === dest.colorTexture0) {
             return false;
         }
+
         var effectParams = this.effectParams;
         var techparams;
+
         // Threshold copy.
         techparams = this.bloomThresholdParameters;
         effectParams.technique = this.bloomThresholdTechnique;
         effectParams.params = techparams;
+
         techparams.bloomThreshold = (params.bloomThreshold !== undefined) ? params.bloomThreshold : 0.65;
         techparams.thresholdCutoff = Math.exp((params.thresholdCutoff !== undefined) ? params.thresholdCutoff : 3);
         techparams.inputTexture0 = source;
         effectParams.destination = blur1;
         this.applyEffect(effectParams);
+
         // Gaussian blur.
         techparams = this.gaussianBlurParameters;
         effectParams.technique = this.gaussianBlurTechnique;
         effectParams.params = techparams;
+
         var sampleRadius = (params.blurRadius || 20);
         techparams.sampleRadius[0] = sampleRadius / source.width;
         techparams.sampleRadius[1] = 0;
         techparams.inputTexture0 = blur1.colorTexture0;
         effectParams.destination = blur2;
         this.applyEffect(effectParams);
+
         techparams.sampleRadius[0] = 0;
         techparams.sampleRadius[1] = sampleRadius / source.height;
         techparams.inputTexture0 = blur2.colorTexture0;
         effectParams.destination = blur1;
         this.applyEffect(effectParams);
+
         // Merge.
         techparams = this.bloomMergeParameters;
         effectParams.technique = this.bloomMergeTechnique;
         effectParams.params = techparams;
+
         techparams.bloomIntensity = (params.bloomIntensity !== undefined) ? params.bloomIntensity : 1.2;
         techparams.bloomSaturation = (params.bloomSaturation !== undefined) ? params.bloomSaturation : 1.2;
         techparams.originalIntensity = (params.originalIntensity !== undefined) ? params.originalIntensity : 1.0;
@@ -186,43 +221,53 @@ var TextureEffects = (function () {
         techparams.inputTexture1 = blur1.colorTexture0;
         effectParams.destination = dest;
         this.applyEffect(effectParams);
+
         return true;
     };
+
     TextureEffects.prototype.applyGaussianBlur = function (params) {
         var source = params.source;
         var blur = params.blurTarget;
         var dest = params.destination;
-        if(!source || !dest || !blur || !blur.colorTexture0 || blur === dest || source === blur.colorTexture0) {
+        if (!source || !dest || !blur || !blur.colorTexture0 || blur === dest || source === blur.colorTexture0) {
             return false;
         }
+
         var effectParams = this.effectParams;
         var techparams = this.gaussianBlurParameters;
         effectParams.technique = this.gaussianBlurTechnique;
         effectParams.params = techparams;
+
         var sampleRadius = (params.blurRadius || 5);
         techparams['sampleRadius'][0] = sampleRadius / source.width;
         techparams['sampleRadius'][1] = 0;
         techparams['inputTexture0'] = source;
         effectParams['destination'] = blur;
         this.applyEffect(effectParams);
+
         techparams['sampleRadius'][0] = 0;
         techparams['sampleRadius'][1] = sampleRadius / source.height;
         techparams['inputTexture0'] = blur.colorTexture0;
         effectParams['destination'] = dest;
         this.applyEffect(effectParams);
+
         return true;
     };
+
     TextureEffects.prototype.applyColorMatrix = function (params) {
         var source = params.source;
         var dest = params.destination;
-        if(!source || !dest || !dest.colorTexture0 || source === dest.colorTexture0) {
+        if (!source || !dest || !dest.colorTexture0 || source === dest.colorTexture0) {
             return false;
         }
+
         var effectParams = this.effectParams;
         var techparams = this.colorMatrixParameters;
         effectParams.technique = this.colorMatrixTechnique;
         effectParams.params = techparams;
+
         var matrix = params.colorMatrix;
+
         // TODO: cache 'colorMatrix' here
         techparams['colorMatrix'][0] = matrix[0];
         techparams['colorMatrix'][1] = matrix[3];
@@ -236,24 +281,29 @@ var TextureEffects = (function () {
         techparams['colorMatrix'][9] = matrix[5];
         techparams['colorMatrix'][10] = matrix[8];
         techparams['colorMatrix'][11] = matrix[11];
+
         techparams['inputTexture0'] = source;
         effectParams.destination = dest;
         this.applyEffect(effectParams);
+
         return true;
     };
+
     TextureEffects.prototype.applyDistort = function (params) {
         var source = params.source;
         var dest = params.destination;
         var distort = params.distortion;
-        if(!source || !dest || !distort || !dest.colorTexture0 || source === dest.colorTexture0 || distort === dest.colorTexture0) {
+        if (!source || !dest || !distort || !dest.colorTexture0 || source === dest.colorTexture0 || distort === dest.colorTexture0) {
             return false;
         }
+
         // input transform.
         //  a b tx
         //  c d ty
-                var a, b, c, d, tx, ty;
+        var a, b, c, d, tx, ty;
+
         var transform = params.transform;
-        if(transform) {
+        if (transform) {
             // transform col-major.
             a = transform[0];
             b = transform[2];
@@ -266,10 +316,12 @@ var TextureEffects = (function () {
             b = c = 0;
             tx = ty = 0;
         }
+
         var effectParams = this.effectParams;
         var techparams = this.distortParameters;
         effectParams.technique = this.distortTechnique;
         effectParams.params = techparams;
+
         // TODO: Cache 'transform', 'invTransform', etc in the code below
         techparams['transform'][0] = a;
         techparams['transform'][1] = b;
@@ -277,129 +329,116 @@ var TextureEffects = (function () {
         techparams['transform'][3] = c;
         techparams['transform'][4] = d;
         techparams['transform'][5] = ty;
+
         // Compute inverse transform to use in distort texture displacement..
         var idet = 1 / (a * d - b * c);
         var ia = techparams['invTransform'][0] = (idet * d);
         var ib = techparams['invTransform'][1] = (idet * -b);
         var ic = techparams['invTransform'][2] = (idet * -c);
         var id = techparams['invTransform'][3] = (idet * a);
+
         // Compute max pixel offset after transform for normalisation.
         var x1 = ((ia + ib) * (ia + ib)) + ((ic + id) * (ic + id));
         var x2 = ((ia - ib) * (ia - ib)) + ((ic - id) * (ic - id));
         var x3 = ((-ia + ib) * (-ia + ib)) + ((-ic + id) * (-ic + id));
         var x4 = ((-ia - ib) * (-ia - ib)) + ((-ic - id) * (-ic - id));
         var xmax = 0.5 * Math.sqrt(Math.max(x1, x2, x3, x4));
+
         var strength = (params.strength || 10);
         techparams['strength'][0] = strength / (source.width * xmax);
         techparams['strength'][1] = strength / (source.height * xmax);
+
         techparams['inputTexture0'] = source;
         techparams['distortTexture'] = distort;
         effectParams.destination = dest;
         this.applyEffect(effectParams);
+
         return true;
     };
+
     TextureEffects.prototype.applyEffect = function (effect) {
         var graphicsDevice = this.graphicsDevice;
+
         var dest = effect.destination;
-        if(graphicsDevice.beginRenderTarget(dest)) {
+        if (graphicsDevice.beginRenderTarget(dest)) {
             graphicsDevice.setTechnique(effect.technique);
             graphicsDevice.setTechniqueParameters(effect.params);
+
             graphicsDevice.setStream(this.staticVertexBuffer, this.quadSemantics);
             graphicsDevice.draw(this.quadPrimitive, 4);
+
             graphicsDevice.endRenderTarget();
         }
     };
+
     TextureEffects.prototype.destroy = function () {
         this.staticVertexBuffer.destroy();
+
         delete this.graphicsDevice;
         delete this.mathDevice;
     };
-    TextureEffects.create = function create(params) {
+
+    TextureEffects.create = function (params) {
         var e = new TextureEffects();
+
         var gd = params.graphicsDevice;
         var md = params.mathDevice;
+
         e.graphicsDevice = gd;
         e.mathDevice = md;
+
         e.staticVertexBufferParams = {
             numVertices: 4,
-            attributes: [
-                'FLOAT2', 
-                'FLOAT2'
-            ],
+            attributes: ['FLOAT2', 'FLOAT2'],
             dynamic: false,
             data: [
-                -1, 
-                -1, 
-                0, 
-                0, 
-                1, 
-                -1, 
-                1, 
-                0, 
-                -1, 
-                1, 
-                0, 
-                1, 
-                1, 
-                1, 
-                1, 
+                -1,
+                -1,
+                0,
+                0,
+                1,
+                -1,
+                1,
+                0,
+                -1,
+                1,
+                0,
+                1,
+                1,
+                1,
+                1,
                 1
             ]
         };
+
         e.staticVertexBuffer = gd.createVertexBuffer(e.staticVertexBufferParams);
+
         e.effectParams = {
             technique: null,
             params: null,
             destination: null
         };
-        e.quadSemantics = gd.createSemantics([
-            'POSITION', 
-            'TEXCOORD0'
-        ]);
+
+        e.quadSemantics = gd.createSemantics(['POSITION', 'TEXCOORD0']);
         e.quadPrimitive = gd.PRIMITIVE_TRIANGLE_STRIP;
+
         // Distort effect.
         // ---------------
         e.distortParameters = gd.createTechniqueParameters({
             inputTexture0: null,
             distortTexture: null,
-            strength: [
-                0, 
-                0
-            ],
-            transform: [
-                0, 
-                0, 
-                0, 
-                0, 
-                0, 
-                0
-            ],
-            invTransform: [
-                0, 
-                0, 
-                0, 
-                0
-            ]
+            strength: [0, 0],
+            transform: [0, 0, 0, 0, 0, 0],
+            invTransform: [0, 0, 0, 0]
         });
+
         // Color matrix effect.
         // --------------------
         e.colorMatrixParameters = gd.createTechniqueParameters({
             inputTexture0: null,
-            colorMatrix: [
-                0, 
-                0, 
-                0, 
-                0, 
-                0, 
-                0, 
-                0, 
-                0, 
-                0, 
-                0, 
-                0, 
-                0
-            ]
+            colorMatrix: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         });
+
         // Bloom effect.
         // ------------
         e.bloomThresholdParameters = gd.createTechniqueParameters({
@@ -407,6 +446,7 @@ var TextureEffects = (function () {
             bloomThreshold: 0,
             thresholdCuttoff: 0
         });
+
         e.bloomMergeParameters = gd.createTechniqueParameters({
             inputTexture0: null,
             inputTexture1: null,
@@ -415,16 +455,15 @@ var TextureEffects = (function () {
             originalIntensity: 0,
             originalSaturation: 0
         });
+
         // Gaussian Blur effect.
         // ---------------------
         // (also used by bloom)
         e.gaussianBlurParameters = gd.createTechniqueParameters({
             inputTexture0: null,
-            sampleRadius: [
-                1, 
-                1
-            ]
+            sampleRadius: [1, 1]
         });
+
         // Shader embedding.
         // -----------------
         var shader = gd.createShader({
@@ -513,137 +552,73 @@ var TextureEffects = (function () {
                 "Gauss": {
                     "type": "float",
                     "rows": 9,
-                    "values": [
-                        0.93, 
-                        0.8, 
-                        0.7, 
-                        0.6, 
-                        0.5, 
-                        0.4, 
-                        0.3, 
-                        0.2, 
-                        0.1
-                    ]
+                    "values": [0.93, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
                 }
             },
             "techniques": {
                 "distort": [
                     {
-                        "parameters": [
-                            "strength", 
-                            "transform", 
-                            "invTransform", 
-                            "inputTexture0", 
-                            "distortTexture"
-                        ],
-                        "semantics": [
-                            "POSITION", 
-                            "TEXCOORD0"
-                        ],
+                        "parameters": ["strength", "transform", "invTransform", "inputTexture0", "distortTexture"],
+                        "semantics": ["POSITION", "TEXCOORD0"],
                         "states": {
                             "DepthTestEnable": false,
                             "DepthMask": false,
                             "CullFaceEnable": false,
                             "BlendEnable": false
                         },
-                        "programs": [
-                            "vp_copy", 
-                            "fp_distort"
-                        ]
+                        "programs": ["vp_copy", "fp_distort"]
                     }
                 ],
                 "copyColorMatrix": [
                     {
-                        "parameters": [
-                            "colorMatrix", 
-                            "inputTexture0"
-                        ],
-                        "semantics": [
-                            "POSITION", 
-                            "TEXCOORD0"
-                        ],
+                        "parameters": ["colorMatrix", "inputTexture0"],
+                        "semantics": ["POSITION", "TEXCOORD0"],
                         "states": {
                             "DepthTestEnable": false,
                             "DepthMask": false,
                             "CullFaceEnable": false,
                             "BlendEnable": false
                         },
-                        "programs": [
-                            "vp_copy", 
-                            "fp_colorMatrix"
-                        ]
+                        "programs": ["vp_copy", "fp_colorMatrix"]
                     }
                 ],
                 "bloomThreshold": [
                     {
-                        "parameters": [
-                            "bloomThreshold", 
-                            "thresholdCutoff", 
-                            "inputTexture0"
-                        ],
-                        "semantics": [
-                            "POSITION", 
-                            "TEXCOORD0"
-                        ],
+                        "parameters": ["bloomThreshold", "thresholdCutoff", "inputTexture0"],
+                        "semantics": ["POSITION", "TEXCOORD0"],
                         "states": {
                             "DepthTestEnable": false,
                             "DepthMask": false,
                             "CullFaceEnable": false,
                             "BlendEnable": false
                         },
-                        "programs": [
-                            "vp_copy", 
-                            "fp_bloom_threshold"
-                        ]
+                        "programs": ["vp_copy", "fp_bloom_threshold"]
                     }
                 ],
                 "bloomMerge": [
                     {
-                        "parameters": [
-                            "bloomSaturation", 
-                            "originalSaturation", 
-                            "bloomIntensity", 
-                            "originalIntensity", 
-                            "inputTexture0", 
-                            "inputTexture1"
-                        ],
-                        "semantics": [
-                            "POSITION", 
-                            "TEXCOORD0"
-                        ],
+                        "parameters": ["bloomSaturation", "originalSaturation", "bloomIntensity", "originalIntensity", "inputTexture0", "inputTexture1"],
+                        "semantics": ["POSITION", "TEXCOORD0"],
                         "states": {
                             "DepthTestEnable": false,
                             "DepthMask": false,
                             "CullFaceEnable": false,
                             "BlendEnable": false
                         },
-                        "programs": [
-                            "vp_copy", 
-                            "fp_bloom_merge"
-                        ]
+                        "programs": ["vp_copy", "fp_bloom_merge"]
                     }
                 ],
                 "gaussianBlur": [
                     {
-                        "parameters": [
-                            "sampleRadius", 
-                            "inputTexture0", 
-                            "Gauss"
-                        ],
-                        "semantics": [
-                            "POSITION", 
-                            "TEXCOORD0"
-                        ],
+                        "parameters": ["sampleRadius", "inputTexture0", "Gauss"],
+                        "semantics": ["POSITION", "TEXCOORD0"],
                         "states": {
                             "DepthTestEnable": false,
                             "DepthMask": false,
                             "CullFaceEnable": false,
                             "BlendEnable": false
                         },
-                        "programs": [
-                            "vp_copy", 
-                            "fp_gaussian_blur"
-                        ]
+                        "programs": ["vp_copy", "fp_gaussian_blur"]
                     }
                 ]
             },
@@ -674,13 +649,15 @@ var TextureEffects = (function () {
                 }
             }
         });
+
         e.distortTechnique = shader.getTechnique("distort");
         e.colorMatrixTechnique = shader.getTechnique("copyColorMatrix");
         e.bloomThresholdTechnique = shader.getTechnique("bloomThreshold");
         e.bloomMergeTechnique = shader.getTechnique("bloomMerge");
         e.gaussianBlurTechnique = shader.getTechnique("gaussianBlur");
+
         return e;
     };
+    TextureEffects.version = 1;
     return TextureEffects;
 })();
-

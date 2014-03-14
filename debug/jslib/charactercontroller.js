@@ -1,18 +1,14 @@
-/* This file was generated from TypeScript source tslib/charactercontroller.ts */
-
-// Copyright (c) 2009-2012 Turbulenz Limited
+// Copyright (c) 2009-2013 Turbulenz Limited
 /*global TurbulenzEngine:false*/
 /*global Profile:false*/
-/// <reference path="turbulenz.d.ts" />
-/// <reference path="utilities.ts" />
-//
-// CharacterController
-//
+;
+
 var CharacterController = (function () {
-    function CharacterController() { }
-    CharacterController.version = 1;
-    CharacterController.create = function create(gd, id, pd, dynamicsWorld, matrix, params, log) {
+    function CharacterController() {
+    }
+    CharacterController.create = function (gd, id, pd, dynamicsWorld, matrix, params, log) {
         var c = new CharacterController();
+
         var md = TurbulenzEngine.getMathDevice();
         c.md = md;
         c.matrix = matrix.slice();
@@ -27,8 +23,19 @@ var CharacterController = (function () {
         c.padleft = 0.0;
         c.padforward = 0.0;
         c.padbackward = 0.0;
+        c.looktouch = {
+            id: -1,
+            originX: 0,
+            originY: 0
+        };
+        c.movetouch = {
+            id: -1,
+            originX: 0,
+            originY: 0
+        };
         c.step = 0.0;
         c.extents = md.aabbBuildEmpty();
+
         //
         // Character creation
         //
@@ -51,7 +58,8 @@ var CharacterController = (function () {
         c.onGround = false;
         c.dead = false;
         c.god = false;
-        if(params) {
+
+        if (params) {
             c.radius = params.radius || c.radius;
             c.halfHeight = params.halfHeight || c.halfHeight;
             c.crouchHalfHeight = params.crouchHalfHeight || c.crouchHalfHeight;
@@ -62,16 +70,20 @@ var CharacterController = (function () {
             c.maxStepHeight = params.maxStepHeight || c.maxStepHeight;
             c.maxJumpHeight = params.maxJumpHeight || c.maxJumpHeight;
         }
+
         var at = md.m43At(matrix);
         c.walkDirection = md.v3Normalize(md.v3Build(at[0], 0, at[2]));
+
         var physicsHeightOffset = md.v3Build(0, c.halfHeight, 0);
         c.physicsHeightOffset = physicsHeightOffset;
         c.physicsStandingHeightOffset = physicsHeightOffset;
         c.physicsCrouchingHeightOffset = md.v3Build(0, c.crouchHalfHeight, 0);
         c.deadHeightOffset = md.v3BuildZero();
+
         var physicsMatrix = matrix.slice();
         physicsMatrix[10] += c.halfHeight;
         c.updateExtents(md.m43Pos(physicsMatrix));
+
         c.character = pd.createCharacter({
             transform: physicsMatrix,
             mass: 100.0,
@@ -83,39 +95,47 @@ var CharacterController = (function () {
             restitution: 0.1,
             friction: 0.7
         });
+
         dynamicsWorld.addCharacter(c.character);
+
         // keyboard handling
-                var keyCodes, padCodes;
-        if(id) {
+        var keyCodes, padCodes;
+        if (id) {
             keyCodes = id.keyCodes;
             padCodes = id.padCodes;
         }
+
         var onkeydownFn = function onkeydownFnFn(keynum) {
-            if(!c.dead) {
-                switch(keynum) {
+            if (!c.dead) {
+                switch (keynum) {
                     case keyCodes.A:
                     case keyCodes.LEFT:
                     case keyCodes.NUMPAD_4:
                         c.left = 1.0;
                         break;
+
                     case keyCodes.D:
                     case keyCodes.RIGHT:
                     case keyCodes.NUMPAD_6:
                         c.right = 1.0;
                         break;
+
                     case keyCodes.W:
                     case keyCodes.UP:
                     case keyCodes.NUMPAD_8:
                         c.forward = 1.0;
                         break;
+
                     case keyCodes.S:
                     case keyCodes.DOWN:
                     case keyCodes.NUMPAD_2:
                         c.backward = 1.0;
                         break;
+
                     case keyCodes.SPACE:
                         c.jump = true;
                         break;
+
                     case keyCodes.C:
                         c.crouch = true;
                         c.physicsHeightOffset = c.physicsCrouchingHeightOffset;
@@ -123,57 +143,65 @@ var CharacterController = (function () {
                 }
             }
         };
+
         var onkeyupFn = function onkeyupFnFn(keynum) {
-            if(!c.dead) {
-                switch(keynum) {
+            if (!c.dead) {
+                switch (keynum) {
                     case keyCodes.A:
                     case keyCodes.LEFT:
                     case keyCodes.NUMPAD_4:
                         c.left = 0.0;
                         break;
+
                     case keyCodes.D:
                     case keyCodes.RIGHT:
                     case keyCodes.NUMPAD_6:
                         c.right = 0.0;
                         break;
+
                     case keyCodes.W:
                     case keyCodes.UP:
                     case keyCodes.NUMPAD_8:
                         c.forward = 0.0;
                         break;
+
                     case keyCodes.S:
                     case keyCodes.DOWN:
                     case keyCodes.NUMPAD_2:
                         c.backward = 0.0;
                         break;
+
                     case keyCodes.C:
                         c.crouch = false;
                         c.physicsHeightOffset = c.physicsStandingHeightOffset;
                         break;
                 }
             }
-            if(keynum === keyCodes.G) {
+            if (keynum === keyCodes.G) {
                 c.god = !c.god;
-                if(c.god) {
+                if (c.god) {
                     c.character.velocity = c.md.v3BuildZero();
                 } else {
                     var characterPosition = c.md.m43Pos(c.matrix);
                     c.character.position = c.md.v3Add(characterPosition, c.physicsHeightOffset);
                 }
-            } else if(keynum === keyCodes.RETURN) {
+            } else if (keynum === keyCodes.RETURN) {
                 gd.fullscreen = !gd.fullscreen;
             }
-            if(keynum === keyCodes.P && Profile) {
+
+            if (keynum === keyCodes.P && Profile) {
                 Profile.reset();
             }
         };
-        if(log) {
+
+        if (log) {
             c.onkeydown = function onkeydownLogFn(keynum) {
                 log.innerHTML += " KeyDown:&nbsp;" + keynum;
                 onkeydownFn(keynum);
             };
+
             c.onkeyup = function onkeyupLogFn(keynum) {
-                if(keynum === keyCodes.BACKSPACE) {
+                if (keynum === keyCodes.BACKSPACE) {
                     log.innerHTML = "";
                 } else {
                     log.innerHTML += " KeyUp:&nbsp;" + keynum;
@@ -184,36 +212,40 @@ var CharacterController = (function () {
             c.onkeydown = onkeydownFn;
             c.onkeyup = onkeyupFn;
         }
+
         // Mouse handling
         c.onmousewheel = function onmousewheelFn(delta) {
-            if(!c.dead) {
-                if(delta !== 0.0) {
-                    // Only use the mouse wheel for movement in god mode
-                    if(c.god) {
+            if (!c.dead) {
+                if (delta !== 0.0) {
+                    if (c.god) {
                         c.step = delta * 5;
                     }
                 }
             }
         };
+
         c.onmousemove = function onmousemoveFn(deltaX, deltaY) {
-            if(!c.dead) {
+            if (!c.dead) {
                 c.turn += deltaX;
                 c.pitch += deltaY;
             }
         };
+
         // Pad handling
         c.onpadmove = function onpadmoveFn(lX, lY, lZ, rX, rY/*, rZ, dpadState */ ) {
-            if(!c.dead) {
+            if (!c.dead) {
                 c.turn += rX * 15.0;
                 c.pitch -= rY * 15.0;
-                if(lX >= 0) {
+
+                if (lX >= 0) {
                     c.padright = lX;
                     c.padleft = 0;
                 } else {
                     c.padright = 0;
                     c.padleft = -lX;
                 }
-                if(lY >= 0) {
+
+                if (lY >= 0) {
                     c.padforward = lY;
                     c.padbackward = 0.0;
                 } else {
@@ -222,18 +254,19 @@ var CharacterController = (function () {
                 }
             }
         };
+
         c.onpaddown = function onpaddownFn(buttonnum) {
-            if(!c.dead) {
-                if(buttonnum === padCodes.A) {
+            if (!c.dead) {
+                if (buttonnum === padCodes.A) {
                     c.jump = true;
-                } else if(buttonnum === padCodes.LEFT_THUMB) {
+                } else if (buttonnum === padCodes.LEFT_THUMB) {
                     c.crouch = !c.crouch;
                     c.physicsHeightOffset = c.crouch ? c.physicsCrouchingHeightOffset : c.physicsStandingHeightOffset;
                 }
             }
-            if(buttonnum === padCodes.BACK) {
+            if (buttonnum === padCodes.BACK) {
                 c.god = !c.god;
-                if(c.god) {
+                if (c.god) {
                     c.character.velocity = c.md.v3BuildZero();
                 } else {
                     var characterPosition = c.md.m43Pos(c.matrix);
@@ -241,6 +274,97 @@ var CharacterController = (function () {
                 }
             }
         };
+
+        c.ontouchstart = function ontouchstartFn(touchEvent) {
+            var changedTouches = touchEvent.changedTouches;
+            var numTouches = changedTouches.length;
+            var t;
+            var halfScreenWidth = gd.width * 0.5;
+            for (t = 0; t < numTouches; t += 1) {
+                var touchId = changedTouches[t].identifier;
+                var touchX = changedTouches[t].positionX;
+                var touchY = changedTouches[t].positionY;
+                if (touchX < halfScreenWidth && c.looktouch.id === -1) {
+                    c.looktouch.id = touchId;
+                    c.looktouch.originX = touchX;
+                    c.looktouch.originY = touchY;
+                } else if (touchX >= halfScreenWidth && c.movetouch.id === -1) {
+                    c.movetouch.id = touchId;
+                    c.movetouch.originX = touchX;
+                    c.movetouch.originY = touchY;
+                }
+            }
+        };
+
+        c.ontouchend = function ontouchendFn(touchEvent) {
+            var changedTouches = touchEvent.changedTouches;
+            var numTouches = changedTouches.length;
+            var t;
+            for (t = 0; t < numTouches; t += 1) {
+                var touchId = changedTouches[t].identifier;
+                if (c.looktouch.id === touchId) {
+                    c.looktouch.id = -1;
+                    c.looktouch.originX = 0;
+                    c.looktouch.originY = 0;
+                    c.turn = 0;
+                    c.pitch = 0;
+                } else if (c.movetouch.id === touchId) {
+                    c.movetouch.id = -1;
+                    c.movetouch.originX = 0;
+                    c.movetouch.originY = 0;
+                    c.left = 0.0;
+                    c.right = 0.0;
+                    c.forward = 0.0;
+                    c.backward = 0.0;
+                }
+            }
+        };
+
+        c.ontouchmove = function ontouchmoveFn(touchEvent) {
+            var changedTouches = touchEvent.changedTouches;
+            var numTouches = changedTouches.length;
+            var deadzone = 16.0;
+            var t;
+            for (t = 0; t < numTouches; t += 1) {
+                var touchId = changedTouches[t].identifier;
+                var touchX = changedTouches[t].positionX;
+                var touchY = changedTouches[t].positionY;
+                if (c.looktouch.id === touchId) {
+                    if (touchX - c.looktouch.originX > deadzone || touchX - c.looktouch.originX < -deadzone) {
+                        c.turn = (touchX - c.looktouch.originX) / deadzone;
+                    } else {
+                        c.turn = 0.0;
+                    }
+                    if (touchY - c.looktouch.originY > deadzone || touchY - c.looktouch.originY < -deadzone) {
+                        c.pitch = (touchY - c.looktouch.originY) / deadzone;
+                    } else {
+                        c.pitch = 0.0;
+                    }
+                } else if (c.movetouch.id === touchId) {
+                    if (touchX - c.movetouch.originX > deadzone) {
+                        c.left = 0.0;
+                        c.right = 1.0;
+                    } else if (touchX - c.movetouch.originX < -deadzone) {
+                        c.left = 1.0;
+                        c.right = 0.0;
+                    } else {
+                        c.left = 0.0;
+                        c.right = 0.0;
+                    }
+                    if (touchY - c.movetouch.originY > deadzone) {
+                        c.forward = 0.0;
+                        c.backward = 1.0;
+                    } else if (touchY - c.movetouch.originY < -deadzone) {
+                        c.forward = 1.0;
+                        c.backward = 0.0;
+                    } else {
+                        c.forward = 0.0;
+                        c.backward = 0.0;
+                    }
+                }
+            }
+        };
+
         // Attach to an InputDevice
         c.attach = function attachFn(inputDevice) {
             inputDevice.addEventListener('keydown', c.onkeydown);
@@ -249,12 +373,18 @@ var CharacterController = (function () {
             inputDevice.addEventListener('mousemove', c.onmousemove);
             inputDevice.addEventListener('padmove', c.onpadmove);
             inputDevice.addEventListener('paddown', c.onpaddown);
+            inputDevice.addEventListener('touchstart', c.ontouchstart);
+            inputDevice.addEventListener('touchend', c.ontouchend);
+            inputDevice.addEventListener('touchmove', c.ontouchmove);
         };
-        if(id) {
+
+        if (id) {
             c.attach(id);
         }
+
         return c;
     };
+
     CharacterController.prototype.rotate = function (turn, pitch) {
         var md = this.md;
         var degreestoradians = (Math.PI / 180.0);
@@ -263,25 +393,36 @@ var CharacterController = (function () {
         var matrix = this.matrix;
         var pos = md.m43Pos(matrix);
         md.m43SetPos(matrix, md.v3BuildZero());
+
         var rotate;
-        if(pitch !== 0.0) {
+        if (pitch !== 0.0) {
             pitch *= this.rotateSpeed * degreestoradians;
             pitch *= this.mouseRotateFactor;
+
             var right = md.v3Normalize(md.m43Right(matrix));
             md.m43SetRight(matrix, right);
+
             rotate = axisRotation.call(md, right, pitch);
+
             matrix = mul.call(md, matrix, rotate);
         }
-        if(turn !== 0.0) {
+
+        if (turn !== 0.0) {
             turn *= this.rotateSpeed * degreestoradians;
             turn *= this.mouseRotateFactor;
+
             rotate = axisRotation.call(md, md.v3BuildYAxis(), turn);
-            this.walkDirection = md.m43TransformVector(rotate, this.walkDirection);
+
+            this.walkDirection = md.m43TransformVector(rotate, this.walkDirection, this.walkDirection);
+
             matrix = mul.call(md, matrix, rotate);
         }
+
         md.m43SetPos(matrix, pos);
+
         this.matrix = matrix;
     };
+
     CharacterController.prototype.setPosition = function (position) {
         var md = this.md;
         var physicsPosition = md.v3Add(position, this.physicsHeightOffset);
@@ -289,8 +430,9 @@ var CharacterController = (function () {
         this.updateExtents(physicsPosition);
         md.m43SetPos(this.matrix, position);
     };
+
     CharacterController.prototype.setDead = function (dead) {
-        if(dead && !this.dead) {
+        if (dead && !this.dead) {
             this.dead = true;
             this.crouch = false;
             this.jump = false;
@@ -301,19 +443,20 @@ var CharacterController = (function () {
             this.right = 0.0;
             this.character.dead = true;
             this.physicsHeightOffset = this.deadHeightOffset;
-        } else if(!dead && this.dead) {
+        } else if (!dead && this.dead) {
             this.dead = false;
             this.crouch = false;
             this.character.dead = false;
             this.physicsHeightOffset = this.physicsStandingHeightOffset;
         }
     };
+
     CharacterController.prototype.updateExtents = function (position) {
         var radius = this.radius;
         var halfHeight = this.halfHeight;
-        if(this.crouch) {
+        if (this.crouch) {
             halfHeight = this.crouchHalfHeight;
-        } else if(this.dead) {
+        } else if (this.dead) {
             halfHeight = this.radius;
         }
         var p0 = position[0];
@@ -327,10 +470,11 @@ var CharacterController = (function () {
         extents[4] = (p1 + (halfHeight * 2));
         extents[5] = (p2 + radius);
     };
+
     CharacterController.prototype.update = function (deltaTime) {
         var md = this.md;
         var position;
-        if(this.dead) {
+        if (this.dead) {
             // If we're dead we ignore input and just update based on the physics changes
             var charPosition = this.character.position;
             position = md.v3Sub(charPosition, this.physicsHeightOffset);
@@ -341,64 +485,78 @@ var CharacterController = (function () {
             this.step = 0.0;
             return;
         }
-        if(this.turn !== 0.0 || this.pitch !== 0.0) {
+
+        if (this.turn !== 0.0 || this.pitch !== 0.0) {
             this.rotate(this.turn, this.pitch);
+
             this.turn = 0.0;
             this.pitch = 0.0;
         }
+
         var step = this.step;
-        if(step > 0) {
+        if (step > 0) {
             this.forward += step;
-        } else if(step < 0) {
+        } else if (step < 0) {
             this.backward -= step;
         }
+
         var matrix = this.matrix;
         var character = this.character;
         var maxSpeed = this.maxSpeed;
         var right = ((this.right + this.padright) - (this.left + this.padleft));
         var forward = ((this.forward + this.padforward) - (this.backward + this.padbackward));
-        if(this.god) {
+
+        if (this.god) {
             // Clamp character velocities at zero for when god mode is switched off
             character.velocity = md.v3BuildZero();
             position = md.m43Pos(matrix);
+
             var up = this.up;
-            if(right !== 0.0 || up !== 0.0 || forward !== 0.0) {
+            if (right !== 0.0 || up !== 0.0 || forward !== 0.0) {
                 var muls = md.v3ScalarMul;
                 var speed = (maxSpeed * deltaTime);
                 position = md.v3Add4(muls.call(md, md.m43Right(matrix), (speed * right)), muls.call(md, md.m43Up(matrix), (speed * up)), muls.call(md, md.m43At(matrix), -(speed * forward)), position);
+
                 this.updateExtents(position);
             }
             this.onGround = false;
         } else {
             var onGround = character.onGround;
+
             var oldVelocity = character.velocity;
             var oldVelocity0 = oldVelocity[0];
             var oldVelocity1 = oldVelocity[1];
             var oldVelocity2 = oldVelocity[2];
-            if(right !== 0.0 || forward !== 0.0) {
+
+            if (right !== 0.0 || forward !== 0.0) {
                 var walkAt = this.walkDirection;
                 var walkAt0 = -walkAt[0];
                 var walkAt2 = -walkAt[2];
+
                 //var walkRight = this.md.v3Cross([0, 1, 0], walkAt);
                 var walkRight0 = -walkAt2;
                 var walkRight2 = walkAt0;
-                if(this.crouch) {
+
+                if (this.crouch) {
                     maxSpeed *= 0.5;
                 }
+
                 maxSpeed *= this.speedModifier;
+
                 var acceleration = (maxSpeed * deltaTime);
-                if(onGround) {
+                if (onGround) {
                     acceleration *= 15.0;
                 } else {
                     acceleration *= 1.18;
                 }
                 var newVelocity0 = (oldVelocity0 + (acceleration * (walkRight0 * right + walkAt0 * forward)));
                 var newVelocity2 = (oldVelocity2 + (acceleration * (walkRight2 * right + walkAt2 * forward)));
+
                 var velocityMagnitudeSq = ((newVelocity0 * newVelocity0) + (newVelocity2 * newVelocity2));
-                if(velocityMagnitudeSq > (maxSpeed * maxSpeed)) {
+                if (velocityMagnitudeSq > (maxSpeed * maxSpeed)) {
                     var velocityClamp;
                     var oldVelocityMagnitudeSq = ((oldVelocity0 * oldVelocity0) + (oldVelocity2 * oldVelocity2));
-                    if(oldVelocityMagnitudeSq < (maxSpeed * maxSpeed)) {
+                    if (oldVelocityMagnitudeSq < (maxSpeed * maxSpeed)) {
                         // If we weren't already above max walking speed then clamp the velocity to that
                         velocityClamp = maxSpeed / Math.sqrt(velocityMagnitudeSq);
                     } else {
@@ -408,36 +566,42 @@ var CharacterController = (function () {
                     newVelocity0 *= velocityClamp;
                     newVelocity2 *= velocityClamp;
                 }
+
                 character.velocity = md.v3Build(newVelocity0, oldVelocity1, newVelocity2);
             } else {
-                if(onGround) {
+                if (onGround) {
                     var dampingScale = Math.pow((1.0 - 0.8), deltaTime);
                     character.velocity = md.v3Build(((Math.abs(oldVelocity0) < 0.01) ? 0.0 : (oldVelocity0 * dampingScale)), oldVelocity1, ((Math.abs(oldVelocity2) < 0.01) ? 0.0 : (oldVelocity2 * dampingScale)));
                 }
             }
+
             character.crouch = this.crouch;
-            if(this.jump && onGround) {
-                this.jump = false// Avoid jumping again until they press the key again
-                ;
+
+            if (this.jump && onGround) {
+                this.jump = false;
                 character.jump();
                 this.jumped = true;
             } else {
                 this.jumped = false;
             }
+
             this.onGround = onGround;
+
             var physicsPosition = character.position;
             position = md.v3Sub(physicsPosition, this.physicsHeightOffset);
             this.updateExtents(position);
         }
-        if(step > 0) {
+
+        if (step > 0) {
             this.forward -= step;
             this.step = 0.0;
-        } else if(step < 0) {
+        } else if (step < 0) {
             this.backward += step;
             this.step = 0.0;
         }
+
         md.m43SetPos(matrix, position);
     };
+    CharacterController.version = 1;
     return CharacterController;
 })();
-
