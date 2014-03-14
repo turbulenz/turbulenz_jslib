@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2013 Turbulenz Limited
+// Copyright (c) 2009-2014 Turbulenz Limited
 ;
 
 ;
@@ -6,9 +6,11 @@
 var DefaultRendering = (function () {
     function DefaultRendering() {
     }
+    /* tslint:disable:no-empty */
     DefaultRendering.prototype.updateShader = function (/* sm */ ) {
     };
 
+    /* tslint:enable:no-empty */
     DefaultRendering.prototype.sortRenderablesAndLights = function (camera, scene) {
         var opaque = DefaultRendering.passIndex.opaque;
         var decal = DefaultRendering.passIndex.decal;
@@ -31,7 +33,7 @@ var DefaultRendering = (function () {
         var visibleRenderables = scene.getCurrentVisibleRenderables();
         var numVisibleRenderables = visibleRenderables.length;
         if (numVisibleRenderables > 0) {
-            var renderable, pass, passIndex;
+            var renderable, passIndex;
             var n = 0;
             do {
                 renderable = visibleRenderables[n];
@@ -92,12 +94,16 @@ var DefaultRendering = (function () {
         } else {
             this.eyePositionUpdated = false;
         }
+
+        /* tslint:disable:no-string-literal */
         this.globalTechniqueParameters['time'] = currentTime;
+
+        /* tslint:enable:no-string-literal */
         this.camera = camera;
         this.scene = scene;
     };
 
-    DefaultRendering.prototype.updateBuffers = function (/* gd, deviceWidth, deviceHeight */ ) {
+    DefaultRendering.prototype.updateBuffers = function (gd, deviceWidth, deviceHeight) {
         return true;
     };
 
@@ -147,6 +153,7 @@ var DefaultRendering = (function () {
         this.lightPosition[2] = pos[2];
     };
 
+    /* tslint:disable:no-string-literal */
     DefaultRendering.prototype.setGlobalLightColor = function (color) {
         this.globalTechniqueParameters['lightColor'] = color;
     };
@@ -159,6 +166,7 @@ var DefaultRendering = (function () {
         this.globalTechniqueParameters['diffuse'] = tex;
     };
 
+    /* tslint:enable:no-string-literal */
     DefaultRendering.prototype.setWireframe = function (wireframeEnabled, wireframeInfo) {
         this.wireframeInfo = wireframeInfo;
         this.wireframe = wireframeEnabled;
@@ -188,8 +196,12 @@ var DefaultRendering = (function () {
         var sharedMaterial = geometryInstance.sharedMaterial;
         var techniqueParameters = geometryInstance.techniqueParameters;
 
+        if (!sharedMaterial.techniqueParameters.materialColor && !techniqueParameters.materialColor) {
+            sharedMaterial.techniqueParameters.materialColor = DefaultRendering.v4One;
+        }
+
         if (!sharedMaterial.techniqueParameters.uvTransform && !techniqueParameters.uvTransform) {
-            techniqueParameters.uvTransform = DefaultRendering.identityUVTransform;
+            sharedMaterial.techniqueParameters.uvTransform = DefaultRendering.identityUVTransform;
         }
 
         // NOTE: the way this functions is called, 'this' is an
@@ -323,16 +335,16 @@ var DefaultRendering = (function () {
 
         var debugUpdate = function debugUpdateFn(camera) {
             var matrix = this.node.world;
-            var techniqueParameters = this.techniqueParameters;
-            techniqueParameters.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
-            techniqueParameters.worldInverseTranspose = md.m33InverseTranspose(matrix, techniqueParameters.worldInverseTranspose);
+            var tp = this.techniqueParameters;
+            tp.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, tp.worldViewProjection);
+            tp.worldInverseTranspose = md.m33InverseTranspose(matrix, tp.worldInverseTranspose);
         };
 
         var debugSkinnedUpdate = function debugSkinnedUpdateFn(camera) {
             var matrix = this.node.world;
-            var techniqueParameters = this.techniqueParameters;
-            techniqueParameters.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, techniqueParameters.worldViewProjection);
-            techniqueParameters.worldInverseTranspose = md.m33InverseTranspose(matrix, techniqueParameters.worldInverseTranspose);
+            var tp = this.techniqueParameters;
+            tp.worldViewProjection = md.m43MulM44(matrix, camera.viewProjectionMatrix, tp.worldViewProjection);
+            tp.worldInverseTranspose = md.m33InverseTranspose(matrix, tp.worldInverseTranspose);
 
             var skinController = this.skinController;
             if (skinController) {
@@ -1338,6 +1350,7 @@ var DefaultRendering = (function () {
     DefaultRendering.version = 1;
 
     DefaultRendering.numPasses = 3;
+
     DefaultRendering.passIndex = {
         opaque: 0,
         decal: 1,
@@ -1347,6 +1360,7 @@ var DefaultRendering = (function () {
     DefaultRendering.nextRenderinfoID = 0;
     DefaultRendering.nextSkinID = 0;
 
+    DefaultRendering.v4One = new Float32Array([1.0, 1.0, 1.0, 1.0]);
     DefaultRendering.identityUVTransform = new Float32Array([1, 0, 0, 1, 0, 0]);
     return DefaultRendering;
 })();

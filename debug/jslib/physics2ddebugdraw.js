@@ -1,4 +1,4 @@
-// Copyright (c) 2012 Turbulenz Limited
+// Copyright (c) 2012-2014 Turbulenz Limited
 /*global
 
 Physics2DDevice: false
@@ -1064,14 +1064,18 @@ Physics2DPulleyConstraint.prototype._drawLink = function _drawLinkFn(debug, x1, 
         var minY1 = (midY - (ny * (jointMin * 0.5)));
         var minX2 = (midX + (nx * (jointMin * 0.5)));
         var minY2 = (midY + (ny * (jointMin * 0.5)));
-        var maxX1 = (midX - (nx * (jointMax * 0.5)));
-        var maxY1 = (midY - (ny * (jointMax * 0.5)));
-        var maxX2 = (midX + (nx * (jointMax * 0.5)));
-        var maxY2 = (midY + (ny * (jointMax * 0.5)));
 
         debug.drawLine(minX1, minY1, minX2, minY2, colSA);
-        debug.drawLine(maxX1, maxY1, minX1, minY1, colSB);
-        debug.drawLine(maxX2, maxY2, minX2, minY2, colSB);
+
+        if (isFinite(jointMax)) {
+            var maxX1 = (midX - (nx * (jointMax * 0.5)));
+            var maxY1 = (midY - (ny * (jointMax * 0.5)));
+            var maxX2 = (midX + (nx * (jointMax * 0.5)));
+            var maxY2 = (midY + (ny * (jointMax * 0.5)));
+
+            debug.drawLine(maxX1, maxY1, minX1, minY1, colSB);
+            debug.drawLine(maxX2, maxY2, minX2, minY2, colSB);
+        }
 
         if (!this._stiff) {
             var numCoils = debug.constraintSpringNumCoils;
@@ -1184,14 +1188,18 @@ Physics2DDistanceConstraint.prototype._draw = function distanceDrawFn(debug) {
         var minY1 = (midY - (ny * (jointMin * 0.5)));
         var minX2 = (midX + (nx * (jointMin * 0.5)));
         var minY2 = (midY + (ny * (jointMin * 0.5)));
-        var maxX1 = (midX - (nx * (jointMax * 0.5)));
-        var maxY1 = (midY - (ny * (jointMax * 0.5)));
-        var maxX2 = (midX + (nx * (jointMax * 0.5)));
-        var maxY2 = (midY + (ny * (jointMax * 0.5)));
 
         debug.drawLine(minX1, minY1, minX2, minY2, colSA);
-        debug.drawLine(maxX1, maxY1, minX1, minY1, colSB);
-        debug.drawLine(maxX2, maxY2, minX2, minY2, colSB);
+
+        if (isFinite(jointMax)) {
+            var maxX1 = (midX - (nx * (jointMax * 0.5)));
+            var maxY1 = (midY - (ny * (jointMax * 0.5)));
+            var maxX2 = (midX + (nx * (jointMax * 0.5)));
+            var maxY2 = (midY + (ny * (jointMax * 0.5)));
+
+            debug.drawLine(maxX1, maxY1, minX1, minY1, colSB);
+            debug.drawLine(maxX2, maxY2, minX2, minY2, colSB);
+        }
 
         if (!this._stiff) {
             var numCoils = debug.constraintSpringNumCoils;

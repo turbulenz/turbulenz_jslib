@@ -527,7 +527,7 @@ var TGALoader = (function () {
                 }
             };
             xhr.open("GET", params.src, true);
-            if (xhr.hasOwnProperty && xhr.hasOwnProperty("responseType")) {
+            if (typeof xhr.responseType === "string" || (xhr.hasOwnProperty && xhr.hasOwnProperty("responseType"))) {
                 xhr.responseType = "arraybuffer";
             } else if (xhr.overrideMimeType) {
                 xhr.overrideMimeType("text/plain; charset=x-user-defined");

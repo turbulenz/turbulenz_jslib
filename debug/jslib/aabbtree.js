@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2013 Turbulenz Limited
+// Copyright (c) 2009-2014 Turbulenz Limited
 /*global Float32Array: false*/
 ;
 
@@ -69,17 +69,67 @@ var AABBTree = (function () {
         this.ignoreY = false;
         this.nodesStack = new Array(32);
     }
+    AABBTree.allocateNode = function () {
+        var nodesPool = this.nodesPool;
+        if (!nodesPool.length) {
+            // Allocate a bunch of nodes in one go
+            var nodesPoolAllocationSize = this.nodesPoolAllocationSize;
+            var useFloat32Array = this.useFloat32Array;
+            var extentsArray, extentsArrayIndex;
+            if (useFloat32Array) {
+                extentsArray = new Float32Array(nodesPoolAllocationSize * 6);
+                extentsArrayIndex = 0;
+            }
+            var n, extents;
+            for (n = 0; n < nodesPoolAllocationSize; n += 1) {
+                if (useFloat32Array) {
+                    extents = extentsArray.subarray(extentsArrayIndex, (extentsArrayIndex + 6));
+                    extentsArrayIndex += 6;
+                } else {
+                    extents = [0, 0, 0, 0, 0, 0];
+                }
+                nodesPool[n] = AABBTreeNode.create(extents, 1, undefined);
+            }
+        }
+        return nodesPool.pop();
+    };
+
+    AABBTree.releaseNode = function (node) {
+        var nodesPool = this.nodesPool;
+        if (nodesPool.length < this.nodesPoolAllocationSize) {
+            node.clear();
+            nodesPool.push(node);
+        }
+    };
+
+    AABBTree.recycleNodes = function (nodes, start) {
+        var numNodes = nodes.length;
+        var n;
+        for (n = start; n < numNodes; n += 1) {
+            var node = nodes[n];
+            if (node) {
+                this.releaseNode(node);
+            }
+        }
+        nodes.length = start;
+    };
+
     AABBTree.prototype.add = function (externalNode, extents) {
         var endNode = this.endNode;
         externalNode.spatialIndex = endNode;
-        var copyExtents = new this.arrayConstructor(6);
+
+        var node = AABBTree.allocateNode();
+        node.escapeNodeOffset = 1;
+        node.externalNode = externalNode;
+        var copyExtents = node.extents;
         copyExtents[0] = extents[0];
         copyExtents[1] = extents[1];
         copyExtents[2] = extents[2];
         copyExtents[3] = extents[3];
         copyExtents[4] = extents[4];
         copyExtents[5] = extents[5];
-        this.nodes[endNode] = AABBTreeNode.create(copyExtents, 1, externalNode);
+
+        this.nodes[endNode] = node;
         this.endNode = (endNode + 1);
         this.needsRebuild = true;
         this.numAdds += 1;
@@ -299,7 +349,7 @@ var AABBTree = (function () {
         if (this.numExternalNodes > 0) {
             var nodes = this.nodes;
 
-            var buildNodes, numBuildNodes, endNodeIndex;
+            var n, buildNodes, numBuildNodes, endNodeIndex;
 
             if (this.numExternalNodes === nodes.length) {
                 buildNodes = nodes;
@@ -311,7 +361,7 @@ var AABBTree = (function () {
                 buildNodes.length = this.numExternalNodes;
                 numBuildNodes = 0;
                 endNodeIndex = this.endNode;
-                for (var n = 0; n < endNodeIndex; n += 1) {
+                for (n = 0; n < endNodeIndex; n += 1) {
                     var currentNode = nodes[n];
                     if (currentNode.externalNode) {
                         nodes[n] = undefined;
@@ -336,13 +386,16 @@ var AABBTree = (function () {
                     }
                 }
 
-                nodes.length = this._predictNumNodes(0, numBuildNodes, 0);
+                var predictedNumNodes = this._predictNumNodes(0, numBuildNodes, 0);
+                if (nodes.length > predictedNumNodes) {
+                    AABBTree.recycleNodes(nodes, predictedNumNodes);
+                }
 
                 this._recursiveBuild(buildNodes, 0, numBuildNodes, 0);
 
                 endNodeIndex = nodes[0].escapeNodeOffset;
                 if (nodes.length > endNodeIndex) {
-                    nodes.length = endNodeIndex;
+                    AABBTree.recycleNodes(nodes, endNodeIndex);
                 }
                 this.endNode = endNodeIndex;
 
@@ -410,7 +463,7 @@ var AABBTree = (function () {
         var axis = 0;
 
         function sortNodesRecursive(nodes, startIndex, endIndex) {
-            /*jshint bitwise: false*/
+            /* tslint:disable:no-bitwise */
             var splitNodeIndex = ((startIndex + endIndex) >> 1);
 
             if (axis === 0) {
@@ -484,7 +537,7 @@ var AABBTree = (function () {
         var axis = 0;
 
         function sortNodesNoYRecursive(nodes, startIndex, endIndex) {
-            /*jshint bitwise: false*/
+            /* tslint:disable:no-bitwise */
             var splitNodeIndex = ((startIndex + endIndex) >> 1);
 
             if (axis === 0) {
@@ -580,10 +633,10 @@ var AABBTree = (function () {
         var reverse = false;
 
         function sortNodesHighQualityRecursive(nodes, startIndex, endIndex) {
-            /*jshint bitwise: false*/
+            /* tslint:disable:no-bitwise */
             var splitNodeIndex = ((startIndex + endIndex) >> 1);
 
-            /*jshint bitwise: true*/
+            /* tslint:enable:no-bitwise */
             nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyXfn);
             var sahX = (calculateSAH(nodes, startIndex, splitNodeIndex) + calculateSAH(nodes, splitNodeIndex, endIndex));
 
@@ -727,10 +780,10 @@ var AABBTree = (function () {
         }
 
         while ((last - first) > 8) {
-            /*jshint bitwise: false*/
+            /* tslint:disable:no-bitwise */
             var midValue = medianFn(getkey(nodes[first]), getkey(nodes[first + ((last - first) >> 1)]), getkey(nodes[last - 1]));
 
-            /*jshint bitwise: true*/
+            /* tslint:enable:no-bitwise */
             var firstPos = first;
             var lastPos = last;
             var midPos;
@@ -815,7 +868,7 @@ var AABBTree = (function () {
 
             lastNode = nodes[lastNodeIndex];
         } else {
-            /*jshint bitwise: false*/
+            /* tslint:disable:no-bitwise */
             var splitPosIndex = ((startIndex + endIndex) >> 1);
 
             if ((startIndex + 1) >= splitPosIndex) {
@@ -870,29 +923,17 @@ var AABBTree = (function () {
         }
 
         var node = nodes[nodeIndex];
-        if (node !== undefined) {
-            node.reset(minX, minY, minZ, maxX, maxY, maxZ, (lastNodeIndex + lastNode.escapeNodeOffset - nodeIndex));
-        } else {
-            var parentExtents = new this.arrayConstructor(6);
-            parentExtents[0] = minX;
-            parentExtents[1] = minY;
-            parentExtents[2] = minZ;
-            parentExtents[3] = maxX;
-            parentExtents[4] = maxY;
-            parentExtents[5] = maxZ;
-
-            nodes[nodeIndex] = AABBTreeNode.create(parentExtents, (lastNodeIndex + lastNode.escapeNodeOffset - nodeIndex));
+        if (node === undefined) {
+            nodes[nodeIndex] = node = AABBTree.allocateNode();
         }
+        node.reset(minX, minY, minZ, maxX, maxY, maxZ, (lastNodeIndex + lastNode.escapeNodeOffset - nodeIndex));
     };
 
     AABBTree.prototype._replaceNode = function (nodes, nodeIndex, newNode) {
         var oldNode = nodes[nodeIndex];
         nodes[nodeIndex] = newNode;
         if (oldNode !== undefined) {
-            do {
-                nodeIndex += 1;
-            } while(nodes[nodeIndex] !== undefined);
-            nodes[nodeIndex] = oldNode;
+            AABBTree.releaseNode(oldNode);
         }
     };
 
@@ -902,6 +943,7 @@ var AABBTree = (function () {
         if ((startIndex + this.numNodesLeaf) >= endIndex) {
             lastNodeIndex += (endIndex - startIndex);
         } else {
+            /* tslint:disable:no-bitwise */
             var splitPosIndex = ((startIndex + endIndex) >> 1);
 
             if ((startIndex + 1) >= splitPosIndex) {
@@ -929,7 +971,7 @@ var AABBTree = (function () {
             var storageIndex = (startIndex === undefined) ? visibleNodes.length : startIndex;
             var node, extents, endChildren;
             var n0, n1, n2, p0, p1, p2;
-            var isInside, n, plane, d0, d1, d2;
+            var isInside, n, plane, d0, d1, d2, distance;
             var nodeIndex = 0;
 
             for (; ;) {
@@ -950,7 +992,8 @@ var AABBTree = (function () {
                     d0 = plane[0];
                     d1 = plane[1];
                     d2 = plane[2];
-                    if ((d0 * (d0 < 0 ? n0 : p0) + d1 * (d1 < 0 ? n1 : p1) + d2 * (d2 < 0 ? n2 : p2)) < plane[3]) {
+                    distance = (d0 * (d0 < 0 ? n0 : p0) + d1 * (d1 < 0 ? n1 : p1) + d2 * (d2 < 0 ? n2 : p2));
+                    if (distance < plane[3]) {
                         isInside = false;
                         break;
                     }
@@ -974,7 +1017,8 @@ var AABBTree = (function () {
                             d0 = plane[0];
                             d1 = plane[1];
                             d2 = plane[2];
-                            if ((d0 * (d0 > 0 ? n0 : p0) + d1 * (d1 > 0 ? n1 : p1) + d2 * (d2 > 0 ? n2 : p2)) < plane[3]) {
+                            distance = (d0 * (d0 > 0 ? n0 : p0) + d1 * (d1 > 0 ? n1 : p1) + d2 * (d2 > 0 ? n2 : p2));
+                            if (distance < plane[3]) {
                                 isInside = false;
                                 break;
                             }
@@ -1211,7 +1255,9 @@ var AABBTree = (function () {
     };
 
     AABBTree.prototype.clear = function () {
-        this.nodes = [];
+        if (this.nodes.length) {
+            AABBTree.recycleNodes(this.nodes, 0);
+        }
         this.endNode = 0;
         this.needsRebuild = false;
         this.needsRebound = false;
@@ -1408,6 +1454,11 @@ var AABBTree = (function () {
         return new AABBTree(highQuality ? true : false);
     };
     AABBTree.version = 1;
+
+    AABBTree.useFloat32Array = false;
+
+    AABBTree.nodesPoolAllocationSize = 128;
+    AABBTree.nodesPool = [];
     return AABBTree;
 })();
 ;
@@ -1415,12 +1466,11 @@ var AABBTree = (function () {
 //
 // Detect correct typed arrays
 ((function () {
-    AABBTree.prototype.arrayConstructor = Array;
     if (typeof Float32Array !== "undefined") {
         var testArray = new Float32Array(4);
         var textDescriptor = Object.prototype.toString.call(testArray);
         if (textDescriptor === '[object Float32Array]') {
-            AABBTree.prototype.arrayConstructor = Float32Array;
+            AABBTree.useFloat32Array = true;
         }
     }
 })());

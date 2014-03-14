@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2013 Turbulenz Limited
+// Copyright (c) 2010-2014 Turbulenz Limited
 ;
 
 //
@@ -6,6 +6,13 @@
 //
 var Geometry = (function () {
     function Geometry() {
+        this.semantics = null;
+        this.vertexBuffer = null;
+        this.vertexOffset = 0;
+        this.reference = Reference.create(this);
+        this.surfaces = {};
+        this.type = "rigid";
+        return this;
     }
     Geometry.prototype.destroy = function () {
         if (this.vertexBufferAllocation) {
@@ -30,11 +37,7 @@ var Geometry = (function () {
     };
 
     Geometry.create = function () {
-        var geometry = new Geometry();
-        geometry.reference = Reference.create(geometry);
-        geometry.surfaces = {};
-        geometry.type = "rigid";
-        return geometry;
+        return new Geometry();
     };
     Geometry.version = 1;
     return Geometry;
@@ -239,7 +242,6 @@ var GeometryInstance = (function () {
         delete this.drawParameters;
         delete this.renderUpdate;
         delete this.rendererInfo;
-        delete this.sorting;
     };
 
     //
@@ -250,6 +252,7 @@ var GeometryInstance = (function () {
         var geometry = this.geometry;
         drawParameters.setVertexBuffer(0, geometry.vertexBuffer);
         drawParameters.setSemantics(0, this.semantics);
+        drawParameters.setOffset(0, geometry.vertexOffset);
 
         drawParameters.primitive = surface.primitive;
 
@@ -286,7 +289,6 @@ var GeometryInstance = (function () {
         }
         instance.worldExtents = new instance.arrayConstructor(6);
         instance.worldExtentsUpdate = -1;
-        instance.worldUpdate = -1;
 
         instance.node = undefined;
         instance.renderUpdate = undefined;
@@ -295,6 +297,7 @@ var GeometryInstance = (function () {
         return instance;
     };
     GeometryInstance.version = 1;
+
     GeometryInstance.maxUpdateValue = Number.MAX_VALUE;
     return GeometryInstance;
 })();

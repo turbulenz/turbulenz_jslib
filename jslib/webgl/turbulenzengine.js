@@ -22,7 +22,7 @@
 //
 var WebGLTurbulenzEngine = (function () {
     function WebGLTurbulenzEngine() {
-        this.version = '0.27.0.0';
+        this.version = '0.28.0.0';
     }
     WebGLTurbulenzEngine.prototype.setInterval = function (f, t) {
         var that = this;
@@ -286,6 +286,11 @@ var WebGLTurbulenzEngine = (function () {
         }
         if (this.resizeCanvas) {
             window.removeEventListener('resize', this.resizeCanvas, false);
+            delete this.resizeCanvas;
+        }
+        if (this.handleZeroTimeoutMessages) {
+            window.removeEventListener("message", this.handleZeroTimeoutMessages, true);
+            delete this.handleZeroTimeoutMessages;
         }
     };
 
@@ -425,7 +430,7 @@ var WebGLTurbulenzEngine = (function () {
             };
 
             var clearZeroTimeout = function clearZeroTimeoutFn(timeout) {
-                var id = timeout;
+                var id = timeout.id;
                 var numTimeouts = timeouts.length;
                 for (var n = 0; n < numTimeouts; n += 1) {
                     if (timeouts[n].id === id) {
@@ -446,6 +451,9 @@ var WebGLTurbulenzEngine = (function () {
                     }
                 }
             };
+
+            tz.handleZeroTimeoutMessages = handleZeroTimeoutMessages;
+
             window.addEventListener("message", handleZeroTimeoutMessages, true);
 
             tz.setTimeout = function (f, t) {
@@ -544,7 +552,7 @@ var WebGLTurbulenzEngine = (function () {
         if (fillParent) {
             // Resize canvas to fill parent
             tz.resizeCanvas = function () {
-                if (document.fullscreenElement === canvas || document.mozFullScreenElement === canvas || document.webkitFullscreenElement === canvas) {
+                if (document.fullscreenElement === canvas || document.mozFullScreenElement === canvas || document.webkitFullscreenElement === canvas || document.msFullscreenElement === canvas) {
                     canvas.width = window.innerWidth;
                     canvas.height = window.innerHeight;
                 } else {

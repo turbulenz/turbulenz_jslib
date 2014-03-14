@@ -63,11 +63,11 @@ var VMath = {
             throw "Division by zero";
         }
     },
-    /*jshint bitwise: false*/
+    /* tslint:disable:no-bitwise */
     truncate: function truncateFn(value) {
         return (value | 0);
     },
-    /*jshint bitwise: true*/
+    /* tslint:enable:no-bitwise */
     //
     // Vector2
     //
@@ -122,7 +122,7 @@ var VMath = {
         if (dst === undefined) {
             dst = new VMathArrayConstructor(2);
         }
-        debug.assert(2 == src.length);
+        debug.assert(2 === src.length);
         debug.assert(debug.isMathType(dst) && debug.isVec2(dst));
         dst[0] = src[0];
         dst[1] = src[1];
@@ -1718,7 +1718,8 @@ var VMath = {
             var d0 = plane[0];
             var d1 = plane[1];
             var d2 = plane[2];
-            if ((d0 * (d0 < 0 ? aabb[0] : aabb[3]) + d1 * (d1 < 0 ? aabb[1] : aabb[4]) + d2 * (d2 < 0 ? aabb[2] : aabb[5])) < plane[3]) {
+            var distance = (d0 * (d0 < 0 ? aabb[0] : aabb[3]) + d1 * (d1 < 0 ? aabb[1] : aabb[4]) + d2 * (d2 < 0 ? aabb[2] : aabb[5]));
+            if (distance < plane[3]) {
                 return false;
             }
             n += 1;
@@ -1734,7 +1735,8 @@ var VMath = {
             var d0 = plane[0];
             var d1 = plane[1];
             var d2 = plane[2];
-            if ((d0 * (d0 > 0 ? aabb[0] : aabb[3]) + d1 * (d1 > 0 ? aabb[1] : aabb[4]) + d2 * (d2 > 0 ? aabb[2] : aabb[5])) < plane[3]) {
+            var distance = (d0 * (d0 > 0 ? aabb[0] : aabb[3]) + d1 * (d1 > 0 ? aabb[1] : aabb[4]) + d2 * (d2 > 0 ? aabb[2] : aabb[5]));
+            if (distance < plane[3]) {
                 return false;
             }
             n += 1;
@@ -2211,7 +2213,10 @@ var VMath = {
         debug.assert(debug.isMtx33(m));
         debug.assert(debug.isMathType(dst) && debug.isMtx33(dst));
 
-        var det = VMath.m33Determinant(m);
+        var d4857 = (m4 * m8 - m5 * m7);
+        var d5638 = (m5 * m6 - m3 * m8);
+        var d3746 = (m3 * m7 - m4 * m6);
+        var det = (m0 * d4857 + m1 * d5638 + m2 * d3746);
         if (det === 0.0) {
             dst[0] = dst[1] = dst[2] = 0.0;
             dst[3] = dst[4] = dst[5] = 0.0;
@@ -2229,24 +2234,25 @@ var VMath = {
             var m8 = m[8];
 
             var detrecp = 1.0 / det;
-            dst[0] = ((m4 * m8 + m5 * (-m7)) * detrecp);
-            dst[1] = ((m7 * m2 + m8 * (-m1)) * detrecp);
+            dst[0] = (d4857 * detrecp);
+            dst[1] = ((m7 * m2 - m8 * m1) * detrecp);
             dst[2] = ((m1 * m5 - m2 * m4) * detrecp);
-            dst[3] = ((m5 * m6 + m3 * (-m8)) * detrecp);
-            dst[4] = ((m8 * m0 + m6 * (-m2)) * detrecp);
+            dst[3] = (d5638 * detrecp);
+            dst[4] = ((m8 * m0 - m6 * m2) * detrecp);
             dst[5] = ((m3 * m2 - m0 * m5) * detrecp);
-            dst[6] = ((m3 * m7 + m4 * (-m6)) * detrecp);
-            dst[7] = ((m6 * m1 + m7 * (-m0)) * detrecp);
+            dst[6] = (d3746 * detrecp);
+            dst[7] = ((m6 * m1 - m7 * m0) * detrecp);
             dst[8] = ((m0 * m4 - m3 * m1) * detrecp);
             return dst;
         }
     },
     m33InverseTranspose: function m33InverseTransposeFn(m, dst) {
-        if (dst === undefined) {
-            dst = new VMathArrayConstructor(9);
+        var res = dst;
+        if (res === undefined) {
+            res = new VMathArrayConstructor(9);
         }
         debug.assert(debug.isMtx33(m) || debug.isMtx43(m));
-        debug.assert(debug.isMathType(dst) && (debug.isMtx33(dst) || debug.isMtx43(dst)));
+        debug.assert(debug.isMathType(res) && (debug.isMtx33(res) || debug.isMtx43(res)));
 
         var m0 = m[0];
         var m1 = m[1];
@@ -2257,25 +2263,27 @@ var VMath = {
         var m6 = m[6];
         var m7 = m[7];
         var m8 = m[8];
-        var det = (m0 * (m4 * m8 - m5 * m7) + m1 * (m5 * m6 - m3 * m8) + m2 * (m3 * m7 - m4 * m6));
+        var d4857 = (m4 * m8 - m5 * m7);
+        var d5638 = (m5 * m6 - m3 * m8);
+        var d3746 = (m3 * m7 - m4 * m6);
+        var det = (m0 * d4857 + m1 * d5638 + m2 * d3746);
         if (det === 0.0) {
-            dst[0] = dst[1] = dst[2] = 0.0;
-            dst[3] = dst[4] = dst[5] = 0.0;
-            dst[6] = dst[7] = dst[8] = 0.0;
-            return dst;
+            res[0] = res[1] = res[2] = 0.0;
+            res[3] = res[4] = res[5] = 0.0;
+            res[6] = res[7] = res[8] = 0.0;
         } else {
             var detrecp = 1.0 / det;
-            dst[0] = ((m4 * m8 + m5 * (-m7)) * detrecp);
-            dst[3] = ((m7 * m2 + m8 * (-m1)) * detrecp);
-            dst[6] = ((m1 * m5 - m2 * m4) * detrecp);
-            dst[1] = ((m5 * m6 + m3 * (-m8)) * detrecp);
-            dst[4] = ((m8 * m0 + m6 * (-m2)) * detrecp);
-            dst[7] = ((m3 * m2 - m0 * m5) * detrecp);
-            dst[2] = ((m3 * m7 + m4 * (-m6)) * detrecp);
-            dst[5] = ((m6 * m1 + m7 * (-m0)) * detrecp);
-            dst[8] = ((m0 * m4 - m3 * m1) * detrecp);
-            return dst;
+            res[0] = (d4857 * detrecp);
+            res[3] = ((m7 * m2 - m8 * m1) * detrecp);
+            res[6] = ((m1 * m5 - m2 * m4) * detrecp);
+            res[1] = (d5638 * detrecp);
+            res[4] = ((m8 * m0 - m6 * m2) * detrecp);
+            res[7] = ((m3 * m2 - m0 * m5) * detrecp);
+            res[2] = (d3746 * detrecp);
+            res[5] = ((m6 * m1 - m7 * m0) * detrecp);
+            res[8] = ((m0 * m4 - m3 * m1) * detrecp);
         }
+        return res;
     },
     m33Mul: function m33MulFn(a, b, dst) {
         var a0 = a[0];
@@ -3127,26 +3135,29 @@ var VMath = {
         var m10 = m[10];
         var m11 = m[11];
 
-        var det = (m0 * (m4 * m8 - m5 * m7) + m1 * (m5 * m6 - m3 * m8) + m2 * (m3 * m7 - m4 * m6));
+        var d4857 = (m4 * m8 - m5 * m7);
+        var d5638 = (m5 * m6 - m3 * m8);
+        var d3746 = (m3 * m7 - m4 * m6);
+        var det = (m0 * d4857 + m1 * d5638 + m2 * d3746);
         if (det === 0.0) {
             return dst;
         } else {
             if (dst === undefined) {
                 dst = new VMathArrayConstructor(12);
             }
-            var detrecp = 1.0 / det;
-            dst[0] = ((m4 * m8 + m5 * (-m7)) * detrecp);
-            dst[1] = ((m7 * m2 + m8 * (-m1)) * detrecp);
-            dst[2] = ((m1 * m5 - m2 * m4) * detrecp);
-            dst[3] = ((m5 * m6 + m3 * (-m8)) * detrecp);
-            dst[4] = ((m8 * m0 + m6 * (-m2)) * detrecp);
-            dst[5] = ((m3 * m2 - m0 * m5) * detrecp);
-            dst[6] = ((m3 * m7 + m4 * (-m6)) * detrecp);
-            dst[7] = ((m6 * m1 + m7 * (-m0)) * detrecp);
-            dst[8] = ((m0 * m4 - m3 * m1) * detrecp);
-            dst[9] = ((m3 * (m10 * m8 - m7 * m11) + m4 * (m6 * m11 - m9 * m8) + m5 * (m9 * m7 - m6 * m10)) * detrecp);
-            dst[10] = ((m6 * (m2 * m10 - m1 * m11) + m7 * (m0 * m11 - m9 * m2) + m8 * (m9 * m1 - m0 * m10)) * detrecp);
-            dst[11] = ((m9 * (m2 * m4 - m1 * m5) + m10 * (m0 * m5 - m3 * m2) + m11 * (m3 * m1 - m0 * m4)) * detrecp);
+            var rdet = 1.0 / det;
+            dst[0] = (d4857 * rdet);
+            dst[1] = ((m7 * m2 - m8 * m1) * rdet);
+            dst[2] = ((m1 * m5 - m2 * m4) * rdet);
+            dst[3] = (d5638 * rdet);
+            dst[4] = ((m8 * m0 - m6 * m2) * rdet);
+            dst[5] = ((m3 * m2 - m0 * m5) * rdet);
+            dst[6] = (d3746 * rdet);
+            dst[7] = ((m6 * m1 - m7 * m0) * rdet);
+            dst[8] = ((m0 * m4 - m3 * m1) * rdet);
+            dst[9] = ((m3 * (m10 * m8 - m7 * m11) + m4 * (m6 * m11 - m9 * m8) + m5 * (m9 * m7 - m6 * m10)) * rdet);
+            dst[10] = ((m6 * (m2 * m10 - m1 * m11) + m7 * (m0 * m11 - m9 * m2) + m8 * (m9 * m1 - m0 * m10)) * rdet);
+            dst[11] = ((m9 * (m2 * m4 - m1 * m5) + m10 * (m0 * m5 - m3 * m2) + m11 * (m3 * m1 - m0 * m4)) * rdet);
             return dst;
         }
     },

@@ -1,4 +1,4 @@
-// Copyright (c) 2013 Turbulenz Limited
+// Copyright (c) 2013-2014 Turbulenz Limited
 //
 // SpatialGridNode
 //
@@ -54,8 +54,11 @@ var SpatialGrid = (function () {
     }
     SpatialGrid.prototype.add = function (externalNode, extents) {
         var numNodes = this.numNodes;
+
+        /* tslint:disable:no-string-literal */
         externalNode['spatialIndex'] = numNodes;
 
+        /* tslint:enable:no-string-literal */
         var node = this.nodes[numNodes];
         var nodeExtents, cellExtents;
         if (node) {
@@ -110,7 +113,9 @@ var SpatialGrid = (function () {
     };
 
     SpatialGrid.prototype.update = function (externalNode, extents) {
+        /* tslint:disable:no-string-literal */
         var index = externalNode['spatialIndex'];
+
         if (index !== undefined) {
             var cellSize = this.cellSize;
             var numCellsX = this.numCellsX;
@@ -229,10 +234,12 @@ var SpatialGrid = (function () {
     };
 
     SpatialGrid.prototype.remove = function (externalNode) {
+        /* tslint:disable:no-string-literal */
         var index = externalNode['spatialIndex'];
         if (index !== undefined) {
             externalNode['spatialIndex'] = undefined;
 
+            /* tslint:enable:no-string-literal */
             var numNodes = this.numNodes;
             if (1 < numNodes) {
                 numNodes -= 1;
@@ -252,7 +259,10 @@ var SpatialGrid = (function () {
                     nodes[numNodes] = node;
                     node.id = numNodes;
                     lastNode.id = index;
+
+                    /* tslint:disable:no-string-literal */
                     lastNode.externalNode['spatialIndex'] = index;
+                    /* tslint:enable:no-string-literal */
                 }
             } else {
                 this.clear();
@@ -313,9 +323,11 @@ var SpatialGrid = (function () {
         } while(minRow <= maxRow);
     };
 
+    /* tslint:disable:no-empty */
     SpatialGrid.prototype.finalize = function () {
     };
 
+    /* tslint:enable:no-empty */
     SpatialGrid.prototype.getOverlappingNodes = function (queryExtents, overlappingNodes, startIndex) {
         var numOverlappingNodes = 0;
         if (0 < this.numNodes) {
@@ -487,7 +499,11 @@ var SpatialGrid = (function () {
                     var numNodes = (cell.length - 1);
                     for (i = 0; i < numNodes; i += 1) {
                         nodeI = cell[i];
+
+                        /* tslint:disable:no-bitwise */
                         pairIdBase = (nodeI.id << 16);
+
+                        /* tslint:enable:no-bitwise */
                         extents = nodeI.extents;
                         var minX = extents[0];
                         var minY = extents[1];
@@ -497,7 +513,10 @@ var SpatialGrid = (function () {
                         var maxZ = extents[5];
                         for (j = (i + 1); j < numNodes; j += 1) {
                             nodeJ = cell[j];
+
+                            /* tslint:disable:no-bitwise */
                             pairId = (pairIdBase | nodeJ.id);
+
                             if (!pairsMap[pairId]) {
                                 extents = nodeJ.extents;
                                 if (minX <= extents[3] && minY <= extents[4] && minZ <= extents[5] && maxX >= extents[0] && maxY >= extents[1] && maxZ >= extents[2]) {
@@ -531,8 +550,8 @@ var SpatialGrid = (function () {
             var minGridZ = gridExtents[2];
             var maxGridX = gridExtents[3];
             var maxGridY = gridExtents[4];
-            var maxGridZ = gridExtents[5];
 
+            //var maxGridZ = gridExtents[5];
             var queryIndex = (this.queryIndex + 1);
             this.queryIndex = queryIndex;
 
@@ -612,10 +631,11 @@ var SpatialGrid = (function () {
                                     }
                                 }
 
+                                var node;
                                 if (numQueryCellPlanes === 0) {
                                     for (k = 0; k < numNodes; k += 1) {
                                         // check if node is visible
-                                        var node = cell[k];
+                                        node = cell[k];
                                         if (node.queryIndex !== queryIndex) {
                                             node.queryIndex = queryIndex;
                                             visibleNodes[storageIndex] = node.externalNode;
@@ -626,7 +646,7 @@ var SpatialGrid = (function () {
                                 } else {
                                     for (k = 0; k < numNodes; k += 1) {
                                         // check if node is visible
-                                        var node = cell[k];
+                                        node = cell[k];
                                         if (node.queryIndex !== queryIndex) {
                                             node.queryIndex = queryIndex;
 

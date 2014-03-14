@@ -1,3 +1,7 @@
+// Copyright (c) 2011-2013 Turbulenz Limited
+/* global debug: false*/
+/* global VMath: false*/
+/* global WebGLMathDevice: true*/
 WebGLMathDevice = VMath;
 
 debug.evaluate(function debugSetupMathDevice() {

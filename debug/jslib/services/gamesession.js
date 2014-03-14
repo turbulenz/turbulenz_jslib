@@ -115,21 +115,6 @@ var GameSession = (function () {
         var turbulenzData = (turbulenz && turbulenz.Data) || {};
         var mode = turbulenzData.mode || TurbulenzServices.mode;
         var createSessionURL = '/api/v1/games/create-session/' + gameSlug;
-        var gameSessionRequestCallback = function gameSessionRequestCallbackFn(jsonResponse, status) {
-            if (status === 200) {
-                gameSession.mappingTable = jsonResponse.mappingTable;
-                gameSession.gameSessionId = jsonResponse.gameSessionId;
-
-                if (sessionCreatedFn) {
-                    sessionCreatedFn(gameSession);
-                }
-
-                TurbulenzBridge.createdGameSession(gameSession.gameSessionId);
-            } else {
-                gameSession.errorCallbackFn("TurbulenzServices.createGameSession error with HTTP status " + status + ": " + jsonResponse.msg, status);
-            }
-        };
-
         gameSession.info = {
             sessionData: {},
             playerSessionData: {}
@@ -161,12 +146,38 @@ var GameSession = (function () {
 
         if (!TurbulenzServices.available()) {
             if (sessionCreatedFn) {
+                // On a timeout so it happens asynchronously, like an
+                // ajax call.
                 TurbulenzEngine.setTimeout(function sessionCreatedCall() {
                     sessionCreatedFn(gameSession);
                 }, 0);
             }
             return gameSession;
         }
+
+        var gameSessionRequestCallback = function gameSessionRequestCallbackFn(jsonResponse, status) {
+            if (status === 200) {
+                gameSession.mappingTable = jsonResponse.mappingTable;
+                gameSession.gameSessionId = jsonResponse.gameSessionId;
+
+                if (sessionCreatedFn) {
+                    sessionCreatedFn(gameSession);
+                }
+
+                TurbulenzBridge.createdGameSession(gameSession.gameSessionId);
+            } else if (404 === status) {
+                // Treat this case as the equivalent of services being
+                // unavailable.
+                window.gameSlug = undefined;
+                gameSession.gameSlug = undefined;
+
+                if (sessionCreatedFn) {
+                    sessionCreatedFn(gameSession);
+                }
+            } else {
+                gameSession.errorCallbackFn("TurbulenzServices.createGameSession error with HTTP status " + status + ": " + jsonResponse.msg, status);
+            }
+        };
 
         if (mode) {
             createSessionURL += '/' + mode;

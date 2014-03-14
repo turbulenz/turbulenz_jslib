@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2013 Turbulenz Limited
+// Copyright (c) 2010-2014 Turbulenz Limited
 ;
 
 //
@@ -351,6 +351,7 @@ var PhysicsManager = (function () {
     PhysicsManager.prototype.loadNodes = function (loadParams, scene) {
         var sceneData = loadParams.data;
         var collisionMargin = (loadParams.collisionMargin || 0.005);
+        var positionMargin = collisionMargin * 0.1;
         var nodesNamePrefix = loadParams.nodesNamePrefix;
 
         if (!loadParams.append) {
@@ -455,7 +456,7 @@ var PhysicsManager = (function () {
                                 var centerPos0 = ((posMax[0] + posMin[0]) * 0.5);
                                 var centerPos1 = ((posMax[1] + posMin[1]) * 0.5);
                                 var centerPos2 = ((posMax[2] + posMin[2]) * 0.5);
-                                if (Math.abs(centerPos0) > 1.e-6 || Math.abs(centerPos1) > 1.e-6 || Math.abs(centerPos2) > 1.e-6) {
+                                if (Math.abs(centerPos0) > positionMargin || Math.abs(centerPos1) > positionMargin || Math.abs(centerPos2) > positionMargin) {
                                     var halfPos0 = ((posMax[0] - posMin[0]) * 0.5);
                                     var halfPos1 = ((posMax[1] - posMin[1]) * 0.5);
                                     var halfPos2 = ((posMax[2] - posMin[2]) * 0.5);
@@ -501,7 +502,37 @@ var PhysicsManager = (function () {
                                 geometry.origin = [0, 0, 0];
                             }
 
-                            if (positionsData.length === 24) {
+                            if (positionsData.length === 12) {
+                                min0 = posMin[0];
+                                min1 = posMin[1];
+                                min2 = posMin[2];
+                                max0 = posMax[0];
+                                max1 = posMax[1];
+                                max2 = posMax[2];
+                                if (min0 === max0 || min1 === max1 || min2 === max2) {
+                                    for (np = 0; np < 12; np += 3) {
+                                        pos0 = positionsData[np + 0];
+                                        pos1 = positionsData[np + 1];
+                                        pos2 = positionsData[np + 2];
+                                        if ((pos0 !== min0 && pos0 !== max0) || (pos1 !== min1 && pos1 !== max1) || (pos2 !== min2 && pos2 !== max2)) {
+                                            break;
+                                        }
+                                    }
+
+                                    if (np >= numPositionsValues) {
+                                        shapeType = "box";
+
+                                        shape = physicsDevice.createBoxShape({
+                                            halfExtents: [
+                                                (max0 - min0) * 0.5,
+                                                (max1 - min1) * 0.5,
+                                                (max2 - min2) * 0.5
+                                            ],
+                                            margin: collisionMargin
+                                        });
+                                    }
+                                }
+                            } else if (positionsData.length === 24) {
                                 min0 = posMin[0];
                                 min1 = posMin[1];
                                 min2 = posMin[2];
@@ -535,7 +566,9 @@ var PhysicsManager = (function () {
                             if (shapeType === "convexhull") {
                                 shape = physicsDevice.createConvexHullShape({
                                     points: positionsData,
-                                    margin: collisionMargin
+                                    margin: collisionMargin,
+                                    minExtent: posMin,
+                                    maxExtent: posMax
                                 });
                             } else if (shapeType === "mesh") {
                                 var maxOffset = 0;
@@ -660,6 +693,10 @@ var PhysicsManager = (function () {
                                 } else if (filter === "KINEMATIC") {
                                     collisionFilters += kinematicFilterFlag;
                                 }
+                            }
+                            if (collisionFilters === 0) {
+                                debug.log("Ignoring physics node without a collision mask: " + fn);
+                                continue;
                             }
                         }
                     }

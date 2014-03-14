@@ -107,6 +107,9 @@ var Draw2DSprite = (function () {
     };
 
     Draw2DSprite.prototype.setTexture = function (texture) {
+        // Verify that the texture is not NPOT
+        /* debug.assert((!texture) || (0 === (texture.width & (texture.width - 1)) && 0 === (texture.height & (texture.height - 1))), "Draw2DSprite does not support non-power-of-2 textures"); */
+
         if (this._texture !== texture) {
             var su = (this._texture ? this._texture.width : 1.0) / (texture ? texture.width : 1.0);
             var sv = (this._texture ? this._texture.height : 1.0) / (texture ? texture.height : 1.0);
@@ -129,6 +132,10 @@ var Draw2DSprite = (function () {
         width *= 0.5;
         var data = this.data;
         if (data[17] !== width) {
+            // Move the origin so that the sprite gets scaled around
+            // it, rather than scaled around the top left corner.
+            // originX = originX * (newwidth/2) / (oldwidth/2)
+            data[23] = data[23] * width / data[17];
             data[17] = width;
             this._invalidate();
         }
@@ -142,6 +149,8 @@ var Draw2DSprite = (function () {
         height *= 0.5;
         var data = this.data;
         if (data[18] !== height) {
+            // originY = originY * (newheight/2) / (oldheight/2)
+            data[24] = data[24] * height / data[18];
             data[18] = height;
             this._invalidate();
         }
@@ -379,6 +388,12 @@ var Draw2DSprite = (function () {
 
         // texture (not optional)
         var texture = s._texture = params.texture || null;
+        if (texture) {
+            if ((0 !== (texture.width & (texture.width - 1))) || (0 !== (texture.height & (texture.height - 1)))) {
+                /* debug.abort("Draw2DSprites require textures with power-of-2 " + "dimensions"); */
+                return null;
+            }
+        }
 
         // position (optional, default 0,0)
         s.x = (params.x || 0.0);
@@ -436,6 +451,7 @@ var Draw2DSprite = (function () {
 //function Draw2DSpriteData() {}
 var Draw2DSpriteData = {
     setFromRotatedRectangle: function setFromRotatedRectangleFn(sprite, texture, rect, uvrect, color, rotation, origin) {
+        /* debug.assert(rect.length === 4); */
         var x1 = rect[0];
         var y1 = rect[1];
         var x2 = rect[2];
@@ -453,6 +469,7 @@ var Draw2DSpriteData = {
         } else {
             var cx, cy;
             if (origin) {
+                /* debug.assert(origin.length === 2); */
                 cx = x1 + origin[0];
                 cy = y1 + origin[1];
             } else {
@@ -479,6 +496,7 @@ var Draw2DSpriteData = {
         }
 
         if (color) {
+            /* debug.assert(color.length === 4); */
             sprite[8] = color[0];
             sprite[9] = color[1];
             sprite[10] = color[2];
@@ -488,6 +506,7 @@ var Draw2DSpriteData = {
         }
 
         if (uvrect && texture) {
+            /* debug.assert(uvrect.length === 4); */
             var iwidth = 1 / texture.width;
             var iheight = 1 / texture.height;
             sprite[12] = uvrect[0] * iwidth;
@@ -1788,8 +1807,8 @@ var Draw2D = (function () {
             "name": "draw2D.cgfx",
             "samplers": {
                 "texture": {
-                    "MinFilter": 9985,
-                    "MagFilter": 9729,
+                    "MinFilter": 9985/* LINEAR_MIPMAP_NEAREST */ ,
+                    "MagFilter": 9729/* LINEAR */ ,
                     "WrapS": 33071,
                     "WrapT": 33071
                 },

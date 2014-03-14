@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2012 Turbulenz Limited
+// Copyright (c) 2010-2014 Turbulenz Limited
 ;
 
 var AnimationManager = (function () {
@@ -32,8 +32,10 @@ var AnimationManager = (function () {
 
     AnimationManager.create = function (errorCallback, log) {
         if (!errorCallback) {
+            /* tslint:disable:no-empty */
             errorCallback = function (msg) {
             };
+            /* tslint:enable:no-empty */
         }
 
         var animations = {};
@@ -106,6 +108,7 @@ var AnimationManager = (function () {
                                 if (channels.hasOwnProperty(value)) {
                                     channel = channels[value];
 
+                                    // TODO: For now we repeate values for intermediate keyframes
                                     channel.count = 1 + channel.lastKey - channel.firstKey;
                                     if (channel.firstKey) {
                                         channel.count += 1;
@@ -198,9 +201,11 @@ var AnimationManager = (function () {
             }
         };
 
+        /* tslint:disable:no-empty */
         var loadAnimationFile = function loadAnimationFileFn(path, onload) {
         };
 
+        /* tslint:enable:no-empty */
         var getAnimation = function getAnimationFn(name) {
             var animation = animations[name];
             return animation;

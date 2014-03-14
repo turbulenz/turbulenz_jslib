@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2012 Turbulenz Limited
+// Copyright (c) 2009-2014 Turbulenz Limited
 /*global TurbulenzEngine: false*/
 ;
 
@@ -95,8 +95,6 @@ var AnimationChannels = {
 var Animation = {
     minKeyframeDelta: 0.0001,
     standardGetJointWorldTransform: function StandardGetJointWorldTransformFn(controller, jointId, mathDevice, asMatrix) {
-        var quatMulTranslate = mathDevice.quatMulTranslate;
-        var m43FromRTS = mathDevice.m43FromRTS;
         var m43FromRT = mathDevice.m43FromRT;
         var quatCopy = mathDevice.quatCopy;
         var v3Copy = mathDevice.v3Copy;
@@ -109,10 +107,10 @@ var Animation = {
         if (hasScale) {
             var m43Mul = mathDevice.m43Mul;
             var parentMatrix;
-            var matrix = m43FromRTS.call(mathDevice, joint.rotation, joint.translation, joint.scale);
+            var matrix = mathDevice.m43FromRTS(joint.rotation, joint.translation, joint.scale);
             while (parentIndex !== -1) {
                 parentJoint = output[parentIndex];
-                parentMatrix = m43FromRTS.call(mathDevice, parentJoint.rotation, parentJoint.translation, parentJoint.scale, parentMatrix);
+                parentMatrix = mathDevice.m43FromRTS(parentJoint.rotation, parentJoint.translation, parentJoint.scale, parentMatrix);
 
                 matrix = m43Mul.call(mathDevice, matrix, parentMatrix, matrix);
 
@@ -134,7 +132,7 @@ var Animation = {
             while (parentIndex !== -1) {
                 parentJoint = output[parentIndex];
 
-                quatMulTranslate.call(mathDevice, parentJoint.rotation, parentJoint.translation, rotation, translation, rotation, translation);
+                mathDevice.quatMulTranslate(parentJoint.rotation, parentJoint.translation, rotation, translation, rotation, translation);
 
                 parentIndex = hierarchyParents[parentIndex];
             }
@@ -194,7 +192,12 @@ var InterpolatorController = (function () {
                         return;
                     }
                 }
-                this.currentTime -= animLength;
+                if (0 !== animLength) {
+                    this.currentTime -= animLength;
+                } else {
+                    this.currentTime = 0;
+                    break;
+                }
             } else {
                 if (this.onFinishedCallback) {
                     if (!this.onFinishedCallback(this)) {
@@ -202,6 +205,7 @@ var InterpolatorController = (function () {
                     }
                 }
                 this.currentTime = animLength;
+                break;
             }
         }
 
@@ -860,24 +864,25 @@ var TransitionController = (function () {
         // For each joint slerp between the quats and return the quat pos result
         var numJoints = this.startController.getHierarchy().numNodes;
         for (var j = 0; j < numJoints; j += 1) {
-            if (!output[j]) {
-                output[j] = {};
+            var joint = output[j];
+            if (!joint) {
+                output[j] = joint = {};
             }
             var j1 = startOutput[j];
             var j2 = endOutput[j];
 
-            output[j].rotation = quatSlerp.call(mathDevice, j1.rotation, j2.rotation, delta, output[j].rotation);
-            output[j].translation = v3Lerp.call(mathDevice, j1.translation, j2.translation, delta, output[j].translation);
+            joint.rotation = quatSlerp.call(mathDevice, j1.rotation, j2.rotation, delta, joint.rotation);
+            joint.translation = v3Lerp.call(mathDevice, j1.translation, j2.translation, delta, joint.translation);
 
             if (outputScale) {
                 if (scaleOnStart) {
                     if (scaleOnEnd) {
-                        output[j].scale = v3Lerp.call(mathDevice, j1.scale, j2.scale, delta, output[j].scale);
+                        joint.scale = v3Lerp.call(mathDevice, j1.scale, j2.scale, delta, joint.scale);
                     } else {
-                        output[j].scale = v3Copy.call(mathDevice, j1.scale, output[j].scale);
+                        joint.scale = v3Copy.call(mathDevice, j1.scale, joint.scale);
                     }
                 } else if (scaleOnEnd) {
-                    output[j].scale = v3Copy.call(mathDevice, j2.scale, output[j].scale);
+                    joint.scale = v3Copy.call(mathDevice, j2.scale, joint.scale);
                 }
             }
         }
@@ -1051,24 +1056,25 @@ var BlendController = (function () {
         // For each joint slerp between the quats and return the quat pos result
         var numJoints = startController.getHierarchy().numNodes;
         for (var j = 0; j < numJoints; j += 1) {
-            if (!output[j]) {
-                output[j] = {};
+            var joint = output[j];
+            if (!joint) {
+                output[j] = joint = {};
             }
             var j1 = startOutput[j];
             var j2 = endOutput[j];
 
-            output[j].rotation = quatSlerp.call(mathDevice, j1.rotation, j2.rotation, delta, output[j].rotation);
-            output[j].translation = v3Lerp.call(mathDevice, j1.translation, j2.translation, delta, output[j].translation);
+            joint.rotation = quatSlerp.call(mathDevice, j1.rotation, j2.rotation, delta, joint.rotation);
+            joint.translation = v3Lerp.call(mathDevice, j1.translation, j2.translation, delta, joint.translation);
 
             if (outputScale) {
                 if (scaleOnStart) {
                     if (scaleOnEnd) {
-                        output[j].scale = v3Lerp.call(mathDevice, j1.scale, j2.scale, delta, output[j].scale);
+                        joint.scale = v3Lerp.call(mathDevice, j1.scale, j2.scale, delta, joint.scale);
                     } else {
-                        output[j].scale = v3Copy.call(mathDevice, j1.scale, output[j].scale);
+                        joint.scale = v3Copy.call(mathDevice, j1.scale, joint.scale);
                     }
                 } else if (scaleOnEnd) {
-                    output[j].scale = v3Copy.call(mathDevice, j2.scale, output[j].scale);
+                    joint.scale = v3Copy.call(mathDevice, j2.scale, joint.scale);
                 }
             }
         }
@@ -1233,16 +1239,17 @@ var MaskController = (function () {
             // For each joint copy over if the mask is set
             var numJoints = controller.getHierarchy().numNodes;
             for (var j = 0; j < numJoints; j += 1) {
-                if (!output[j]) {
-                    output[j] = {};
+                var joint = output[j];
+                if (!joint) {
+                    output[j] = joint = {};
                 }
                 if (mask[j]) {
-                    output[j].rotation = mathDevice.quatCopy(controllerOutput[j].rotation, output[j].rotation);
-                    output[j].translation = mathDevice.v3Copy(controllerOutput[j].translation, output[j].translation);
+                    joint.rotation = mathDevice.quatCopy(controllerOutput[j].rotation, joint.rotation);
+                    joint.translation = mathDevice.v3Copy(controllerOutput[j].translation, joint.translation);
                     if (createScale) {
-                        output[j].scale = mathDevice.v3BuildOne(output[j].scale);
+                        joint.scale = mathDevice.v3BuildOne(joint.scale);
                     } else if (outputScale) {
-                        output[j].scale = mathDevice.v3Copy(controllerOutput[j].scale, output[j].scale);
+                        joint.scale = mathDevice.v3Copy(controllerOutput[j].scale, joint.scale);
                     }
                 }
             }
@@ -1435,39 +1442,36 @@ var PoseController = (function () {
     function PoseController() {
     }
     // Controller Base End
+    /* tslint:disable:no-empty */
     PoseController.prototype.addTime = function (delta) {
     };
 
     PoseController.prototype.update = function () {
     };
 
+    /* tslint:enable:no-empty */
     PoseController.prototype.updateBounds = function () {
         if (this.dirtyBounds) {
             // First generate ltms for the pose
             var md = this.mathDevice;
-            var m43Mul = md.m43Mul;
-            var m43Copy = md.m43Copy;
-            var m43FromRTS = md.m43FromRTS;
-            var m43FromRT = md.m43FromRT;
-            var m43Pos = md.m43Pos;
-
             var output = this.output;
             var numJoints = this.hierarchy.numNodes;
             var parents = this.hierarchy.parents;
             var ltms = [];
-            var jointMatrix;
+            var jointMatrix, joint;
             for (var j = 0; j < numJoints; j += 1) {
-                if (output[j].scale) {
-                    jointMatrix = m43FromRTS.call(md, output[j].rotation, output[j].translation, output[j].scale, jointMatrix);
+                joint = output[j];
+                if (joint.scale) {
+                    jointMatrix = md.m43FromRTS(joint.rotation, joint.translation, joint.scale, jointMatrix);
                 } else {
-                    jointMatrix = m43FromRT.call(md, output[j].rotation, output[j].translation, jointMatrix);
+                    jointMatrix = md.m43FromRT(joint.rotation, joint.translation, jointMatrix);
                 }
 
                 var parent = parents[j];
                 if (parent !== -1) {
-                    ltms[j] = m43Mul.call(md, jointMatrix, ltms[parent], ltms[j]);
+                    ltms[j] = md.m43Mul(jointMatrix, ltms[parent], ltms[j]);
                 } else {
-                    ltms[j] = m43Copy.call(md, jointMatrix, ltms[j]);
+                    ltms[j] = md.m43Copy(jointMatrix, ltms[j]);
                 }
             }
 
@@ -1477,7 +1481,7 @@ var PoseController = (function () {
             var max = md.v3Build(-maxNumber, -maxNumber, -maxNumber);
             for (j = 0; j < numJoints; j += 1) {
                 jointMatrix = ltms[j];
-                var pos = m43Pos.call(md, jointMatrix);
+                var pos = md.m43Pos(jointMatrix);
                 min = md.v3Min(min, pos);
                 max = md.v3Max(max, pos);
             }
@@ -1500,12 +1504,14 @@ var PoseController = (function () {
         return Animation.standardGetJointWorldTransform(this, jointId, this.mathDevice, asMatrix);
     };
 
+    /* tslint:disable:no-empty */
     PoseController.prototype.setTime = function (time) {
     };
 
     PoseController.prototype.setRate = function (rate) {
     };
 
+    /* tslint:enable:no-empty */
     PoseController.prototype.setOutputChannels = function (channels) {
         this.outputChannels = channels;
     };
@@ -1654,9 +1660,6 @@ var NodeTransformController = (function () {
 
         // convert the input interpolator quat pos data into skinning matrices
         var node;
-        var m43FromRTS = mathDevice.m43FromRTS;
-        var m43FromQuatPos = mathDevice.m43FromQuatPos;
-        var quatPosBuild = mathDevice.quatPosBuild;
 
         var interpOut = this.inputController.output;
         var interpChannels = this.inputController.outputChannels;
@@ -1672,10 +1675,10 @@ var NodeTransformController = (function () {
             var interpVal = interpOut[j];
 
             if (hasScale) {
-                jointMatrix = m43FromRTS.call(mathDevice, interpVal.rotation, interpVal.translation, interpVal.scale, jointMatrix);
+                jointMatrix = mathDevice.m43FromRTS(interpVal.rotation, interpVal.translation, interpVal.scale, jointMatrix);
             } else {
-                quatPos = quatPosBuild.call(mathDevice, interpVal.rotation, interpVal.translation, quatPos);
-                jointMatrix = m43FromQuatPos.call(mathDevice, quatPos, ltms[j]);
+                quatPos = mathDevice.quatPosBuild(interpVal.rotation, interpVal.translation, quatPos);
+                jointMatrix = mathDevice.m43FromQuatPos(quatPos, ltms[j]);
             }
 
             node = nodesMap[j];
@@ -1898,6 +1901,45 @@ var SkinnedNode = (function () {
         this.skinController.dirty = true;
     };
 
+    SkinnedNode.prototype.setNodeHierarchyBoneMatricesAndBounds = function (node, extents, skinController) {
+        var isFullySkinned = (!node.lightInstances || node.lightInstances.length === 0);
+
+        var renderables = node.renderables;
+        if (renderables) {
+            var numRenderables = renderables.length;
+            for (var i = 0; i < numRenderables; i += 1) {
+                var renderable = renderables[i];
+                if (renderable.isSkinned()) {
+                    renderable.skinController = skinController;
+                    renderable.addCustomWorldExtents(extents);
+                } else {
+                    isFullySkinned = false;
+                }
+            }
+        }
+
+        var children = node.children;
+        if (children) {
+            var numChildren = children.length;
+            for (var c = 0; c < numChildren; c += 1) {
+                var childSkinned = this.setNodeHierarchyBoneMatricesAndBounds(children[c], extents, skinController);
+                if (!childSkinned) {
+                    isFullySkinned = false;
+                }
+            }
+        }
+
+        if (isFullySkinned) {
+            node.addCustomWorldExtents(extents);
+        } else {
+            if (node.getCustomWorldExtents()) {
+                node.removeCustomWorldExtents();
+            }
+        }
+
+        return isFullySkinned;
+    };
+
     SkinnedNode.prototype.update = function (updateSkinController) {
         // update the skin controller
         var skinController = this.skinController;
@@ -1907,45 +1949,6 @@ var SkinnedNode = (function () {
             if (this.input.dirtyBounds) {
                 this.input.updateBounds();
             }
-        }
-
-        function setNodeHierarchyBoneMatricesAndBoundsFn(node, extents, skinController) {
-            var isFullySkinned = (!node.lightInstances || node.lightInstances.length === 0);
-
-            var renderables = node.renderables;
-            if (renderables) {
-                var numRenderables = renderables.length;
-                for (var i = 0; i < numRenderables; i += 1) {
-                    var renderable = renderables[i];
-                    if (renderable.isSkinned()) {
-                        renderable.skinController = skinController;
-                        renderable.addCustomWorldExtents(extents);
-                    } else {
-                        isFullySkinned = false;
-                    }
-                }
-            }
-
-            var children = node.children;
-            if (children) {
-                var numChildren = children.length;
-                for (var c = 0; c < numChildren; c += 1) {
-                    var childSkinned = setNodeHierarchyBoneMatricesAndBoundsFn(children[c], extents, skinController);
-                    if (!childSkinned) {
-                        isFullySkinned = false;
-                    }
-                }
-            }
-
-            if (isFullySkinned) {
-                node.addCustomWorldExtents(extents);
-            } else {
-                if (node.getCustomWorldExtents()) {
-                    node.removeCustomWorldExtents();
-                }
-            }
-
-            return isFullySkinned;
         }
 
         // calculate the bounds in world space
@@ -2001,7 +2004,7 @@ var SkinnedNode = (function () {
             extents[5] = (c2 + h2);
         }
 
-        setNodeHierarchyBoneMatricesAndBoundsFn(this.node, extents, skinController);
+        this.setNodeHierarchyBoneMatricesAndBounds(this.node, extents, skinController);
     };
 
     SkinnedNode.prototype.getJointIndex = function (jointName) {
@@ -2024,32 +2027,32 @@ var SkinnedNode = (function () {
 
         // convert the input quat pos data into skinning matrices
         var md = this.md;
-        var m43FromRT = md.m43FromRT;
-        var m43FromRTS = md.m43FromRTS;
-        var m43Mul = md.m43Mul;
         var interpOut = this.input.output;
         var interpChannels = this.input.outputChannels;
         var hasScale = interpChannels.scale;
 
         var jointParents = this.skinController.skeleton.parents;
 
+        var jointOutput = interpOut[jointIndex];
+
         var boneMatrix;
         if (hasScale) {
-            boneMatrix = m43FromRTS.call(md, interpOut[jointIndex].rotation, interpOut[jointIndex].translation, interpOut[jointIndex].scale, dst);
+            boneMatrix = md.m43FromRTS(jointOutput.rotation, jointOutput.translation, jointOutput.scale, dst);
         } else {
-            boneMatrix = m43FromRT.call(md, interpOut[jointIndex].rotation, interpOut[jointIndex].translation, dst);
+            boneMatrix = md.m43FromRT(jointOutput.rotation, jointOutput.translation, dst);
         }
 
         var parentMatrix = this.scratchM43;
 
         while (jointParents[jointIndex] !== -1) {
             jointIndex = jointParents[jointIndex];
+            jointOutput = interpOut[jointIndex];
             if (hasScale) {
-                parentMatrix = m43FromRTS.call(md, interpOut[jointIndex].rotation, interpOut[jointIndex].translation, interpOut[jointIndex].scale, parentMatrix);
+                parentMatrix = md.m43FromRTS(jointOutput.rotation, jointOutput.translation, jointOutput.scale, parentMatrix);
             } else {
-                parentMatrix = m43FromRT.call(md, interpOut[jointIndex].rotation, interpOut[jointIndex].translation, parentMatrix);
+                parentMatrix = md.m43FromRT(jointOutput.rotation, jointOutput.translation, parentMatrix);
             }
-            boneMatrix = m43Mul.call(md, boneMatrix, parentMatrix, boneMatrix);
+            boneMatrix = md.m43Mul(boneMatrix, parentMatrix, boneMatrix);
         }
         return boneMatrix;
     };

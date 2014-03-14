@@ -1,4 +1,4 @@
-// Copyright (c) 2012 Turbulenz Limited
+// Copyright (c) 2012-2014 Turbulenz Limited
 // Complains in various parts about use of (/*NAME*/value) constants.
 /*global
 Float32Array: false
@@ -5022,8 +5022,6 @@ var Physics2DPolygon = (function (_super) {
     Physics2DPolygon.version = 1;
     return Physics2DPolygon;
 })(Physics2DShape);
-
-Physics2DPolygon;
 
 // =========================================================================
 //

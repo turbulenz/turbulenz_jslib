@@ -1,4 +1,4 @@
-// Copyright (c) 2012 Turbulenz Limited
+// Copyright (c) 2012-2014 Turbulenz Limited
 /*global Float32Array: false*/
 ;
 
@@ -364,7 +364,7 @@ var BoxTree = (function () {
         var axis = 0;
 
         var sortNodesRecursive = function sortNodesRecursiveFn(nodes, startIndex, endIndex) {
-            /*jshint bitwise: false*/
+            /* tslint:disable:no-bitwise */
             var splitNodeIndex = ((startIndex + endIndex) >> 1);
 
             if (axis === 0) {
@@ -452,10 +452,10 @@ var BoxTree = (function () {
         var reverse = false;
 
         var sortNodesHighQualityRecursive = function sortNodesHighQualityRecursiveFn(nodes, startIndex, endIndex) {
-            /*jshint bitwise: false*/
+            /* tslint:disable:no-bitwise */
             var splitNodeIndex = ((startIndex + endIndex) >> 1);
 
-            /*jshint bitwise: true*/
+            /* tslint:enable:no-bitwise */
             nthElement(nodes, startIndex, splitNodeIndex, endIndex, getkeyXfn);
             var sahX = (calculateSAH(nodes, startIndex, splitNodeIndex) + calculateSAH(nodes, splitNodeIndex, endIndex));
 
@@ -580,10 +580,10 @@ var BoxTree = (function () {
         }
 
         while ((last - first) > 8) {
-            /*jshint bitwise: false*/
+            /* tslint:disable:no-bitwise */
             var midValue = medianFn(getkey(nodes[first]), getkey(nodes[first + ((last - first) >> 1)]), getkey(nodes[last - 1]));
 
-            /*jshint bitwise: true*/
+            /* tslint:enable:no-bitwise */
             var firstPos = first;
             var lastPos = last;
             var midPos;
@@ -657,7 +657,7 @@ var BoxTree = (function () {
 
             lastNode = nodes[lastNodeIndex];
         } else {
-            /*jshint bitwise: false*/
+            /* tslint:disable:no-bitwise */
             var splitPosIndex = ((startIndex + endIndex) >> 1);
 
             if ((startIndex + 1) >= splitPosIndex) {

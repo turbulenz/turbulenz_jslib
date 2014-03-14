@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2013 Turbulenz Limited
+// Copyright (c) 2010-2014 Turbulenz Limited
 ;
 var Utilities = {
     //
@@ -8,6 +8,7 @@ var Utilities = {
     assert: function assertFn(test, message) {
         if (!test) {
             if (!this.skipAsserts) {
+                // Use a function that does not exist. This is caught in the debuggers.
                 this.breakInDebugger.doesNotExist();
             }
         }
@@ -16,8 +17,11 @@ var Utilities = {
     // beget
     //
     beget: function begetFn(o) {
+        /* tslint:disable:no-empty */
         var F = function () {
         };
+
+        /* tslint:enable:no-empty */
         F.prototype = o;
         return new F();
     },
@@ -48,6 +52,7 @@ var Utilities = {
             }
         }
     },
+    /* tslint:disable:no-bitwise */
     nearestLowerPow2: function UtilitiesNearestLowerPow2(num) {
         num = num | (num >>> 1);
         num = num | (num >>> 2);
@@ -57,7 +62,6 @@ var Utilities = {
         return (num - (num >>> 1));
     },
     nearestUpperPow2: function UtilitiesNearestUpperPow2(num) {
-        /*jshint bitwise: false*/
         num = num - 1;
         num = num | (num >>> 1);
         num = num | (num >>> 2);
@@ -66,6 +70,7 @@ var Utilities = {
         num = num | (num >>> 16);
         return (num + 1);
     },
+    /* tslint:enable:no-bitwise */
     //
     // ajax
     //
@@ -116,40 +121,46 @@ var Utilities = {
             this.xhr.onreadystatechange = null;
             this.xhr = null;
 
-            var response;
-
-            response = JSON.parse(xhrResponseText);
-            if (encrypted) {
-                var sig = xhr.getResponseHeader("X-TZ-Signature");
-                var validSignature = TurbulenzEngine.verifySignature(xhrResponseText, sig);
-                xhrResponseText = null;
-
+            if (xhr.getResponseHeader("Content-Type") !== "application/json; charset=utf-8") {
                 TurbulenzEngine.setTimeout(function () {
-                    var receivedUrl = response.requestUrl;
-
-                    if (validSignature) {
-                        if (!TurbulenzEngine.encryptionEnabled || receivedUrl === url) {
-                            callbackFn(response, xhrStatus);
-                            callbackFn = null;
-                            return;
-                        }
-                    }
-
-                    if (xhrStatus === 400) {
-                        callbackFn(response, xhrStatus, "Verification Failed");
-                    } else {
-                        // Else drop reply
-                        callbackFn({ msg: "Verification failed", ok: false }, 400, "Verification Failed");
-                    }
+                    callbackFn({ msg: 'HttpStatus ' + xhrStatus + ' ' + Utilities.ajaxStatusCodes[xhrStatus] }, xhrStatus);
                     callbackFn = null;
                 }, 0);
             } else {
-                xhrResponseText = null;
+                var response = JSON.parse(xhrResponseText);
 
-                TurbulenzEngine.setTimeout(function () {
-                    callbackFn(response, xhrStatus);
-                    callbackFn = null;
-                }, 0);
+                if (encrypted) {
+                    var sig = xhr.getResponseHeader("X-TZ-Signature");
+                    var validSignature = TurbulenzEngine.verifySignature(xhrResponseText, sig);
+                    xhrResponseText = null;
+
+                    TurbulenzEngine.setTimeout(function () {
+                        var receivedUrl = response.requestUrl;
+
+                        if (validSignature) {
+                            if (!TurbulenzEngine.encryptionEnabled || receivedUrl === url) {
+                                callbackFn(response, xhrStatus);
+                                callbackFn = null;
+                                return;
+                            }
+                        }
+
+                        if (xhrStatus === 400) {
+                            callbackFn(response, xhrStatus, "Verification Failed");
+                        } else {
+                            // Else drop reply
+                            callbackFn({ msg: "Verification failed", ok: false }, 400, "Verification Failed");
+                        }
+                        callbackFn = null;
+                    }, 0);
+                } else {
+                    xhrResponseText = null;
+
+                    TurbulenzEngine.setTimeout(function () {
+                        callbackFn(response, xhrStatus);
+                        callbackFn = null;
+                    }, 0);
+                }
             }
         };
 
@@ -267,7 +278,9 @@ var Utilities = {
     }
 };
 
-var MathDeviceConvert = {
+/* tslint:disable:no-unused-variable */
+var MathDeviceConvert = /* tslint:enable:no-unused-variable */
+{
     v2ToArray: function v2ToJavaScriptArrayFn(v2) {
         return [v2[0], v2[1]];
     },

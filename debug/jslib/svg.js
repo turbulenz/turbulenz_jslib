@@ -1,4 +1,4 @@
-// Copyright (c) 2013 Turbulenz Limited
+// Copyright (c) 2013-2014 Turbulenz Limited
 var __extends = this.__extends || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -170,7 +170,7 @@ var SVGBaseNode = (function () {
         var numTransforms = transforms.length;
         var matrix = [1, 0, 0, 1, 0, 0];
         var ax, ay;
-        var m0, m1, m2, m3, m4, m5;
+        var m0, m1, m2, m3;
         for (var t = 0; t < numTransforms; t += 2) {
             var type = transforms[t];
             var arg = transforms[t + 1];
@@ -197,8 +197,8 @@ var SVGBaseNode = (function () {
                         var s = Math.sin(angle);
                         var c = Math.cos(angle);
                         if (s < -0.005 || 0.005 < s || c < 0.995 || 1.005 < c) {
-                            var ax = arg[1];
-                            var ay = arg[2];
+                            ax = arg[1];
+                            ay = arg[2];
 
                             m0 = matrix[0];
                             m1 = matrix[1];
@@ -376,6 +376,7 @@ var SVGBaseNode = (function () {
         }
     };
 
+    /* tslint:disable:no-empty */
     SVGBaseNode.prototype._drawShape = function (ctx) {
     };
     return SVGBaseNode;
@@ -390,9 +391,11 @@ var SVGEmptyNode = (function (_super) {
     function SVGEmptyNode() {
         _super.apply(this, arguments);
     }
+    /* tslint:disable:no-empty */
     SVGEmptyNode.prototype._drawState = function (ctx) {
     };
 
+    /* tslint:enable:no-empty */
     SVGEmptyNode.prototype._drawStateChildren = function (ctx) {
         ctx.save();
 
@@ -426,16 +429,16 @@ var SVGPathNode = (function (_super) {
     function SVGPathNode(path) {
         _super.call(this);
 
-        this.path = path;
-
         debug.assert(path);
+
+        this.compiledPath = CanvasContext.prototype.parsePath(path);
     }
     SVGPathNode.prototype._drawShape = function (ctx) {
-        var path = this.path;
+        var compiledPath = this.compiledPath;
 
         ctx.beginPath();
 
-        ctx.path(path);
+        ctx.compiledPath(compiledPath);
 
         if (ctx.fillStyle !== 'none') {
             ctx.fill();

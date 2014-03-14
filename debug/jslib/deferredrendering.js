@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2013 Turbulenz Limited
+// Copyright (c) 2009-2014 Turbulenz Limited
 ;
 
 //
@@ -9,6 +9,7 @@ renderingCommonCreateRendererInfoFn: false,
 renderingCommonSortKeyFn: false*/
 var DeferredRendering = (function () {
     function DeferredRendering() {
+        /* tslint:enable:no-unused-variable */
         this.minPixelCount = 256;
     }
     DeferredRendering.prototype.updateShader = function (sm) {
@@ -157,6 +158,8 @@ var DeferredRendering = (function () {
         var viewProjectionMatrix = camera.viewProjectionMatrix;
 
         var md = this.md;
+
+        /* tslint:disable:no-string-literal */
         var globalTechniqueParameters = this.globalTechniqueParameters;
         globalTechniqueParameters['viewProjection'] = viewProjectionMatrix;
         globalTechniqueParameters['eyePosition'] = md.m43Pos(camera.matrix, globalTechniqueParameters['eyePosition']);
@@ -172,7 +175,8 @@ var DeferredRendering = (function () {
         sharedTechniqueParameters['viewProjection'] = viewProjectionMatrix;
         sharedTechniqueParameters['maxDepth'] = -maxDepth;
 
-        var l, node, light, lightInstance, matrix, techniqueParameters, origin, halfExtents, worldView;
+        /* tslint:enable:no-string-literal */
+        var l, node, light, lightInstance, matrix, tp, origin, halfExtents, worldView;
 
         var directionalInstances = this.localDirectionalLights;
         var numDirectionalInstances = directionalInstances.length;
@@ -187,26 +191,26 @@ var DeferredRendering = (function () {
 
                 if (this.lightFindVisibleRenderables(lightInstance, scene)) {
                     matrix = node.world;
-                    techniqueParameters = lightInstance.techniqueParameters;
-                    if (!techniqueParameters) {
-                        techniqueParameters = gd.createTechniqueParameters();
-                        lightInstance.techniqueParameters = techniqueParameters;
+                    tp = lightInstance.techniqueParameters;
+                    if (!tp) {
+                        tp = gd.createTechniqueParameters();
+                        lightInstance.techniqueParameters = tp;
                     }
 
                     halfExtents = light.halfExtents;
 
                     worldView = md.m43Mul(matrix, viewMatrix, worldView);
 
-                    techniqueParameters.world = matrix;
-                    techniqueParameters.worldViewTranspose = md.m43Transpose(worldView, techniqueParameters.worldViewTranspose);
+                    tp.world = matrix;
+                    tp.worldViewTranspose = md.m43Transpose(worldView, tp.worldViewTranspose);
 
                     direction = md.m43TransformVector(worldView, light.direction, direction);
-                    techniqueParameters.lightOrigin = md.v3ScalarMul(direction, -1e6, techniqueParameters.lightOrigin);
+                    tp.lightOrigin = md.v3ScalarMul(direction, -1e6, tp.lightOrigin);
 
-                    techniqueParameters.lightColor = light.color;
+                    tp.lightColor = light.color;
 
-                    techniqueParameters.lightExtents = halfExtents;
-                    techniqueParameters.lightViewInverseTranspose = md.m43InverseTransposeProjection(worldView, halfExtents, techniqueParameters.lightViewInverseTranspose);
+                    tp.lightExtents = halfExtents;
+                    tp.lightViewInverseTranspose = md.m43InverseTransposeProjection(worldView, halfExtents, tp.lightViewInverseTranspose);
 
                     l += 1;
                 } else {
@@ -236,10 +240,10 @@ var DeferredRendering = (function () {
 
                 if (this.lightFindVisibleRenderables(lightInstance, scene)) {
                     matrix = node.world;
-                    techniqueParameters = lightInstance.techniqueParameters;
-                    if (!techniqueParameters) {
-                        techniqueParameters = gd.createTechniqueParameters();
-                        lightInstance.techniqueParameters = techniqueParameters;
+                    tp = lightInstance.techniqueParameters;
+                    if (!tp) {
+                        tp = gd.createTechniqueParameters();
+                        lightInstance.techniqueParameters = tp;
                     }
 
                     origin = light.origin;
@@ -247,17 +251,17 @@ var DeferredRendering = (function () {
 
                     worldView = md.m43Mul(matrix, viewMatrix, worldView);
 
-                    techniqueParameters.world = matrix;
-                    techniqueParameters.worldViewTranspose = md.m43Transpose(worldView, techniqueParameters.worldViewTranspose);
+                    tp.world = matrix;
+                    tp.worldViewTranspose = md.m43Transpose(worldView, tp.worldViewTranspose);
                     if (origin) {
-                        techniqueParameters.lightOrigin = md.m43TransformPoint(worldView, origin, techniqueParameters.lightOrigin);
+                        tp.lightOrigin = md.m43TransformPoint(worldView, origin, tp.lightOrigin);
                     } else {
-                        techniqueParameters.lightOrigin = md.m43Pos(worldView, techniqueParameters.lightOrigin);
+                        tp.lightOrigin = md.m43Pos(worldView, tp.lightOrigin);
                     }
-                    techniqueParameters.lightColor = light.color;
+                    tp.lightColor = light.color;
 
-                    techniqueParameters.lightExtents = halfExtents;
-                    techniqueParameters.lightViewInverseTranspose = md.m43InverseTransposeProjection(worldView, halfExtents, techniqueParameters.lightViewInverseTranspose);
+                    tp.lightExtents = halfExtents;
+                    tp.lightViewInverseTranspose = md.m43InverseTransposeProjection(worldView, halfExtents, tp.lightViewInverseTranspose);
 
                     l += 1;
                 } else {
@@ -290,24 +294,24 @@ var DeferredRendering = (function () {
 
                 if (this.lightFindVisibleRenderables(lightInstance, scene)) {
                     matrix = node.world;
-                    techniqueParameters = lightInstance.techniqueParameters;
-                    if (!techniqueParameters) {
-                        techniqueParameters = gd.createTechniqueParameters();
-                        lightInstance.techniqueParameters = techniqueParameters;
+                    tp = lightInstance.techniqueParameters;
+                    if (!tp) {
+                        tp = gd.createTechniqueParameters();
+                        lightInstance.techniqueParameters = tp;
                     }
 
                     origin = light.origin;
 
                     worldView = md.m43Mul(matrix, viewMatrix, worldView);
 
-                    techniqueParameters.world = matrix;
-                    techniqueParameters.worldViewTranspose = md.m43Transpose(worldView, techniqueParameters.worldViewTranspose);
+                    tp.world = matrix;
+                    tp.worldViewTranspose = md.m43Transpose(worldView, tp.worldViewTranspose);
                     if (origin) {
-                        techniqueParameters.lightOrigin = md.m43TransformPoint(worldView, origin, techniqueParameters.lightOrigin);
+                        tp.lightOrigin = md.m43TransformPoint(worldView, origin, tp.lightOrigin);
                     } else {
-                        techniqueParameters.lightOrigin = md.m43Pos(worldView, techniqueParameters.lightOrigin);
+                        tp.lightOrigin = md.m43Pos(worldView, tp.lightOrigin);
                     }
-                    techniqueParameters.lightColor = light.color;
+                    tp.lightColor = light.color;
 
                     var frustum = light.frustum;
                     var frustumNear = light.frustumNear;
@@ -317,8 +321,8 @@ var DeferredRendering = (function () {
                     lightProjection[8] = invFrustumNear;
                     lightProjection[11] = -(frustumNear * invFrustumNear);
                     lightViewInverseProjection = md.m43Mul(lightViewInverse, lightProjection, lightViewInverseProjection);
-                    techniqueParameters.lightFrustum = frustum;
-                    techniqueParameters.lightViewInverseTranspose = md.m43Transpose(lightViewInverseProjection, techniqueParameters.lightViewInverseTranspose);
+                    tp.lightFrustum = frustum;
+                    tp.lightViewInverseTranspose = md.m43Transpose(lightViewInverseProjection, tp.lightViewInverseTranspose);
 
                     l += 1;
                 } else {
@@ -347,10 +351,10 @@ var DeferredRendering = (function () {
                 node = lightInstance.node;
                 light = lightInstance.light;
                 matrix = node.world;
-                techniqueParameters = lightInstance.techniqueParameters;
-                if (!techniqueParameters) {
-                    techniqueParameters = gd.createTechniqueParameters();
-                    lightInstance.techniqueParameters = techniqueParameters;
+                tp = lightInstance.techniqueParameters;
+                if (!tp) {
+                    tp = gd.createTechniqueParameters();
+                    lightInstance.techniqueParameters = tp;
                 }
 
                 halfExtents = light.halfExtents;
@@ -368,16 +372,16 @@ var DeferredRendering = (function () {
                 }
 
                 worldView = md.m43Mul(matrix, viewMatrix, worldView);
-                lightViewInverseTranspose = md.m43InverseTransposeProjection(worldView, halfExtents, techniqueParameters.lightViewInverseTranspose);
+                lightViewInverseTranspose = md.m43InverseTransposeProjection(worldView, halfExtents, tp.lightViewInverseTranspose);
 
-                techniqueParameters.world = matrix;
-                techniqueParameters.worldViewTranspose = md.m43Transpose(worldView, techniqueParameters.worldViewTranspose);
-                techniqueParameters.lightOrigin = md.m43Pos(worldView, techniqueParameters.lightOrigin);
-                techniqueParameters.lightColor = light.color;
-                techniqueParameters.lightExtents = halfExtents;
-                techniqueParameters.lightExtentsInverse = halfExtentsInverse;
-                techniqueParameters.eyePositionLightSpace = md.m34Pos(lightViewInverseTranspose, techniqueParameters.eyePositionLightSpace);
-                techniqueParameters.lightViewInverseTranspose = lightViewInverseTranspose;
+                tp.world = matrix;
+                tp.worldViewTranspose = md.m43Transpose(worldView, tp.worldViewTranspose);
+                tp.lightOrigin = md.m43Pos(worldView, tp.lightOrigin);
+                tp.lightColor = light.color;
+                tp.lightExtents = halfExtents;
+                tp.lightExtentsInverse = halfExtentsInverse;
+                tp.eyePositionLightSpace = md.m34Pos(lightViewInverseTranspose, tp.eyePositionLightSpace);
+                tp.lightViewInverseTranspose = lightViewInverseTranspose;
 
                 l += 1;
             } while(l < numFogInstances);
@@ -597,6 +601,7 @@ var DeferredRendering = (function () {
         });
 
         if (this.albedoTexture && this.specularTexture && this.normalTexture && this.depthTexture && this.depthBuffer && this.diffuseLightingTexture && this.specularLightingTexture && this.finalTexture) {
+            /* tslint:disable:no-string-literal */
             var sharedTechniqueParameters = this.sharedTechniqueParameters;
             sharedTechniqueParameters['normalTexture'] = this.normalTexture;
             sharedTechniqueParameters['depthTexture'] = this.depthTexture;
@@ -607,6 +612,7 @@ var DeferredRendering = (function () {
             mixTechniqueParameters['diffuseLightingTexture'] = this.diffuseLightingTexture;
             mixTechniqueParameters['specularLightingTexture'] = this.specularLightingTexture;
 
+            /* tslint:enable:no-string-literal */
             this.baseRenderTarget = gd.createRenderTarget({
                 colorTexture0: this.albedoTexture,
                 colorTexture1: this.specularTexture,
@@ -837,15 +843,18 @@ var DeferredRendering = (function () {
                     }
                 }
 
+                var directionalLightTechnique;
                 if (numGlobalDirectionalLights) {
                     var ambientDirectionalLightTechnique = this.ambientDirectionalLightTechnique;
-                    var directionalLightTechnique = this.directionalLightTechnique;
+                    directionalLightTechnique = this.directionalLightTechnique;
 
                     var viewMatrix = md.m43InverseOrthonormal(this.globalCameraMatrix);
 
                     gd.setStream(quadVertexBuffer, quadSemantics);
 
                     gd.setTechnique(ambientDirectionalLightTechnique);
+
+                    /* tslint:disable:no-string-literal */
                     ambientDirectionalLightTechnique['normalTexture'] = this.normalTexture;
                     ambientDirectionalLightTechnique['ambientColor'] = md.v3Build(ambientColor0, ambientColor1, ambientColor2);
 
@@ -866,14 +875,17 @@ var DeferredRendering = (function () {
                         }
                     }
 
+                    /* tslint:enable:no-string-literal */
                     firstLight = false;
                 } else if (ambientColor0 !== 0 || ambientColor1 !== 0 || ambientColor1 !== 0) {
                     gd.setStream(quadVertexBuffer, quadSemantics);
 
                     gd.setTechnique(this.ambientLightTechnique);
 
+                    /* tslint:disable:no-string-literal */
                     this.ambientLightTechnique['lightColor'] = md.v3Build(ambientColor0, ambientColor1, ambientColor2);
 
+                    /* tslint:enable:no-string-literal */
                     gd.draw(quadPrimitive, 4);
 
                     firstLight = false;
@@ -888,7 +900,7 @@ var DeferredRendering = (function () {
             var technique, currentTechnique;
 
             if (numDirectionalInstances) {
-                var directionalLightTechnique = this.pointLightTechnique;
+                directionalLightTechnique = this.pointLightTechnique;
                 var directionalLightSpecularTechnique = this.pointLightSpecularTechnique;
                 var directionalLightSpecularShadowTechnique = this.pointLightSpecularShadowTechnique;
 
@@ -1148,7 +1160,9 @@ var DeferredRendering = (function () {
     };
 
     DeferredRendering.prototype.setLightingScale = function (scale) {
+        /* tslint:disable:no-string-literal */
         this.mixTechniqueParameters['lightingScale'] = scale;
+        /* tslint:enable:no-string-literal */
     };
 
     DeferredRendering.prototype.getDefaultSkinBufferSize = function () {
@@ -1389,6 +1403,7 @@ var DeferredRendering = (function () {
             dr.defaultShadowMappingSkinnedUpdateFn = shadowMappingSkinnedUpdateFn;
         }
 
+        var v4One = new Float32Array([1.0, 1.0, 1.0, 1.0]);
         var identityUVTransform = new Float32Array([1, 0, 0, 1, 0, 0]);
         var flareIndexBuffer, flareSemantics, flareVertexData, flareMatrix;
         var worldView;
@@ -1443,34 +1458,34 @@ var DeferredRendering = (function () {
         dr.lightProjection = md.m43Build(lightProjectionRight, lightProjectionUp, lightProjectionAt, lightProjectionPos);
 
         var deferredUpdate = function deferredUpdateFn(camera) {
-            var techniqueParameters = this.techniqueParameters;
+            var tp = this.techniqueParameters;
             var node = this.node;
             var matrix = node.world;
             worldView = m43MulAsM33(matrix, camera.viewMatrix, worldView);
-            techniqueParameters.worldViewInverseTranspose = md.m33InverseTranspose(worldView, techniqueParameters.worldViewInverseTranspose);
+            tp.worldViewInverseTranspose = md.m33InverseTranspose(worldView, tp.worldViewInverseTranspose);
             this.frameUpdated = this.frameVisible;
             var worldUpdate = node.worldUpdate;
             if (this.techniqueParametersUpdated !== worldUpdate) {
                 this.techniqueParametersUpdated = worldUpdate;
-                techniqueParameters.world = matrix;
+                tp.world = matrix;
             }
         };
 
         var deferredSkinnedUpdate = function deferredSkinnedUpdateFn(camera) {
-            var techniqueParameters = this.techniqueParameters;
+            var tp = this.techniqueParameters;
             var node = this.node;
             var matrix = node.world;
             worldView = md.m33Mul(matrix, camera.viewMatrix, worldView);
-            techniqueParameters.worldViewInverseTranspose = md.m33InverseTranspose(worldView, techniqueParameters.worldViewInverseTranspose);
+            tp.worldViewInverseTranspose = md.m33InverseTranspose(worldView, tp.worldViewInverseTranspose);
             this.frameUpdated = this.frameVisible;
             var worldUpdate = node.worldUpdate;
             if (this.techniqueParametersUpdated !== worldUpdate) {
                 this.techniqueParametersUpdated = worldUpdate;
-                techniqueParameters.world = matrix;
+                tp.world = matrix;
             }
             var skinController = this.skinController;
             if (skinController) {
-                techniqueParameters.skinBones = skinController.output;
+                tp.skinBones = skinController.output;
                 skinController.update();
             }
         };
@@ -1491,8 +1506,12 @@ var DeferredRendering = (function () {
                 drawParameters.userData.passIndex = dr.passIndex.opaque;
             }
 
+            if (!geometryInstance.sharedMaterial.techniqueParameters.materialColor && !geometryInstance.techniqueParameters.materialColor) {
+                geometryInstance.sharedMaterial.techniqueParameters.materialColor = v4One;
+            }
+
             if (!geometryInstance.sharedMaterial.techniqueParameters.uvTransform && !geometryInstance.techniqueParameters.uvTransform) {
-                geometryInstance.techniqueParameters.uvTransform = identityUVTransform;
+                geometryInstance.sharedMaterial.techniqueParameters.uvTransform = identityUVTransform;
             }
 
             drawParameters.sortKey = renderingCommonSortKeyFn(this.techniqueIndex, meta.materialIndex);
@@ -1539,16 +1558,16 @@ var DeferredRendering = (function () {
 
         var deferredBlendSkinnedUpdate = function deferredBlendSkinnedUpdateFn(/* camera */ ) {
             this.frameUpdated = this.frameVisible;
-            var techniqueParameters = this.techniqueParameters;
+            var tp = this.techniqueParameters;
             var node = this.node;
             var worldUpdate = node.worldUpdate;
             if (this.techniqueParametersUpdated !== worldUpdate) {
                 this.techniqueParametersUpdated = worldUpdate;
-                techniqueParameters.world = node.world;
+                tp.world = node.world;
             }
             var skinController = this.skinController;
             if (skinController) {
-                techniqueParameters.skinBones = skinController.output;
+                tp.skinBones = skinController.output;
                 skinController.update();
             }
         };
@@ -1559,27 +1578,27 @@ var DeferredRendering = (function () {
             var worldUpdate = node.worldUpdate;
             if (this.techniqueParametersUpdated !== worldUpdate) {
                 this.techniqueParametersUpdated = worldUpdate;
-                var techniqueParameters = this.techniqueParameters;
+                var tp = this.techniqueParameters;
                 var matrix = node.world;
-                techniqueParameters.world = matrix;
-                techniqueParameters.worldInverseTranspose = md.m33InverseTranspose(matrix, techniqueParameters.worldInverseTranspose);
+                tp.world = matrix;
+                tp.worldInverseTranspose = md.m33InverseTranspose(matrix, tp.worldInverseTranspose);
             }
         };
 
         var deferredEnvSkinnedUpdate = function deferredEnvSkinnedUpdateFn(/* camera */ ) {
             this.frameUpdated = this.frameVisible;
-            var techniqueParameters = this.techniqueParameters;
+            var tp = this.techniqueParameters;
             var node = this.node;
             var worldUpdate = node.worldUpdate;
             if (this.techniqueParametersUpdated !== worldUpdate) {
                 this.techniqueParametersUpdated = worldUpdate;
                 var matrix = node.world;
-                techniqueParameters.world = matrix;
-                techniqueParameters.worldInverseTranspose = md.m33InverseTranspose(matrix, techniqueParameters.worldInverseTranspose);
+                tp.world = matrix;
+                tp.worldInverseTranspose = md.m33InverseTranspose(matrix, tp.worldInverseTranspose);
             }
             var skinController = this.skinController;
             if (skinController) {
-                techniqueParameters.skinBones = skinController.output;
+                tp.skinBones = skinController.output;
                 skinController.update();
             }
         };
@@ -1657,12 +1676,16 @@ var DeferredRendering = (function () {
                 }
 
                 var faces;
-                if (oldIndexData[3] !== 0 && oldIndexData[4] !== 0 && oldIndexData[5] !== 0) {
-                    faces = [0, 2, 1, 3];
-                } else if (oldIndexData[3] !== 1 && oldIndexData[4] !== 1 && oldIndexData[5] !== 1) {
-                    faces = [1, 0, 2, 3];
+                if (oldIndexData.length === 4) {
+                    faces = oldIndexData;
                 } else {
-                    faces = [3, 0, 1, 2];
+                    if (oldIndexData[3] !== 0 && oldIndexData[4] !== 0 && oldIndexData[5] !== 0) {
+                        faces = [0, 2, 1, 3];
+                    } else if (oldIndexData[3] !== 1 && oldIndexData[4] !== 1 && oldIndexData[5] !== 1) {
+                        faces = [1, 0, 2, 3];
+                    } else {
+                        faces = [3, 0, 1, 2];
+                    }
                 }
                 oldIndexData = null;
 

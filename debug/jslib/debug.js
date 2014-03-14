@@ -1,4 +1,4 @@
-// Copyright (c) 2012 Turbulenz Limited
+// Copyright (c) 2012-2014 Turbulenz Limited
 var debug = {
     // Override this to change the behaviour when asserts are
     // triggered.  Default logs the message to the console and then

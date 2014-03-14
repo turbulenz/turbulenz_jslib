@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2013 Turbulenz Limited
+// Copyright (c) 2011-2014 Turbulenz Limited
 ;
 
 ;
@@ -1686,19 +1686,7 @@ var CanvasContext = (function () {
         this.matrix = new floatArrayConstructor(6);
 
         /*jshint newcap: true*/
-        this.matrix[0] = 1;
-        this.matrix[1] = 0;
-        this.matrix[2] = 0;
-        this.matrix[3] = 0;
-        this.matrix[4] = 1;
-        this.matrix[5] = 0;
-
-        this.scale = this.scaleIdentity;
-        this.translate = this.translateIdentity;
-        this.transform = this.setTransformIdentity;
-        this.setTransform = this.setTransformIdentity;
-        this.transformPoint = this.transformPointIdentity;
-        this.transformRect = this.transformRectIdentity;
+        this.resetTransform();
 
         //
         // Clipping
@@ -1798,6 +1786,23 @@ var CanvasContext = (function () {
         m[3] = b;
         m[4] = d;
         m[5] = f;
+    };
+
+    CanvasContext.prototype.resetTransform = function () {
+        var matrix = this.matrix;
+        matrix[0] = 1;
+        matrix[1] = 0;
+        matrix[2] = 0;
+        matrix[3] = 0;
+        matrix[4] = 1;
+        matrix[5] = 0;
+
+        this.scale = this.scaleIdentity;
+        this.translate = this.translateIdentity;
+        this.transform = this.setTransformIdentity;
+        this.setTransform = this.setTransformIdentity;
+        this.transformPoint = this.transformPointIdentity;
+        this.transformRect = this.transformRectIdentity;
     };
 
     CanvasContext.prototype.createLinearGradient = function (x0, y0, x1, y1) {
@@ -2265,7 +2270,7 @@ var CanvasContext = (function () {
         needToSimplifyPath[numSubPaths + 1] = true;
     };
 
-    CanvasContext.prototype._parsePath = function (path) {
+    CanvasContext.prototype.parsePath = function (path) {
         var commands = [];
 
         var end = path.length;
@@ -2736,12 +2741,16 @@ var CanvasContext = (function () {
                 this.numCachedPaths = 0;
             }
 
-            commands = this._parsePath(path);
+            commands = this.parsePath(path);
 
             this.cachedPaths[path] = commands;
             this.numCachedPaths += 1;
         }
 
+        this.compiledPath(commands);
+    };
+
+    CanvasContext.prototype.compiledPath = function (commands) {
         var end = commands.length;
         var currentCommand = -1;
         var i = 0;
@@ -3249,24 +3258,50 @@ var CanvasContext = (function () {
 
         var params;
         if (this.transformRect === CanvasContext.prototype.transformRect) {
+            var dimensions = font.calculateTextDimensions(text, scale, 0);
+
             params = {
                 rect: [x, y, maxWidth, maxWidth],
                 scale: scale,
                 spacing: 0,
-                alignment: alignment
+                alignment: alignment,
+                dimensions: dimensions
             };
 
-            var textVertices = font.generateTextVertices(text, params);
-            if (textVertices) {
-                var numValues = textVertices.length;
-                var n;
-                for (n = 0; n < numValues; n += 4) {
-                    var p = this.transformPoint(textVertices[n], textVertices[n + 1]);
-                    textVertices[n] = p[0];
-                    textVertices[n + 1] = p[1];
+            var totalNumGlyphs = dimensions.numGlyphs;
+            var glyphCounts = dimensions.glyphCounts;
+            var numPages = glyphCounts.length;
+
+            var pageIdx;
+            var numGlyphs;
+            var pageCtx = font.fm.scratchPageContext;
+
+            for (pageIdx = 0; pageIdx < numPages; pageIdx += 1) {
+                numGlyphs = glyphCounts[pageIdx];
+                if (numGlyphs) {
+                    pageCtx = font.generatePageTextVertices(text, params, pageIdx, pageCtx);
+
+                    // Transform the vertices
+                    var textVertices = pageCtx.vertices;
+                    if (textVertices) {
+                        var numValues = textVertices.length;
+                        var n;
+                        for (n = 0; n < numValues; n += 4) {
+                            var p = this.transformPoint(textVertices[n], textVertices[n + 1]);
+                            textVertices[n] = p[0];
+                            textVertices[n + 1] = p[1];
+                        }
+                    }
+
+                    font.drawTextVertices(pageCtx, pageIdx, true);
                 }
 
-                font.drawTextVertices(textVertices, true);
+                // Keep this out of the loop as a way to break when
+                // there are no glyphs to begin with.
+                totalNumGlyphs -= numGlyphs;
+                if (0 === totalNumGlyphs) {
+                    break;
+                }
             }
         } else {
             var rect = this.transformRect(x, y, maxWidth, maxWidth, this.tempRect);
@@ -3281,9 +3316,9 @@ var CanvasContext = (function () {
                 spacing: 0,
                 alignment: alignment
             };
-
-            font.drawTextRect(text, params);
         }
+
+        font.drawTextRect(text, params);
 
         // Clear stream cache because drawTextRect sets its own
         this.activeVertexBuffer = null;
@@ -4888,7 +4923,6 @@ var CanvasContext = (function () {
         var d10l = ((d10x * d10x) + (d10y * d10y));
         var n = 2;
         var sqrt = Math.sqrt;
-        var abs = Math.abs;
         var angle;
         do {
             var p2 = points[n];
@@ -4916,7 +4950,7 @@ var CanvasContext = (function () {
         var first = 0;
         var count = (bin.length >>> 1);
         var step, middle, binIndex, diff;
-        var diff, n;
+        var n;
         var a;
 
         while (0 < count) {

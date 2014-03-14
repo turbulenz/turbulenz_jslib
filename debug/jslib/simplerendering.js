@@ -83,7 +83,7 @@ var SimpleRendering = (function () {
         this.scene = scene;
     };
 
-    SimpleRendering.prototype.updateBuffers = function (/* gd, deviceWidth, deviceHeight */ ) {
+    SimpleRendering.prototype.updateBuffers = function (gd, deviceWidth, deviceHeight) {
         return true;
     };
 
@@ -189,8 +189,12 @@ var SimpleRendering = (function () {
         // TODO: any cast
         drawParameters.sortKey = renderingCommonSortKeyFn((this).techniqueIndex, sharedMaterial.meta.materialIndex);
 
+        if (!geometryInstance.sharedMaterial.techniqueParameters.materialColor && !geometryInstance.techniqueParameters.materialColor) {
+            geometryInstance.sharedMaterial.techniqueParameters.materialColor = SimpleRendering.v4One;
+        }
+
         if (!geometryInstance.sharedMaterial.techniqueParameters.uvTransform && !geometryInstance.techniqueParameters.uvTransform) {
-            geometryInstance.techniqueParameters.uvTransform = SimpleRendering.identityUVTransform;
+            geometryInstance.sharedMaterial.techniqueParameters.uvTransform = SimpleRendering.identityUVTransform;
         }
 
         // TODO: any cast
@@ -1326,6 +1330,7 @@ var SimpleRendering = (function () {
 
     SimpleRendering.numPasses = 3;
     SimpleRendering.passIndex = { opaque: 0, decal: 1, transparent: 2 };
+    SimpleRendering.v4One = new Float32Array([1.0, 1.0, 1.0, 1.0]);
     SimpleRendering.identityUVTransform = new Float32Array([1, 0, 0, 1, 0, 0]);
     return SimpleRendering;
 })();

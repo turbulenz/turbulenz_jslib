@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2012 Turbulenz Limited
+// Copyright (c) 2009-2014 Turbulenz Limited
 var Floor = (function () {
     function Floor() {
     }
@@ -70,7 +70,7 @@ var Floor = (function () {
             frustumMaxX = -maxValue;
             frustumMaxZ = -maxValue;
 
-            var frustumPoints = camera.getFrustumPoints();
+            var frustumPoints = camera.getFrustumPoints(camera.farPlane, camera.nearPlane, (this)._frustumPoints);
             intersect(frustumPoints[0], frustumPoints[4]);
             intersect(frustumPoints[1], frustumPoints[5]);
             intersect(frustumPoints[2], frustumPoints[6]);
@@ -209,3 +209,4 @@ var Floor = (function () {
 })();
 
 Floor.prototype.color = [0.1, 0.1, 1.0, 1.0], Floor.prototype.fadeToColor = [0.95, 0.95, 1.0, 1.0], Floor.prototype.numLines = 200;
+Floor.prototype._frustumPoints = [];

@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2011 Turbulenz Limited
+// Copyright (c) 2010-2014 Turbulenz Limited
 /*exported renderingCommonSortKeyFn*/
 /*exported renderingCommonCreateRendererInfoFn*/
 /*exported renderingCommonAddDrawParameterFastestFn*/

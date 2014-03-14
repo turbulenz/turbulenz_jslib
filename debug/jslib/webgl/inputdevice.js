@@ -183,7 +183,7 @@ var WebGLInputDevice = (function () {
         var magnitude;
         var normalizedMagnitude;
 
-        var gamepads = (navigator.gamepads || navigator.webkitGamepads || (navigator.webkitGetGamepads && navigator.webkitGetGamepads()));
+        var gamepads = (navigator.gamepads || navigator.webkitGamepads || (navigator.getGamepads && navigator.getGamepads()) || (navigator.webkitGetGamepads && navigator.webkitGetGamepads()));
 
         if (gamepads) {
             var deadZone = this.padAxisDeadZone;
@@ -210,6 +210,9 @@ var WebGLInputDevice = (function () {
                         var numButtons = buttons.length;
                         for (var n = 0; n < numButtons; n += 1) {
                             var value = buttons[n];
+                            if (typeof value === "object") {
+                                value = value.value;
+                            }
                             if (padButtons[n] !== value) {
                                 padButtons[n] = value;
 
@@ -508,9 +511,15 @@ var WebGLInputDevice = (function () {
         var keyCode = event.keyCode;
         keyCode = this.keyMap[keyCode];
 
-        var keyLocation = event.keyLocation || event.location;
-
         if (undefined !== keyCode && (keyCodes.ESCAPE !== keyCode)) {
+            // Handle left / right key locations
+            //   DOM_KEY_LOCATION_STANDARD = 0x00;
+            //   DOM_KEY_LOCATION_LEFT     = 0x01;
+            //   DOM_KEY_LOCATION_RIGHT    = 0x02;
+            //   DOM_KEY_LOCATION_NUMPAD   = 0x03;
+            //   DOM_KEY_LOCATION_MOBILE   = 0x04;
+            //   DOM_KEY_LOCATION_JOYSTICK = 0x05;
+            var keyLocation = (typeof event.location === "number" ? event.location : event.keyLocation);
             if (2 === keyLocation) {
                 // The Turbulenz KeyCodes are such that CTRL, SHIFT
                 // and ALT have their RIGHT versions exactly one above
@@ -535,21 +544,25 @@ var WebGLInputDevice = (function () {
         var keyCode = event.keyCode;
         keyCode = this.keyMap[keyCode];
 
-        var keyLocation = event.keyLocation || event.location;
-
         if (keyCode === keyCodes.ESCAPE) {
             this.unlockMouse();
 
-            if (document.fullscreenEnabled || document.mozFullScreen || document.webkitIsFullScreen) {
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
                 if (document.webkitCancelFullScreen) {
                     document.webkitCancelFullScreen();
                 } else if (document.cancelFullScreen) {
                     document.cancelFullScreen();
+                } else if (document['mozCancelFullScreen']) {
+                    document['mozCancelFullScreen']();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
                 } else if (document.exitFullscreen) {
                     document.exitFullscreen();
                 }
             }
         } else if (undefined !== keyCode) {
+            // Handle LEFT / RIGHT.  (See OnKeyDown)
+            var keyLocation = (typeof event.location === "number" ? event.location : event.keyLocation);
             if (2 === keyLocation) {
                 keyCode = keyCode + 1;
             }
@@ -791,7 +804,7 @@ var WebGLInputDevice = (function () {
     // Window event handlers
     WebGLInputDevice.prototype.onFullscreenChanged = function (/* event */ ) {
         if (this.isMouseLocked) {
-            if (document.fullscreenEnabled || document.mozFullScreen || document.webkitIsFullScreen) {
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
                 this.ignoreNextMouseMoves = 2;
                 this.requestBrowserLock();
             } else {
@@ -846,12 +859,13 @@ var WebGLInputDevice = (function () {
         this.addInternalEventListener(document, 'fullscreenchange', this.onFullscreenChanged);
         this.addInternalEventListener(document, 'mozfullscreenchange', this.onFullscreenChanged);
         this.addInternalEventListener(document, 'webkitfullscreenchange', this.onFullscreenChanged);
+        this.addInternalEventListener(document, 'MSFullscreenChange', this.onFullscreenChanged);
     };
 
     WebGLInputDevice.prototype.setEventHandlersUnlock = function () {
         this.removeInternalEventListener(document, 'webkitfullscreenchange', this.onFullscreenChanged);
         this.removeInternalEventListener(document, 'mozfullscreenchange', this.onFullscreenChanged);
-        this.removeInternalEventListener(document, 'fullscreenchange', this.onFullscreenChanged);
+        this.removeInternalEventListener(document, 'MSFullscreenChange', this.onFullscreenChanged);
 
         this.removeInternalEventListener(window, 'mousemove', this.onMouseMove);
 

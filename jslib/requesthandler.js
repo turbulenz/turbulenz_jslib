@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2013 Turbulenz Limited
+// Copyright (c) 2011-2014 Turbulenz Limited
 ;
 
 ;
@@ -89,7 +89,7 @@ var RequestHandler = (function () {
             var sendEventToHandlers = that.sendEventToHandlers;
             var handlers = that.handlers;
 
-            if (status === 0 || status === 408 || status === 429 || status === 480) {
+            if (status === 0 || status === 408 || status === 429 || status === 480 || status === 504) {
                 that.retryExponential(callContext, makeRequest, status);
                 return;
             }
@@ -222,10 +222,13 @@ var RequestHandler = (function () {
         rh.reconnectedObserver = Observer.create();
         rh.reconnectTest = null;
 
+        /* tslint:disable:no-empty */
         rh.onReconnected = params.onReconnected || function onReconnectedFn() {
         };
         rh.onRequestTimeout = params.onRequestTimeout || function onRequestTimeoutFn(/* callContext */ ) {
         };
+
+        /* tslint:enable:no-empty */
         var handlers = { eventOnload: [] };
         rh.handlers = handlers;
 
